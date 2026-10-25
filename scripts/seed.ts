@@ -7,7 +7,7 @@ import {
 import { setTimeout as sleep } from "node:timers/promises";
 import { contractExists, ensureAccount } from "./lib/pay.js";
 import {
-  UNIT, adapterKind, address, balance, call, callRule, defaultLimits, fail, i128, policy, read, request, role, send,
+  UNIT, adapterKind, address, balance, call, callRule, defaultLimits, fail, i128, policy, read, request, send,
   sendCosigned, signer, simulate, symbol, testnet, u32, vec, type Limits, type Permission, type PolicyExtras,
   type Quota, type Reserve, type RoleSpec,
 } from "./lib/stellar.js";
@@ -34,6 +34,10 @@ const owner = admin.publicKey();
 const riskoff = signer("LEASH_RISKOFF_SECRET");
 const riskoffRole = (plan: VaultPlan): RoleSpec => ({
   member: riskoff.publicKey(), mode: "RiskOff", calls: plan.riskoff, quota: RISKOFF_QUOTA,
+});
+/** Full registry policy of `plan`, its risk-off role included. */
+const planPolicy = (plan: VaultPlan) => policy(plan.assets, plan.calls, plan.protocols, plan.limits, {
+  ...plan.extras, roles: { [RISKOFF]: riskoffRole(plan) },
 });
 
 const record = readTestnet();
@@ -202,6 +206,9 @@ function plans({ pair, aquariusPool, defindex }: Venues): VaultPlan[] {
         blendCall(STABLE_BPS),
         { target: defindex, fn: "deposit", rule: callRule(["Any", "Any", "Vault", "Any"], STABLE_BPS, false) },
         { target: defindex, fn: "withdraw", rule: callRule(["Any", "Any", "Vault"], STABLE_BPS, false) },
+        // Lets the creator move DeFindex shares between their own accounts. The recipient is left
+        // open on purpose: shares sent anywhere else lower the NAV, which the vault refuses.
+        { target: defindex, fn: "transfer", rule: callRule(["Vault", "Any", "Any"], STABLE_BPS, false) },
       ],
       protocols: [testnet.pool, defindex],
       // Invested DeFindex deposits move through its Blend strategy into the Blend pool.
@@ -312,9 +319,7 @@ async function ensureVault(plan: VaultPlan): Promise<VaultRecord> {
   const id = vault.address;
   if (!await read<unknown>(admin, registry, "policy", [address(id)])) {
     // A fresh vault gets its risk-off role in the initial policy, in force at once.
-    const extras = { ...plan.extras, roles: { [RISKOFF]: riskoffRole(plan) } };
-    const rules = policy(plan.assets, plan.calls, plan.protocols, plan.limits, extras);
-    vault.policyTx = (await send(admin, call(registry, "register", [address(id), rules]))).txHash;
+    vault.policyTx = (await send(admin, call(registry, "register", [address(id), planPolicy(plan)]))).txHash;
     save();
     console.log(`POLICY ${plan.name} ${vault.policyTx}`);
   }
@@ -342,40 +347,47 @@ async function ensureVault(plan: VaultPlan): Promise<VaultRecord> {
 }
 
 interface StoredPolicy {
+  /** Keyed `<target>,<fn>` once converted from the contract map. */
+  calls?: Record<string, unknown>;
   roles?: Record<string, { member: string; mode: string[]; calls: Record<string, unknown>; quota: Record<string, number> }> | null;
 }
 
 const roleInForce = (stored: StoredPolicy | null) => stored?.roles?.[RISKOFF]?.member === riskoff.publicKey();
+const planInForce = (stored: StoredPolicy | null, plan: VaultPlan) => roleInForce(stored)
+  && plan.calls.every(({ target, fn }) => stored?.calls?.[`${target},${fn}`] !== undefined);
 
-/** Proposes the risk-off role on a vault registered without it: `null` once in force, else the apply ETA. */
-async function proposeRiskoff(vault: VaultRecord, plan: VaultPlan): Promise<bigint | null> {
-  if (roleInForce(await read<StoredPolicy | null>(admin, registry, "policy", [address(vault.address)]))) return null;
+/**
+ * Proposes the plan's full policy (risk-off role included) on a vault whose policy in force
+ * lacks part of it: `null` when nothing is missing, else the apply ETA.
+ */
+async function proposePlan(vault: VaultRecord, plan: VaultPlan): Promise<bigint | null> {
+  if (planInForce(await read<StoredPolicy | null>(admin, registry, "policy", [address(vault.address)]), plan)) return null;
   const pendingOf = () => read<{ policy: StoredPolicy; eta: bigint } | null>(admin, registry, "pending_policy", [address(vault.address)]);
   let pending = await pendingOf();
-  if (!pending || !roleInForce(pending.policy)) {
-    const proposed = await send(admin, call(registry, "propose_role", [address(vault.address), symbol(RISKOFF), role(riskoffRole(plan))]));
-    vault.roleTxs = { propose: proposed.txHash };
+  if (!pending || !planInForce(pending.policy, plan)) {
+    const proposed = await send(admin, call(registry, "propose_policy", [address(vault.address), planPolicy(plan)]));
+    vault.policyUpdateTxs = { propose: proposed.txHash };
     save();
     pending = await pendingOf();
-    if (!pending) throw new Error(`propose_role ${proposed.txHash} left no pending policy`);
-    console.log(`ROLE_PROPOSED ${vault.name} ${RISKOFF} eta=${pending.eta} ${proposed.txHash}`);
+    if (!pending) throw new Error(`propose_policy ${proposed.txHash} left no pending policy`);
+    console.log(`POLICY_PROPOSED ${vault.name} eta=${pending.eta} ${proposed.txHash}`);
   }
   return pending.eta;
 }
 
-/** Applies the pending role once the registry timelock has passed on-chain. */
-async function applyRiskoff(vault: VaultRecord, eta: bigint): Promise<void> {
+/** Applies the pending policy once the registry timelock has passed on-chain. */
+async function applyPending(vault: VaultRecord, eta: bigint): Promise<void> {
   const wait = Number(eta) * 1000 - Date.now();
   if (wait > 0) {
-    console.log(`ROLE_TIMELOCK ${vault.name} waiting ${Math.ceil(wait / 1000)} s`);
+    console.log(`POLICY_TIMELOCK ${vault.name} waiting ${Math.ceil(wait / 1000)} s`);
     await sleep(wait);
   }
   // Ledger close times trail the wall clock by a few seconds.
   for (let attempt = 1; ; attempt++) {
     try {
       const applied = await send(admin, call(registry, "apply_policy", [address(vault.address)]));
-      vault.roleTxs = { ...vault.roleTxs, apply: applied.txHash };
-      console.log(`ROLE_APPLIED ${vault.name} ${RISKOFF} ${applied.txHash}`);
+      vault.policyUpdateTxs = { ...vault.policyUpdateTxs, apply: applied.txHash };
+      console.log(`POLICY_APPLIED ${vault.name} ${applied.txHash}`);
       return;
     } catch (error) {
       if (attempt === 12) throw error;
@@ -414,17 +426,17 @@ async function main(): Promise<void> {
   for (const plan of fleet) vaults.set(plan, await ensureVault(plan));
   const pending: [VaultRecord, bigint][] = [];
   for (const [plan, vault] of vaults) {
-    const eta = await proposeRiskoff(vault, plan);
+    const eta = await proposePlan(vault, plan);
     if (eta === null) recordRiskoff(vault);
     else pending.push([vault, eta]);
   }
   for (const [vault, eta] of pending) {
-    await applyRiskoff(vault, eta);
+    await applyPending(vault, eta);
     recordRiskoff(vault);
   }
   const leverage = record.vaults.find(vault => vault.id === "leverage" && vault.factory === factory);
   if (leverage) await riskoffRepay(leverage);
-  for (const vault of vaults.values()) {
+  for (const [plan, vault] of vaults) {
     const [nav, vaultOwner, vaultRegistry, vaultOracle, shares, health, stored] = await Promise.all([
       read<bigint>(admin, vault.address, "nav"),
       read<string>(admin, vault.address, "owner"),
@@ -439,7 +451,7 @@ async function main(): Promise<void> {
     console.log(`CHECK ${vault.name} ${vault.address} nav=${nav} (${toAmount(nav)} USDC) owner=${vaultOwner} registry=${vaultRegistry} oracle=${vaultOracle} health_factor=${hf} creator_shares=${shares}`);
     const riskoffRule = stored?.roles?.[RISKOFF];
     console.log(`ROLE ${vault.name} ${RISKOFF} member=${riskoffRule?.member} mode=${riskoffRule?.mode.join("")} calls=${Object.keys(riskoffRule?.calls ?? {}).length} quota=${JSON.stringify(riskoffRule?.quota)}`);
-    if (nav <= 0n || vaultOwner !== owner || vaultRegistry !== registry || vaultOracle !== oracle || !roleInForce(stored)) {
+    if (nav <= 0n || vaultOwner !== owner || vaultRegistry !== registry || vaultOracle !== oracle || !planInForce(stored, plan)) {
       throw new Error(`${vault.name} does not read back as deployed`);
     }
   }

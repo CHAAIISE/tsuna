@@ -16,3 +16,5 @@ export { delimitNews, loadNewsPage } from "./runtime/news.js";
 export type { NewsPage } from "./runtime/news.js";
 export { knownVaults, resolveKeys, resolveVault } from "./runtime/targets.js";
 export type { VaultTarget } from "./runtime/targets.js";
+export { ATTACKS, ATTACK_IDS, POISONED_NEWS_FILE, runAttack } from "./attacks/scenarios.js";
+export type { Attack, AttackId, AttackOptions, AttackResult } from "./attacks/scenarios.js";

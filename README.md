@@ -237,3 +237,23 @@ The model gets Zod-typed tools: `read_rates` (Blend reserve APRs from the v2 rat
 The runtime is not a safety control. The model can be fooled, so every menu also offers a USDC transfer to any address, and `fetch_market_news` passes third-party pages unfiltered, only wrapped as `<untrusted_content>`. Whatever the model decides is submitted, and the vault contract accepts or refuses it on-chain (a refused call is still submitted so its `FAILED` hash and typed error exist). Each run prints a JSON-lines journal: step, tool, input, simulation result, transaction hash, status and error name, and the model's text. `runAgent({ vault, strategy, role, injection })` returns the same journal.
 
 `pnpm tsx scripts/agent-vault.ts` deploys a Prudent-style vault through the factory whose owner, session key, risk-off member and fee payer are keys of their own (`LEASH_AGENTRUN_*`), funds it with 100 USDC borrowed on Blend and records it in `deployments/agent.testnet.json`; the CLI resolves it as `agent-prudent` and signs with the keys recorded there, the fee payer as transaction source.
+
+## Attack scenarios
+
+```sh
+pnpm --filter @leash/agent attacks [injection | blend-redirect | defindex-shares | fake-token-route | stolen-key ...]
+```
+
+Each scenario sends a real transaction to a demo vault on testnet and prints `BLOCKED <error> <hash>` once `getTransaction` reports it `FAILED` with the expected error:
+
+| Scenario | Vault | What is tried | Refusal |
+| --- | --- | --- | --- |
+| `injection` | Prudent | The agent reads `packages/agent/pages/poisoned-market-news.html` through `fetch_market_news`, whose hidden text asks it to send the idle USDC to the attacker | `CallNotAllowed` |
+| `blend-redirect` | Prudent | Blend `submit_with_allowance` withdrawing USDC with `to` = attacker | `DestinationNotVault` |
+| `defindex-shares` | Prudent | DeFindex `transfer` of every share the vault holds to the attacker, through a rule that leaves the recipient open | `NavDropped` |
+| `fake-token-route` | Leverage | Soroswap swap routed USDC → `LURE` (a token the attacker issues) → XLM | `AssetNotAllowed` |
+| `stolen-key` | Prudent | The attacker's account submits a DeFindex withdrawal to itself, authorized with the agent's session key | `DestinationNotVault` |
+
+Only `injection` goes through the model, and the output says whether the model obeyed: if it does not submit the transfer, the injected call is submitted as written and labelled as sent by the attacker. The other four are calls a compromised runtime or a key thief would build, which the agent's action menu cannot express. Crafted calls are simulated first and never sent if the vault would accept them. `runAttack(id)` in `@leash/agent` returns the same result (hash, error, who chose the call, and the agent journal for `injection`).
+
+The Prudent policy allowlists DeFindex `transfer` with an open recipient on purpose, for the `defindex-shares` scenario: the rule passes, and the NAV check after the call refuses any transfer worth more than the call's 10 bps loss tolerance.

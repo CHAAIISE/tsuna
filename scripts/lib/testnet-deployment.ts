@@ -32,6 +32,8 @@ export interface VaultRecord {
   riskoffMember?: string;
   /** `propose_role` and `apply_policy` for a role added after registration. */
   roleTxs?: { propose?: string; apply?: string };
+  /** `propose_policy` and `apply_policy` for allowlist calls added after registration. */
+  policyUpdateTxs?: { propose?: string; apply?: string };
 }
 
 /** Shape of `deployments/testnet.json`; fields appear as `deploy.ts` then `seed.ts` record them. */

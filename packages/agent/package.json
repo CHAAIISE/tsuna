@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "build": "tsc",
-    "agent": "tsx src/cli.ts"
+    "agent": "tsx src/cli.ts",
+    "attacks": "tsx src/attacks/cli.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.102",

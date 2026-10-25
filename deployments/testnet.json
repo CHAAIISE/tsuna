@@ -69,7 +69,11 @@
         "propose": "6937211430bf02c159fd0cf5dad345f099dd6d0ba85ef2435c4920ebbcd8e534",
         "apply": "a36cd7bdf388129d6765a98cc86a00c1152e92a80e1192df685da15a84e0feb3"
       },
-      "riskoffMember": "GAXK2P6IE7STS2OERVNCO6U4Q3EMUAJELP3VEXOJYKHKKVCPJTYZHMFD"
+      "riskoffMember": "GAXK2P6IE7STS2OERVNCO6U4Q3EMUAJELP3VEXOJYKHKKVCPJTYZHMFD",
+      "policyUpdateTxs": {
+        "propose": "0366f530989e5386f0bc29680e9a8e38e95142414ff7bab7534cfd31fb84930c",
+        "apply": "f1a217f68b4594a2e037938d2b5768a08b2f9f9a4613526f2f59f6ea3225b396"
+      }
     },
     {
       "id": "leverage",
@@ -212,7 +216,7 @@
   "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
   "vaultRef": "ecc59f525220bef8a6d816e022ae562bc7e05b378a2605763b695efe47847596",
   "liquidity": {
-    "soroswapAlignTx": "481d99e350e48dd96dd7704f59921b0bd8ad0e843e72bccceec18eadbe472ad4",
+    "soroswapAlignTx": "e4bdfb9a439db4bd0ec7d482fca8eda589e2e68b694ab8087a9f9b115cedbd56",
     "soroswapAddLiquidityTx": "3142821775485fbcb20ae03c891f461e801478f6ae75d06a22bdbf1c904331ec",
     "aquariusPool": "CAM2FIEZINPFYA6T6ACWHBJVIOJSJHGMTCSPJK7HFWBRGU2PLU2BED4F",
     "aquariusPoolIndex": "b2e02fcfca6c96f8ad5cbd84e7784a777b36d9c96a2459402c4f458462aab7f0",
@@ -224,6 +228,6 @@
     "defindexCreateTx": "dbf23b9244df145a6b44cdc52a9037ce021eea927d9911393bcddbc99bb14d4d",
     "defindexSeedTx": "548588cd1fc73663f9fffffe6f1052da5d6a5bde32e5efd56b7358b864a7992b",
     "defindexInvestTx": "b534339689c68ae6a9a9107a29380cce22e66b1b7d550332203763d8a7e8ba89",
-    "aquariusAlignTx": "a7da61c383c0fd53b86e6763709e8fddfae06e2f8eeb74df226f2b1c7b61d91b"
+    "aquariusAlignTx": "d28fddfebbd21da32ffeb5b7ab81dab6b36835807fce7f7100d07df38a2969cb"
   }
 }

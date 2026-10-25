@@ -39,3 +39,10 @@ export async function addUsdcTrustline(address: string): Promise<{ hash: string 
   const { signedTxXdr } = await kit.signTransaction(xdr, { networkPassphrase: TESTNET_PASSPHRASE, address });
   return api<{ hash: string }>("/api/sponsor", { action: "fee-bump", xdr: signedTxXdr });
 }
+
+/** Signs a prepared creator operation locally; the relayer only sponsors its fee. */
+export async function signCreatorTransaction(address: string, xdr: string): Promise<{ hash: string }> {
+  const kit = await walletKit();
+  const { signedTxXdr } = await kit.signTransaction(xdr, { networkPassphrase: TESTNET_PASSPHRASE, address });
+  return api<{ hash: string }>("/api/sponsor", { action: "fee-bump", xdr: signedTxXdr });
+}

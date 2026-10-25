@@ -2,6 +2,7 @@ import { Clock, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { explorerAccount, formatHealth, formatLimitBps, formatUsdc, shortAddress } from "@/lib/stellar/format";
 import type { RoleView, VaultDetail } from "@/lib/stellar/types";
+import { ProtocolWatch } from "@/components/attack/protocol-watch";
 
 const ARG_LABEL: Record<string, string> = {
   Any: "any value",
@@ -137,6 +138,7 @@ export function LeashRules({ vault }: { vault: VaultDetail }) {
           </div>
         </section>
       )}
+      <ProtocolWatch id={vault.id} />
       <section aria-label="Roles" className="space-y-3">
         <h3 className="text-subheading font-medium">Roles</h3>
         {vault.roleViews.length === 0 && <p className="text-sm text-muted-foreground">No role can act: the session key is revoked and no other role is defined.</p>}

@@ -271,6 +271,14 @@ Only `injection` goes through the model, and the output says whether the model o
 
 The Prudent policy allowlists DeFindex `transfer` with an open recipient on purpose, for the `defindex-shares` scenario: the rule passes, and the NAV check after the call refuses any transfer worth more than the call's 10 bps loss tolerance.
 
+The web lab is at `/agents/prudent/attack`, also linked from each vault. Launch one scenario at a time: the first unplayed attack is highlighted, pending transactions disable the other launches, and each result shows the decoded refusal, an explorer receipt and whether the model or attacker chose the call. Four scenarios target Prudent; the fake-token route targets Leverage, regardless of the vault page used to enter the lab. Results are the latest run per scenario on the serving instance, not a permanent history.
+
+The **Leash rules** tab shows the selected vault's exposure caps, rolling loss budget and protocol upgrade watch (pinned versus current executable hashes). **Revoke session key** prepares an unsigned `revoke_session` transaction for the vault's creator wallet; Stellar Wallets Kit signs locally and the relayer sponsors its fee. Depositors cannot revoke the session. Revocation leaves withdrawals and independent risk-off roles available, but stops subsequent default-agent attacks until the creator calls `rotate_session`. No server admin signature is used for this control.
+
+```sh
+pnpm --dir web exec playwright test attack.spec.ts
+```
+
 ## Keeper and protocol upgrades
 
 ```sh

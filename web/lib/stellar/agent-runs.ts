@@ -7,6 +7,7 @@ import { ApiError } from "./http";
 import { appendJournal } from "./journal-store";
 import { runTimeline } from "./timeline";
 import type { AgentRunView } from "./types";
+import { reserveSource } from "./source-lock";
 
 interface RunState {
   id: string;
@@ -24,8 +25,6 @@ interface RunState {
 
 /** Latest run per vault, kept in memory for polling. */
 const runs = new Map<string, RunState>();
-/** Accounts with a run in flight: two runs sharing a key would race its sequence number. */
-const busy = new Set<string>();
 
 const view = (run: RunState): AgentRunView => ({
   id: run.id,
@@ -62,8 +61,7 @@ export function prepareRun(vault: string, signalsBaseUrl: string): { run: AgentR
   }
   const source = (keys.feePayer ?? keys.member).publicKey();
   if (runs.get(vault)?.status === "running") throw new ApiError("The agent is already running on this vault.", 409);
-  if (busy.has(source)) throw new ApiError("Another vault's agent is using the same session key right now. Try again in a minute.", 409);
-  busy.add(source);
+  const release = reserveSource(source);
 
   const signals = keys.member.publicKey() === fleet.agent ? signalOptions(signalsBaseUrl, keys.member) : undefined;
   const run: RunState = {
@@ -96,7 +94,7 @@ export function prepareRun(vault: string, signalsBaseUrl: string): { run: AgentR
       await record("failed", run.error);
     } finally {
       run.finishedAt = new Date().toISOString();
-      busy.delete(source);
+      release();
       for (const key of [`vault:${vault}`, `activity:${vault}`, "agents", "events"]) invalidate(key);
     }
   };

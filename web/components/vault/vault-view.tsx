@@ -123,7 +123,7 @@ export function VaultView({ id }: { id: string }) {
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-6">
-          <div role="tablist" aria-label="Vault sections" className="flex w-fit gap-1 rounded-full bg-secondary p-1 text-sm">
+          <div role="tablist" aria-label="Vault sections" className="flex w-fit max-w-full flex-wrap gap-1 rounded-xl bg-secondary p-1 text-sm sm:rounded-full">
             {TABS.map(entry => (
               <button
                 key={entry.id}
@@ -138,6 +138,7 @@ export function VaultView({ id }: { id: string }) {
                 {entry.label}
               </button>
             ))}
+            <Link href={`/agents/${encodeURIComponent(id)}/attack`} className="shrink-0 rounded-full border border-transparent px-4 py-1.5 text-muted-foreground hover:text-foreground">Attack lab</Link>
           </div>
 
           {tab === "overview" && (

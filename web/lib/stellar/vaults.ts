@@ -1,6 +1,7 @@
 import "server-only";
 import { LeashRefusal, presets, type CallPreset, type LeaderboardRow, type Policy, type PolicyCall, type VaultSummary } from "@leash/sdk";
 import { Address, nativeToScVal, rpc } from "@stellar/stellar-sdk";
+import { publisherAccount } from "@/lib/fleet/create";
 import { passkeyDeployment } from "@/lib/passkey/deployment";
 import { sponsoredContracts } from "@/lib/sponsor/stellar";
 import { decodeVaultEvent, type VaultEvent } from "./chain-events";
@@ -63,11 +64,17 @@ function row(summary: VaultSummary, policy: Policy | null, board: LeaderboardRow
   };
 }
 
-/** Every factory vault with its NAV, policy summary and leaderboard scores. */
+/**
+ * The demo vaults of `deployments/testnet.json` and the vaults published with Create (registered
+ * by its creator account), with NAV, policy summary and leaderboard scores. Other factory vaults
+ * (SDK, runtime and rehearsal test vaults) are left out of the list and its totals.
+ */
 export function listAgents(): Promise<AgentsResponse> {
   return cached("agents", LIST_TTL, async () => {
     const client = leash();
-    const [summaries, board] = await Promise.all([client.vaults(), client.leaderboard()]);
+    const publisher = publisherAccount();
+    const [all, board] = await Promise.all([client.vaults(), client.leaderboard()]);
+    const summaries = all.filter(summary => isFeatured(summary.address) || (publisher !== null && summary.creator === publisher));
     const policies = await Promise.all(summaries.map(summary => client.vault(summary.address).findPolicy()));
     const rows = summaries.map((summary, i) => row(summary, policies[i] ?? null, board.find(entry => entry.vault === summary.address)));
     const ranked = [...rows].sort((a, b) => (b.returnBps ?? -Infinity) - (a.returnBps ?? -Infinity));

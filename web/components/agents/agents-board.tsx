@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowRight, CircleAlert, Plus, Search } from "lucide-react";
 import { cn } from "cn";
@@ -27,8 +27,6 @@ const ASSETS: { id: AssetFilter; label: string }[] = [
   { id: "all", label: "Any asset" }, { id: "stable", label: "Stablecoin only" }, { id: "volatile", label: "Volatile assets" },
 ];
 const NAMED_STRATEGIES = ["prudent", "leverage", "liquidity"];
-/** Vaults below one USDC are test leftovers; hidden unless asked. */
-const DUST = 10_000_000n;
 
 const tvl = (row: AgentRow) => BigInt(row.nav ?? "0");
 
@@ -78,10 +76,20 @@ function AgentName({ row }: { row: AgentRow }) {
   );
 }
 
-function AgentTable({ title, rows, holdings, signedIn, sort, onSort }: {
+function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
   title: string; rows: AgentRow[]; holdings: Map<string, HoldingView>; signedIn: boolean; sort: SortKey; onSort: (key: SortKey) => void;
+  /** Shown under the title when there are no rows; without it, an empty table is not rendered. */
+  empty?: ReactNode;
 }) {
-  if (rows.length === 0) return null;
+  if (rows.length === 0) {
+    if (!empty) return null;
+    return (
+      <section aria-label={title}>
+        <h2 className="px-6 pt-6 pb-2 text-subheading font-medium">{title}</h2>
+        {empty}
+      </section>
+    );
+  }
   return (
     <section aria-label={title}>
       <h2 className="px-6 pt-6 pb-2 text-subheading font-medium">{title}</h2>
@@ -112,7 +120,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort }: {
                 className="group relative h-table-row border-b transition-colors last:border-0 hover:bg-secondary"
               >
                 <td className="py-3 pr-3 pl-6"><AgentName row={row} /></td>
-                <td className="px-3 py-3 text-muted-foreground" title={row.creator}>{shortAddress(row.creator)}</td>
+                <td className="px-3 py-3 whitespace-nowrap text-muted-foreground" title={row.creator}>{shortAddress(row.creator)}</td>
                 <td className="px-3 py-3"><ReturnValue bps={row.returnBps} /></td>
                 <td className="px-3 py-3"><DrawdownValue bps={row.worstDrawdownBps} /></td>
                 <td className="px-3 py-3">
@@ -173,14 +181,13 @@ function SkeletonRows() {
   );
 }
 
-/** The leaderboard: every factory vault, scored from its on-chain `NavSnapshot` events. */
+/** The leaderboard: the demo vaults and those published with Create, scored from their on-chain `NavSnapshot` events. */
 export function AgentsBoard() {
   const { data, error, isPending, refetch, isFetching } = useAgents();
   const { account } = usePasskeyAccount();
   const holdingsQuery = useHoldings(account?.account ?? null);
   const [strategy, setStrategy] = useState<StrategyFilter>("all");
   const [assets, setAssets] = useState<AssetFilter>("all");
-  const [showDust, setShowDust] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("return");
 
@@ -192,15 +199,16 @@ export function AgentsBoard() {
       if (strategy === "other" ? known : strategy !== "all" && row.strategyId !== strategy) return false;
       if (assets === "stable" && !row.stablecoinOnly) return false;
       if (assets === "volatile" && row.stablecoinOnly) return false;
-      if (!showDust && tvl(row) < DUST) return false;
       return !needle || [row.name, row.address, row.creator].some(value => value.toLowerCase().includes(needle));
     });
     const key = (row: AgentRow) => sort === "return" ? row.returnBps ?? -Infinity : sort === "tvl" ? Number(tvl(row)) : -(row.since ?? Infinity);
     return filtered.sort((a, b) => key(b) - key(a));
-  }, [data, strategy, assets, showDust, query, sort]);
+  }, [data, strategy, assets, query, sort]);
   const hidden = (data?.rows.length ?? 0) - rows.length;
   const featured = rows.filter(row => row.featured);
   const community = rows.filter(row => !row.featured);
+  const published = data?.rows.filter(row => !row.featured).length ?? 0;
+  const paused = data?.rows.filter(row => row.paused).length ?? 0;
   const totalRules = data?.rows.reduce((sum, row) => sum + (row.rules?.total ?? 0), 0) ?? 0;
   const oldest = data?.rows.reduce<number | null>((min, row) => row.since !== null && (min === null || row.since < min) ? row.since : min, null) ?? null;
 
@@ -210,12 +218,14 @@ export function AgentsBoard() {
         <Card className="col-span-2 p-5 sm:col-span-1">
           <p className="text-caption text-muted-foreground">Total value locked</p>
           <p className="mt-1 text-section font-medium tabular-nums" data-testid="total-in-vaults">{data ? `${formatUsdc(data.totalNav)} USDC` : <span className="inline-block h-7 w-40 animate-pulse rounded bg-secondary align-middle" />}</p>
-          <p className="mt-1 text-caption text-muted-foreground">Sum of every vault&apos;s NAV at oracle prices</p>
+          <p className="mt-1 text-caption text-muted-foreground">Sum of the listed vaults&apos; NAV at oracle prices</p>
         </Card>
         <Card className="p-5">
-          <p className="text-caption text-muted-foreground">Agents on the factory</p>
-          <p className="mt-1 text-section font-medium tabular-nums">{data ? data.rows.length : "—"}</p>
-          <p className="mt-1 text-caption text-muted-foreground">{data ? `${data.rows.filter(row => row.paused).length} paused by their drawdown breaker or creator` : "Reading the vault factory…"}</p>
+          <p className="text-caption text-muted-foreground">Agents</p>
+          <p className="mt-1 text-section font-medium tabular-nums" data-testid="agents-count">{data ? data.rows.length : "—"}</p>
+          <p className="mt-1 text-caption text-muted-foreground">
+            {data ? `${data.rows.length - published} demo, ${published} published with Create${paused > 0 ? ` · ${paused} paused` : ""}` : "Reading the vault factory…"}
+          </p>
         </Card>
         <Card className="p-5">
           <p className="text-caption text-muted-foreground">Rules enforced on-chain</p>
@@ -230,10 +240,6 @@ export function AgentsBoard() {
             <FilterPills label="Strategy" options={STRATEGIES} value={strategy} onChange={setStrategy} />
             <FilterPills label="Assets" options={ASSETS} value={assets} onChange={setAssets} />
           </div>
-          <label className="flex items-center gap-2 text-caption text-muted-foreground lg:ml-2">
-            <input type="checkbox" checked={showDust} onChange={event => setShowDust(event.target.checked)} className="size-4 accent-primary" />
-            Show vaults under 1 USDC
-          </label>
           <label className="relative lg:ml-auto">
             <span className="sr-only">Filter agents</span>
             <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -252,7 +258,7 @@ export function AgentsBoard() {
         {data && data.rows.length === 0 && (
           <div className="flex flex-col items-start gap-3 px-6 py-10">
             <p className="font-medium">No agents yet — create the first one</p>
-            <p className="text-sm text-muted-foreground">The vault factory has no vault on testnet.</p>
+            <p className="text-sm text-muted-foreground">Neither the demo vaults nor any agent published with Create is on the factory.</p>
             <Button asChild variant="outline"><Link href="/create"><Plus aria-hidden="true" />Publish an agent</Link></Button>
           </div>
         )}
@@ -262,7 +268,19 @@ export function AgentsBoard() {
         {data && rows.length > 0 && (
           <div className="pb-2">
             <AgentTable title="Featured agents" rows={featured} holdings={holdings} signedIn={account !== null} sort={sort} onSort={setSort} />
-            <AgentTable title="Community agents" rows={community} holdings={holdings} signedIn={account !== null} sort={sort} onSort={setSort} />
+            <AgentTable
+              title="Community agents"
+              rows={community}
+              holdings={holdings}
+              signedIn={account !== null}
+              sort={sort}
+              onSort={setSort}
+              empty={published === 0 ? (
+                <p className="px-6 pt-1 pb-6 text-sm text-muted-foreground" data-testid="community-empty">
+                  No community agents yet. Agents published with Create appear here, with the rules they can never break.
+                </p>
+              ) : undefined}
+            />
           </div>
         )}
         {data && (

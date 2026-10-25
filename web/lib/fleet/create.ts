@@ -12,6 +12,11 @@ import {
 const FEE_SECRET = "LEASH_CREATE_FEE_SECRET";
 const CREATOR_SECRET = "LEASH_CREATOR_SECRET";
 
+/** Account that signs every vault published with Create (they are listed as community agents), or null when not configured. */
+export function publisherAccount(): string | null {
+  return serverKey(CREATOR_SECRET)?.publicKey() ?? null;
+}
+
 export const createChoice = z.object({
   strategy: z.enum(["yield", "leverage", "liquidity"]),
   venues: z.array(z.string()).min(1),

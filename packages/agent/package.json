@@ -12,8 +12,11 @@
   "dependencies": {
     "@ai-sdk/openai": "^4.0.102",
     "@leash/sdk": "workspace:*",
+    "@stellar/mpp": "0.7.1",
     "@stellar/stellar-sdk": "^17.4.0",
+    "@x402/core": "2.28.0",
     "ai": "^7.0.153",
+    "mppx": "0.6.31",
     "zod": "^4.1.12"
   },
   "devDependencies": {

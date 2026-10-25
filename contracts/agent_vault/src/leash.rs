@@ -1,34 +1,9 @@
-use soroban_sdk::{contracttype, Address, Env, Symbol, TryFromVal, Val, Vec};
+use policy_registry::{ArgRule, CallRule, Limits, PolicyV2};
+use soroban_sdk::{
+    contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec,
+};
 
-use crate::{adapters::blend::Request, shares, AgentVault, ArgRule, CallRule, Error, Key, BPS};
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Limits {
-    pub tx_cap_bps: u32,
-    pub daily_cap_bps: u32,
-    pub calls_per_hour: u32,
-    pub min_health_factor_bps: u32,
-    pub max_drawdown_bps: u32,
-    /// Cumulative NAV loss allowed over a rolling 24 h window.
-    pub daily_loss_bps: u32,
-    /// Largest share of NAV a single protocol may hold after an execution.
-    pub max_exposure_bps: u32,
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Self {
-            tx_cap_bps: 10_000,
-            daily_cap_bps: 100_000,
-            calls_per_hour: 60,
-            min_health_factor_bps: 13_000,
-            max_drawdown_bps: 2_000,
-            daily_loss_bps: 50,
-            max_exposure_bps: 5_000,
-        }
-    }
-}
+use crate::{adapters::blend::Request, shares, Error, Key, BPS};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -57,45 +32,41 @@ pub(crate) struct Call {
     pub spenders: Vec<Address>,
 }
 
-pub(crate) fn limits(env: &Env) -> Limits {
-    env.storage().instance().get(&Key::Limits).unwrap()
+/// The vault's rules, owned by the policy registry; `None` until the creator registers them.
+pub(crate) fn policy(env: &Env) -> Option<PolicyV2> {
+    let registry: Address = env.storage().instance().get(&Key::Registry).unwrap();
+    env.invoke_contract(
+        &registry,
+        &symbol_short!("policy"),
+        vec![env, env.current_contract_address().into_val(env)],
+    )
 }
 
-pub(crate) fn validate(limits: &Limits) -> Result<(), Error> {
-    if limits.tx_cap_bps > 10_000
-        || limits.daily_cap_bps == 0
-        || limits.calls_per_hour == 0
-        || limits.min_health_factor_bps < 10_000
-        || limits.max_drawdown_bps > 10_000
-        || limits.daily_loss_bps > 10_000
-        || limits.max_exposure_bps == 0
-        || limits.max_exposure_bps > 10_000
-    {
-        return Err(Error::InvalidConfig);
-    }
-    Ok(())
+pub(crate) fn rules(env: &Env) -> Result<PolicyV2, Error> {
+    policy(env).ok_or(Error::PolicyMissing)
 }
 
+/// Assets counted in NAV and paid out on withdrawal, base asset first.
 pub(crate) fn assets(env: &Env) -> Vec<Address> {
-    env.storage().instance().get(&Key::Assets).unwrap()
+    match policy(env) {
+        Some(policy) => policy.assets,
+        None => vec![env, env.storage().instance().get(&Key::Asset).unwrap()],
+    }
 }
 
 pub(crate) fn inspect(
     env: &Env,
+    policy: &PolicyV2,
     target: &Address,
     fn_name: &Symbol,
     args: &Vec<Val>,
 ) -> Result<Call, Error> {
-    let rule: CallRule = env
-        .storage()
-        .persistent()
-        .get(&Key::Rule(target.clone(), fn_name.clone()))
-        .ok_or(Error::CallNotAllowed)?;
+    let rule = policy.rule(target, fn_name).ok_or(Error::CallNotAllowed)?;
     if rule.args.len() != args.len() {
         return Err(Error::ArgCountMismatch);
     }
     let me = env.current_contract_address();
-    let allowed = assets(env);
+    let allowed = &policy.assets;
     let mut spenders = Vec::from_array(env, [target.clone()]);
     let mut value: i128 = 0;
     let mut pull: i128 = 0;
@@ -110,7 +81,7 @@ pub(crate) fn inspect(
             ArgRule::Protocol => {
                 let address =
                     Address::try_from_val(env, &arg).map_err(|_| Error::SpenderNotProtocol)?;
-                if !AgentVault::is_protocol(env, &address) {
+                if !policy.is_protocol(&address) {
                     return Err(Error::SpenderNotProtocol);
                 }
                 spenders.push_back(address);
@@ -164,8 +135,7 @@ pub(crate) fn inspect(
     })
 }
 
-pub(crate) fn charge(env: &Env, amount: i128, nav: i128) -> Result<(), Error> {
-    let limits = limits(env);
+pub(crate) fn charge(env: &Env, limits: &Limits, amount: i128, nav: i128) -> Result<(), Error> {
     if amount > shares::mul_div(env, nav, limits.tx_cap_bps.into(), BPS, false)? {
         return Err(Error::TxCapExceeded);
     }
@@ -225,7 +195,12 @@ pub(crate) fn daily_loss(env: &Env) -> Result<i128, Error> {
 }
 
 /// Many small losses each under the per-call tolerance must not add up to a large one.
-pub(crate) fn record_loss(env: &Env, loss: i128, nav_before: i128) -> Result<(), Error> {
+pub(crate) fn record_loss(
+    env: &Env,
+    limits: &Limits,
+    loss: i128,
+    nav_before: i128,
+) -> Result<(), Error> {
     if loss <= 0 {
         return Ok(());
     }
@@ -235,13 +210,7 @@ pub(crate) fn record_loss(env: &Env, loss: i128, nav_before: i128) -> Result<(),
     for bucket in buckets.iter() {
         total = add(total, bucket.loss)?;
     }
-    let budget = shares::mul_div(
-        env,
-        nav_before,
-        limits(env).daily_loss_bps.into(),
-        BPS,
-        false,
-    )?;
+    let budget = shares::mul_div(env, nav_before, limits.daily_loss_bps.into(), BPS, false)?;
     if total > budget {
         return Err(Error::DailyLossExceeded);
     }

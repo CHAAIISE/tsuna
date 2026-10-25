@@ -4,11 +4,14 @@ use crate::{
     adapters::blend::Request,
     shares::{PRICE_SCALE, VIRTUAL_SHARES},
     testutils::{Echo, Lazy, Router, RouterClient, Skimmer},
-    AgentVault, AgentVaultClient, ArgRule, CallRule, Error, Executed, NavSnapshot,
+    AgentVault, AgentVaultClient, Error, Executed, NavSnapshot,
 };
 use oracle_router::{
     testutils::{MockChainlink, MockReflector},
     OracleRouter,
+};
+use policy_registry::{
+    ArgRule, CallRule, Limits, PolicyChange, PolicyRegistry, PolicyRegistryClient, PolicyV2,
 };
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, symbol_short,
@@ -31,6 +34,8 @@ pub(crate) struct Fixture {
     /// Oracle router quoting in the base asset; the owner is its admin.
     pub(crate) oracle: Address,
     pub(crate) reflector: Address,
+    /// Policy registry without timelock, so loosening applies on `apply_policy`.
+    pub(crate) registry: Address,
 }
 
 impl Fixture {
@@ -63,6 +68,7 @@ impl Fixture {
         } else {
             Address::generate(&env)
         };
+        let registry = env.register(PolicyRegistry, (0_u64,));
         let vault = env.register(
             AgentVault,
             (
@@ -71,6 +77,7 @@ impl Fixture {
                 asset.clone(),
                 protocol.clone(),
                 oracle.clone(),
+                registry.clone(),
             ),
         );
         let f = Self {
@@ -84,7 +91,19 @@ impl Fixture {
             agent,
             oracle,
             reflector,
+            registry,
         };
+        let initial = PolicyV2 {
+            calls: Map::new(&f.env),
+            protocols: Vec::new(&f.env),
+            guards: Map::new(&f.env),
+            assets: vec![&f.env, f.asset.clone()],
+            limits: Limits::default(),
+            exposure_caps: None,
+        };
+        f.registry_client()
+            .mock_all_auths()
+            .register(&f.vault, &initial);
         f.mint(&f.alice, 10_000 * UNIT);
         f.mint(&f.bob, 10_000 * UNIT);
         f
@@ -124,15 +143,42 @@ impl Fixture {
         approve: bool,
         max_loss_bps: u32,
     ) {
-        self.client().mock_all_auths().allow_call(
-            target,
-            &Symbol::new(&self.env, fn_name),
-            &CallRule {
-                args,
-                max_loss_bps,
-                approve,
-            },
-        );
+        let rule = CallRule {
+            args,
+            max_loss_bps,
+            approve,
+        };
+        let call = (target.clone(), Symbol::new(&self.env, fn_name));
+        self.update_policy(|policy| policy.calls.set(call, rule));
+    }
+
+    pub(crate) fn registry_client(&self) -> PolicyRegistryClient<'_> {
+        PolicyRegistryClient::new(&self.env, &self.registry)
+    }
+
+    pub(crate) fn policy(&self) -> PolicyV2 {
+        self.registry_client().policy(&self.vault).unwrap()
+    }
+
+    /// Applies `change` to the vault's policy, going through `apply_policy` when it loosens.
+    pub(crate) fn update_policy(&self, change: impl FnOnce(&mut PolicyV2)) {
+        let mut policy = self.policy();
+        change(&mut policy);
+        let registry = self.registry_client();
+        if let PolicyChange::Proposed(_) = registry
+            .mock_all_auths()
+            .propose_policy(&self.vault, &policy)
+        {
+            registry.mock_all_auths().apply_policy(&self.vault);
+        }
+    }
+
+    pub(crate) fn allow_protocol(&self, protocol: &Address) {
+        self.update_policy(|policy| policy.protocols.push_back(protocol.clone()));
+    }
+
+    pub(crate) fn set_assets(&self, assets: Vec<Address>) {
+        self.update_policy(|policy| policy.assets = assets);
     }
 
     pub(crate) fn approve_noop(&self) {
@@ -162,10 +208,10 @@ impl Fixture {
     }
 
     /// Registers an allowlisted Blend-like pool without investing.
-    fn blend_pool(&self) -> Address {
+    pub(crate) fn blend_pool(&self) -> Address {
         let pool = self.env.register(BlendMock, (self.asset.clone(),));
         self.client().mock_all_auths().set_blend(&pool, &3);
-        self.client().mock_all_auths().allow_protocol(&pool);
+        self.allow_protocol(&pool);
         self.allow(
             &pool,
             "submit_with_allowance",
@@ -181,7 +227,12 @@ impl Fixture {
         pool
     }
 
-    fn submit(&self, pool: &Address, amount: i128, request_type: u32) -> Result<(), Error> {
+    pub(crate) fn submit(
+        &self,
+        pool: &Address,
+        amount: i128,
+        request_type: u32,
+    ) -> Result<(), Error> {
         let requests = vec![
             &self.env,
             Request {
@@ -207,9 +258,7 @@ impl Fixture {
 
     /// Single-protocol tests invest the whole vault, above the default exposure cap.
     fn invest(&self, amount: i128, request_type: u32) -> Address {
-        let mut limits = self.client().limits();
-        limits.max_exposure_bps = 10_000;
-        self.client().mock_all_auths().set_limits(&limits);
+        self.update_policy(|policy| policy.limits.max_exposure_bps = 10_000);
         let pool = self.blend_pool();
         self.submit(&pool, amount, request_type).unwrap();
         pool
@@ -696,7 +745,7 @@ fn rejected_execute_rolls_back_asset_loss_and_fee_state() {
 }
 
 fn configure_approval(f: &Fixture) {
-    f.client().mock_all_auths().allow_protocol(&f.owner);
+    f.allow_protocol(&f.owner);
     f.allow(
         &f.asset,
         "approve",
@@ -737,7 +786,7 @@ pub(crate) fn outcome<T>(
 /// Allowlists the neutral `Echo` protocol, which pulls and returns a budgeted amount.
 fn configure_probe(f: &Fixture) -> Address {
     let echo = f.env.register(Echo, ());
-    f.client().mock_all_auths().allow_protocol(&echo);
+    f.allow_protocol(&echo);
     f.allow(
         &echo,
         "take",
@@ -842,9 +891,7 @@ fn tx_cap_exceeded_rejects_one_unit_above_boundary() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
     let echo = configure_probe(&f);
-    let mut limits = f.client().limits();
-    limits.tx_cap_bps = 1_000;
-    f.client().mock_all_auths().set_limits(&limits);
+    f.update_policy(|policy| policy.limits.tx_cap_bps = 1_000);
     assert_eq!(probe(&f, &echo, 10 * UNIT + 1), Err(Error::TxCapExceeded));
     assert_eq!(f.client().usage().calls, 0);
     probe(&f, &echo, 10 * UNIT).unwrap();
@@ -862,9 +909,7 @@ fn daily_cap_exceeded_accumulates_and_resets_only_at_utc_day() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
     let echo = configure_probe(&f);
-    let mut limits = f.client().limits();
-    limits.daily_cap_bps = 1_000;
-    f.client().mock_all_auths().set_limits(&limits);
+    f.update_policy(|policy| policy.limits.daily_cap_bps = 1_000);
     probe(&f, &echo, 6 * UNIT).unwrap();
     assert_eq!(probe(&f, &echo, 4 * UNIT + 1), Err(Error::DailyCapExceeded));
     probe(&f, &echo, 4 * UNIT).unwrap();
@@ -880,9 +925,7 @@ fn daily_cap_exceeded_accumulates_and_resets_only_at_utc_day() {
 fn rate_limited_counts_zero_amount_calls_and_resets_at_hour() {
     let f = Fixture::new();
     let echo = configure_probe(&f);
-    let mut limits = f.client().limits();
-    limits.calls_per_hour = 2;
-    f.client().mock_all_auths().set_limits(&limits);
+    f.update_policy(|policy| policy.limits.calls_per_hour = 2);
     probe(&f, &echo, 0).unwrap();
     probe(&f, &echo, 0).unwrap();
     f.env.ledger().with_mut(|ledger| ledger.timestamp = 3_599);
@@ -1032,7 +1075,7 @@ fn nav_dropped_rolls_back_malicious_protocol_state_allowance_and_usage() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
     let thief = f.env.register(Exfiltrator, ());
-    f.client().mock_all_auths().allow_protocol(&thief);
+    f.allow_protocol(&thief);
     // The vault itself grants the allowance; the thief uses it to pay a third party.
     f.allow(
         &thief,
@@ -1146,9 +1189,7 @@ fn amount_rules_reject_negative_malformed_and_foreign_asset_requests() {
         .env
         .register_stellar_asset_contract_v2(f.owner.clone())
         .address();
-    f.client()
-        .mock_all_auths()
-        .set_assets(&vec![&f.env, f.asset.clone(), other.clone()]);
+    f.set_assets(vec![&f.env, f.asset.clone(), other.clone()]);
     assert_eq!(
         f.client()
             .mock_all_auths()
@@ -1180,9 +1221,7 @@ fn blend_request_amounts_are_summed_without_netting() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
     let pool = f.invest(50 * UNIT, 0);
-    let mut limits = f.client().limits();
-    limits.tx_cap_bps = 1_000;
-    f.client().mock_all_auths().set_limits(&limits);
+    f.update_policy(|policy| policy.limits.tx_cap_bps = 1_000);
     assert_eq!(
         f.client()
             .mock_all_auths()
@@ -1220,61 +1259,74 @@ fn risk_configuration_requires_owner_and_rejects_unsafe_values() {
     let f = Fixture::new();
     assert!(f.client().try_set_paused(&true).is_err());
     assert!(f.client().try_revoke_session().is_err());
-    let limits = f.client().limits();
-    assert!(f.client().try_set_limits(&limits).is_err());
+    assert!(f.client().try_rotate_session(&f.bob).is_err());
+    assert!(f.client().try_set_blend(&f.bob, &3).is_err());
+    let policy = f.policy();
+    assert!(f
+        .registry_client()
+        .try_propose_policy(&f.vault, &policy)
+        .is_err());
+    let limits = policy.limits.clone();
+    let mut invalid_policies = std::vec::Vec::new();
     for invalid in [
-        crate::Limits {
+        Limits {
             tx_cap_bps: 10_001,
             ..limits.clone()
         },
-        crate::Limits {
+        Limits {
             calls_per_hour: 0,
             ..limits.clone()
         },
-        crate::Limits {
+        Limits {
             daily_cap_bps: 0,
             ..limits.clone()
         },
-        crate::Limits {
+        Limits {
             min_health_factor_bps: 9_999,
             ..limits.clone()
         },
-        crate::Limits {
+        Limits {
             max_drawdown_bps: 10_001,
             ..limits.clone()
         },
-        crate::Limits {
+        Limits {
             daily_loss_bps: 10_001,
             ..limits.clone()
         },
-        crate::Limits {
+        Limits {
             max_exposure_bps: 0,
             ..limits.clone()
         },
     ] {
+        invalid_policies.push(PolicyV2 {
+            limits: invalid,
+            ..policy.clone()
+        });
+    }
+    let mut lossy = policy.clone();
+    lossy.calls.set(
+        (f.asset.clone(), symbol_short!("approve")),
+        CallRule {
+            args: vec![&f.env],
+            max_loss_bps: 10_001,
+            approve: false,
+        },
+    );
+    invalid_policies.push(lossy);
+    // The base asset must stay first so Blend requests and NAV keep their unit.
+    invalid_policies.push(PolicyV2 {
+        assets: vec![&f.env, f.bob.clone()],
+        ..policy.clone()
+    });
+    for invalid in invalid_policies {
         assert_eq!(
-            f.client().mock_all_auths().try_set_limits(&invalid),
-            Err(Ok(Error::InvalidConfig))
+            f.registry_client()
+                .mock_all_auths()
+                .try_propose_policy(&f.vault, &invalid),
+            Err(Ok(policy_registry::Error::InvalidPolicy))
         );
     }
-    let rule = CallRule {
-        args: vec![&f.env],
-        max_loss_bps: 10_001,
-        approve: false,
-    };
-    assert_eq!(
-        f.client()
-            .mock_all_auths()
-            .try_allow_call(&f.asset, &symbol_short!("approve"), &rule),
-        Err(Ok(Error::InvalidConfig))
-    );
-    // The base asset must stay first so Blend requests and NAV keep their unit.
-    assert_eq!(
-        f.client()
-            .mock_all_auths()
-            .try_set_assets(&vec![&f.env, f.bob.clone()]),
-        Err(Ok(Error::InvalidConfig))
-    );
+    assert_eq!(f.policy(), policy);
 }
 
 #[test]
@@ -1289,11 +1341,9 @@ fn asset_not_allowed_blocks_fake_token_route_and_foreign_blend_request() {
         .env
         .register_stellar_asset_contract_v2(f.bob.clone())
         .address();
-    f.client()
-        .mock_all_auths()
-        .set_assets(&vec![&f.env, f.asset.clone(), xlm.clone()]);
+    f.set_assets(vec![&f.env, f.asset.clone(), xlm.clone()]);
     let router = f.env.register(Router, ());
-    f.client().mock_all_auths().allow_protocol(&router);
+    f.allow_protocol(&router);
     f.allow(
         &router,
         "swap_exact_tokens_for_tokens",
@@ -1350,7 +1400,7 @@ fn daily_loss_exceeded_stops_repeated_skims_under_per_call_tolerance() {
     let f = Fixture::new();
     f.deposit(&f.alice, 1_000 * UNIT);
     let skimmer = f.env.register(Skimmer, ());
-    f.client().mock_all_auths().allow_protocol(&skimmer);
+    f.allow_protocol(&skimmer);
     f.allow_with_loss(
         &skimmer,
         "skim",
@@ -1401,7 +1451,7 @@ fn allowance_not_cleared_when_protocol_leaves_approval_unspent() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
     let lazy = f.env.register(Lazy, ());
-    f.client().mock_all_auths().allow_protocol(&lazy);
+    f.allow_protocol(&lazy);
     f.allow(
         &lazy,
         "deposit",
@@ -1450,9 +1500,11 @@ fn value_left_perimeter_when_pool_misreports_positions() {
     // Funds moved to a custody contract the owner declared stay inside the perimeter.
     let custody = Address::generate(&f.env);
     BlendMockClient::new(&f.env, &pool).set_sink(&custody);
-    f.client()
-        .mock_all_auths()
-        .set_guards(&pool, &vec![&f.env, custody.clone()]);
+    f.update_policy(|policy| {
+        policy
+            .guards
+            .set(pool.clone(), vec![&f.env, custody.clone()])
+    });
     f.submit(&pool, 100 * UNIT, 0).unwrap();
     assert_eq!(f.token_balance(&custody), 100 * UNIT);
 }
@@ -1462,7 +1514,7 @@ fn exposure_cap_exceeded_on_over_concentration_in_one_protocol() {
     let f = Fixture::new();
     f.deposit(&f.alice, 1_000 * UNIT);
     let pool = f.blend_pool();
-    assert_eq!(f.client().limits().max_exposure_bps, 5_000);
+    assert_eq!(f.policy().limits.max_exposure_bps, 5_000);
     assert_eq!(
         f.submit(&pool, 500 * UNIT + 1, 2),
         Err(Error::ExposureCapExceeded)
@@ -1474,9 +1526,7 @@ fn exposure_cap_exceeded_on_over_concentration_in_one_protocol() {
     f.submit(&pool, 200 * UNIT, 4).unwrap();
     assert_eq!(f.submit(&pool, 1, 2), Err(Error::ExposureCapExceeded));
     // Above a tightened cap, shrinking the position stays possible; growing it does not.
-    let mut limits = f.client().limits();
-    limits.max_exposure_bps = 3_000;
-    f.client().mock_all_auths().set_limits(&limits);
+    f.update_policy(|policy| policy.limits.max_exposure_bps = 3_000);
     f.submit(&pool, 100 * UNIT, 3).unwrap();
     assert_eq!(f.token_balance(&pool), 200 * UNIT);
     assert_eq!(f.submit(&pool, 1, 2), Err(Error::ExposureCapExceeded));

@@ -7,6 +7,7 @@ name = "agent-vault"
 version = "0.1.0"
 dependencies = [
  "oracle-router",
+ "policy-registry",
  "soroban-sdk",
 ]
 

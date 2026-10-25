@@ -10,7 +10,9 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+policy-registry = { path = "../policy_registry", default-features = false }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 oracle-router = { path = "../oracle_router", features = ["testutils"] }
+policy-registry = { path = "../policy_registry" }

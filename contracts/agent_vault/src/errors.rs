@@ -16,7 +16,6 @@ pub enum Error {
     ZeroShares = 10,
     ArithmeticOverflow = 11,
     Insolvent = 12,
-    InvalidConfig = 13,
     TxCapExceeded = 14,
     DailyCapExceeded = 15,
     RateLimited = 16,
@@ -31,4 +30,6 @@ pub enum Error {
     SourcesDisagree = 25,
     PriceJump = 26,
     OracleUnavailable = 27,
+    /// The creator has not registered this vault's policy yet: the agent can do nothing.
+    PolicyMissing = 28,
 }

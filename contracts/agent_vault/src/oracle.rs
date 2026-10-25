@@ -5,7 +5,7 @@
 
 use soroban_sdk::{token, vec, Address, Env, IntoVal, InvokeError, Symbol, Vec};
 
-use crate::{leash, shares::mul_div, Error, Key};
+use crate::{shares::mul_div, Error, Key};
 
 // Router error codes.
 const NO_PRICE_FEED: u32 = 1;
@@ -17,11 +17,11 @@ fn router(env: &Env) -> Address {
     env.storage().instance().get(&Key::Oracle).unwrap()
 }
 
-/// Non-base allowed assets with a positive idle balance.
-pub(crate) fn held(env: &Env) -> Vec<(Address, i128)> {
+/// Non-base `assets` with a positive idle balance; the base asset comes first and is skipped.
+pub(crate) fn held(env: &Env, assets: &Vec<Address>) -> Vec<(Address, i128)> {
     let me = env.current_contract_address();
     let mut out = Vec::new(env);
-    for asset in leash::assets(env).iter().skip(1) {
+    for asset in assets.iter().skip(1) {
         let balance = token::Client::new(env, &asset).balance(&me);
         if balance > 0 {
             out.push_back((asset, balance));
@@ -87,8 +87,12 @@ fn value(
 
 /// Value of idle non-base assets at strict prices. Assets without a feed count as 0,
 /// so converting into an unpriced asset reads as a loss; any other oracle failure blocks.
-pub(crate) fn strict_value(env: &Env, base: &Address) -> Result<i128, Error> {
-    let held = held(env);
+pub(crate) fn strict_value(
+    env: &Env,
+    base: &Address,
+    assets: &Vec<Address>,
+) -> Result<i128, Error> {
+    let held = held(env, assets);
     if held.is_empty() {
         return Ok(0);
     }

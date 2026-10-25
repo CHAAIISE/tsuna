@@ -6,39 +6,52 @@ import {
 } from "@stellar/stellar-sdk";
 import { fundUsdc } from "./fund-usdc.js";
 import {
-  UNIT, address, balance, build, call, callRule, deployment, fail, horizon, i128, read, request, send,
-  server, signer, simulate, submit, symbol, testnet, u32, vec, type Positions,
+  UNIT, address, balance, build, call, callRule, defaultLimits, deployment, fail, horizon, i128, policy, read,
+  request, send, server, signer, simulate, submit, symbol, testnet, u32, u64, vec, type Positions,
 } from "./lib/stellar.js";
+
+/** Demo timelock for loosening a policy; production registries use 24 h. */
+const POLICY_TIMELOCK = 600n;
 
 async function main(): Promise<void> {
   const admin = signer("LEASH_ADMIN_SECRET");
   const agent = signer("LEASH_AGENT_SECRET");
+  const deploy = async (contract: string, constructorArgs: xdr.ScVal[]) => {
+    const wasm = await readFile(`contracts/target/wasm32v1-none/release/${contract}.wasm`);
+    const uploaded = await send(admin, Operation.uploadContractWasm({ wasm }), true, signer("E2E_USER_SECRET"));
+    assert(uploaded.returnValue, "Upload must return a WASM hash");
+    console.log(`WASM_UPLOADED ${contract} ${uploaded.txHash}`);
+    const deployed = await send(admin, Operation.createCustomContract({
+      address: new Address(admin.publicKey()),
+      wasmHash: Buffer.from(scValToNative(uploaded.returnValue) as Uint8Array),
+      constructorArgs,
+    }));
+    assert(deployed.returnValue, "Deployment must return a contract address");
+    return { id: scValToNative(deployed.returnValue) as string, txHash: deployed.txHash };
+  };
   const attacker = process.env.LEASH_ATTACKER_PUBLIC;
   if (!attacker) throw new Error("Missing LEASH_ATTACKER_PUBLIC");
   await fundUsdc();
   const oracle = await deployment("oracleRouter");
   execFileSync("stellar", ["contract", "build", "--manifest-path", "contracts/Cargo.toml"], { stdio: "inherit" });
-  const wasm = await readFile("contracts/target/wasm32v1-none/release/agent_vault.wasm");
-  const uploaded = await send(admin, Operation.uploadContractWasm({ wasm }), true, signer("E2E_USER_SECRET"));
-  console.log(`WASM_UPLOADED ${uploaded.txHash}`);
-  assert(uploaded.returnValue, "Upload must return a WASM hash");
-  const wasmHash = Buffer.from(scValToNative(uploaded.returnValue) as Uint8Array);
-  const deployed = await send(admin, Operation.createCustomContract({
-    address: new Address(admin.publicKey()), wasmHash,
-    constructorArgs: [
-      address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc),
-      address(signer("LEASH_KEEPER_SECRET").publicKey()), address(oracle),
-    ],
-  }));
-  assert(deployed.returnValue, "Deployment must return a contract address");
-  const vault = scValToNative(deployed.returnValue) as string;
+  const registry = await deploy("policy_registry", [u64(POLICY_TIMELOCK)]);
+  console.log(`REGISTRY ${registry.id} ${registry.txHash} timelock=${POLICY_TIMELOCK}s`);
+  const deployed = await deploy("agent_vault", [
+    address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc),
+    address(signer("LEASH_KEEPER_SECRET").publicKey()), address(oracle), address(registry.id),
+  ]);
+  const vault = deployed.id;
   console.log(`VAULT ${vault} ${deployed.txHash}`);
   assert.equal(await read<string>(admin, vault, "oracle"), oracle, "Vault must use the deployed oracle router");
-  await send(admin, call(vault, "allow_protocol", [address(testnet.pool)]));
+  assert.equal(await read<string>(admin, vault, "registry"), registry.id, "Vault must read its rules from the registry");
   // Zero-amount approvals stay allowlisted as a neutral call; any non-zero one would be
   // refused because the vault requires every allowance to be consumed within the call.
-  await send(admin, call(vault, "allow_call", [address(testnet.usdc), symbol("approve"), callRule(["Vault", "Protocol", "Amount", "Any"], 10, false)]));
-  await send(admin, call(vault, "allow_call", [address(testnet.pool), symbol("submit_with_allowance"), callRule(["Vault", "Vault", "Vault", "BlendRequests"], 10, true)]));
+  const rules = (limits = defaultLimits) => policy([testnet.usdc], [
+    { target: testnet.usdc, fn: "approve", rule: callRule(["Vault", "Protocol", "Amount", "Any"], 10, false) },
+    { target: testnet.pool, fn: "submit_with_allowance", rule: callRule(["Vault", "Vault", "Vault", "BlendRequests"], 10, true) },
+  ], [testnet.pool], limits);
+  const registered = await send(admin, call(registry.id, "register", [address(vault), rules()]));
+  console.log(`POLICY_REGISTERED ${registered.txHash}`);
   await send(admin, call(vault, "set_blend", [address(testnet.pool), u32(3)]));
   const amount = 100n * UNIT;
   const deposited = await send(admin, call(vault, "deposit", [address(admin.publicKey()), i128(amount)]));
@@ -74,18 +87,11 @@ async function main(): Promise<void> {
     const rejected = await server.simulateTransaction(await build(agent, operation));
     assert(rpc.Api.isSimulationError(rejected), "Attack must fail preflight");
     assert(rejected.error.includes(`Error(Contract, #${attack.code})`), `Unexpected preflight error: ${rejected.error}`);
-    // A failing preflight has no resource estimate. Reuse a valid call's budget,
-    // then include the exact allowlist key read by the rejected invocation.
+    // A failing preflight has no resource estimate. Reuse a valid call's budget: it reads
+    // the same vault instance and registry policy entry as the rejected invocation.
     const budgetArgs = [address(testnet.usdc), symbol("approve"), vec([address(vault), address(testnet.pool), i128(0n), u32(expiry)])];
     const { simulation } = await simulate(agent, call(vault, "execute", budgetArgs));
     const data = new SorobanDataBuilder(simulation.transactionData.build());
-    const ruleKey = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
-      contract: new Address(vault).toScAddress(),
-      key: vec([symbol("Rule"), address(attack.target), symbol(attack.fn)]),
-      durability: xdr.ContractDataDurability.persistent,
-    }));
-    const keys = [...data.getReadOnly(), ruleKey];
-    data.setReadOnly([...new Map(keys.map(key => [key.toXdr("base64"), key])).values()]);
     assert(operation.body.type === "invokeHostFunction");
     const func = operation.body.invokeHostFunctionOp.hostFunction;
     assert(func.type === "hostFunctionTypeInvokeContract");
@@ -117,6 +123,25 @@ async function main(): Promise<void> {
   }
   assert.deepEqual((await horizon.loadAccount(attacker)).balances, attackerBefore, "Attacker balances must remain unchanged");
   assert.deepEqual(await read<Positions>(admin, testnet.pool, "get_positions", [address(vault)]), positions, "Rejected attacks must not modify Blend positions");
+  const tightened = await send(admin, call(registry.id, "propose_policy", [
+    address(vault), rules({ ...defaultLimits, tx_cap_bps: 5_000 }),
+  ]));
+  assert(tightened.returnValue, "Policy change must return its outcome");
+  assert.deepEqual(scValToNative(tightened.returnValue), ["Tightened"], "A lower cap must apply immediately");
+  const inForce = await read<{ limits: { tx_cap_bps: number } }>(admin, registry.id, "policy", [address(vault)]);
+  assert.equal(inForce.limits.tx_cap_bps, 5_000, "The tightened cap must be in force");
+  const proposed = await send(admin, call(registry.id, "propose_policy", [address(vault), rules()]));
+  assert(proposed.returnValue, "Policy change must return its outcome");
+  const [outcome, eta] = scValToNative(proposed.returnValue) as [string, bigint];
+  assert.equal(outcome, "Proposed", "Raising the cap back must wait for the timelock");
+  const pending = await read<{ eta: bigint } | null>(admin, registry.id, "pending_policy", [address(vault)]);
+  assert.equal(pending?.eta, eta, "The pending loosening must be public");
+  assert.equal((await read<{ limits: { tx_cap_bps: number } }>(admin, registry.id, "policy", [address(vault)])).limits.tx_cap_bps,
+    5_000, "A proposed loosening must not be in force");
+  const early = await server.simulateTransaction(await build(admin, call(registry.id, "apply_policy", [address(vault)])));
+  assert(rpc.Api.isSimulationError(early) && early.error.includes("Error(Contract, #6)"),
+    "Applying before the timelock must fail with TimelockActive");
+  console.log(`POLICY_TIGHTENED ${tightened.txHash} POLICY_PROPOSED ${proposed.txHash} eta=${eta} early_apply=TimelockActive`);
   // A testnet donation exercises fee accounting; it is not protocol yield.
   await send(admin, call(testnet.usdc, "transfer", [address(admin.publicKey()), address(vault), i128(10n * UNIT)]));
   const crystallized = await send(agent, call(vault, "execute", [

@@ -40,6 +40,7 @@ export const address = (value: string) => new Address(value).toScVal();
 export const symbol = (value: string) => nativeToScVal(value, { type: "symbol" });
 export const i128 = (value: bigint) => nativeToScVal(value, { type: "i128" });
 export const u32 = (value: number) => nativeToScVal(value, { type: "u32" });
+export const u64 = (value: bigint) => nativeToScVal(value, { type: "u64" });
 export const vec = (values: xdr.ScVal[]) => xdr.ScVal.scvVec(values);
 export const call = (id: string, fn: string, args: xdr.ScVal[] = []) => new Contract(id).call(fn, ...args);
 
@@ -57,6 +58,50 @@ export function callRule(args: string[], maxLossBps: number, approve: boolean): 
     new xdr.ScMapEntry({ key: symbol("approve"), val: xdr.ScVal.scvBool(approve) }),
     new xdr.ScMapEntry({ key: symbol("args"), val: vec(args.map(rule => vec([symbol(rule)]))) }),
     new xdr.ScMapEntry({ key: symbol("max_loss_bps"), val: u32(maxLossBps) }),
+  ]);
+}
+
+/** Contract defaults of the policy `Limits`, keyed by field name. */
+export const defaultLimits = {
+  tx_cap_bps: 10_000,
+  daily_cap_bps: 100_000,
+  calls_per_hour: 60,
+  min_health_factor_bps: 13_000,
+  max_drawdown_bps: 2_000,
+  daily_loss_bps: 50,
+  max_exposure_bps: 5_000,
+};
+export type Limits = typeof defaultLimits;
+
+/** One allowlisted `(target, fn)` pair and its `CallRule`. */
+export interface Permission {
+  target: string;
+  fn: string;
+  rule: xdr.ScVal;
+}
+
+const field = (key: string, val: xdr.ScVal) => new xdr.ScMapEntry({ key: symbol(key), val });
+/** Ordinal string order, as the host sorts symbols (unlike `localeCompare`). */
+const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * `PolicyV2` struct of the policy registry, without guards or per-protocol exposure caps.
+ * Soroban maps must be sorted: struct fields by name, calls by target address then function.
+ */
+export function policy(assets: string[], calls: Permission[], protocols: string[], limits: Limits): xdr.ScVal {
+  const sorted = [...calls].sort((a, b) =>
+    Buffer.compare(new Address(a.target).toScAddress().toXDR(), new Address(b.target).toScAddress().toXDR())
+    || byKey(a.fn, b.fn));
+  return xdr.ScVal.scvMap([
+    field("assets", vec(assets.map(address))),
+    field("calls", xdr.ScVal.scvMap(sorted.map(({ target, fn, rule }) =>
+      new xdr.ScMapEntry({ key: vec([address(target), symbol(fn)]), val: rule })))),
+    field("exposure_caps", xdr.ScVal.scvVoid()),
+    field("guards", xdr.ScVal.scvMap([])),
+    field("limits", xdr.ScVal.scvMap(Object.entries(limits)
+      .sort(([a], [b]) => byKey(a, b))
+      .map(([key, value]) => field(key, u32(value))))),
+    field("protocols", vec(protocols.map(address))),
   ]);
 }
 

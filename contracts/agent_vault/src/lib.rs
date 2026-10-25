@@ -12,6 +12,8 @@ mod test;
 #[cfg(test)]
 mod test_oracle;
 #[cfg(test)]
+mod test_policy;
+#[cfg(test)]
 mod testutils;
 
 use soroban_sdk::{
@@ -19,39 +21,9 @@ use soroban_sdk::{
 };
 
 pub use errors::Error;
-pub use leash::{Limits, LossBucket, Usage};
+pub use leash::{LossBucket, Usage};
 
 const BPS: i128 = 10_000;
-const MAX_ASSETS: u32 = 8;
-const MAX_GUARDS: u32 = 4;
-
-/// Constraint on one positional argument of an allowlisted call.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ArgRule {
-    Any,
-    /// Must be this vault: blocks `from`/`to`/`spender` pointing at a third party.
-    Vault,
-    /// Must be an allowlisted protocol (e.g. the spender of an `approve`).
-    Protocol,
-    /// Non-negative base-asset amount, included in transaction and daily budgets.
-    Amount,
-    /// Sum of same-base-asset Blend request amounts; never net deposits against withdrawals.
-    BlendRequests,
-    /// `Vec<Address>` whose every element is one of the vault's allowed assets (e.g. a swap path).
-    Assets,
-}
-
-/// Allowlist entry for one `(target, fn)` pair.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CallRule {
-    pub args: Vec<ArgRule>,
-    /// NAV and perimeter loss tolerated for one call (e.g. 10 stable-to-stable, 50 volatile).
-    pub max_loss_bps: u32,
-    /// The vault grants the target an allowance for the pulled amount, expiring this ledger.
-    pub approve: bool,
-}
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -65,23 +37,19 @@ enum Key {
     Owner,
     Agent,
     Asset,
-    Assets,
     Paused,
     Blend,
-    Rule(Address, Symbol),
-    Protocol(Address),
-    Guards(Address),
     ProtocolRecipient,
     TotalShares,
     Shares(Address),
     HighWaterMark,
-    Limits,
     Usage,
     Revoked,
     Observations,
     Peak(u32, u32),
     Losses,
     Oracle,
+    Registry,
 }
 
 #[contractevent]
@@ -132,6 +100,7 @@ pub struct AgentVault;
 
 #[contractimpl]
 impl AgentVault {
+    /// `registry` holds this vault's rules; the owner registers them there before any deposit.
     pub fn __constructor(
         env: Env,
         owner: Address,
@@ -139,16 +108,16 @@ impl AgentVault {
         asset: Address,
         protocol_recipient: Address,
         oracle: Address,
+        registry: Address,
     ) {
         let s = env.storage().instance();
         s.set(&Key::Owner, &owner);
         s.set(&Key::Agent, &agent);
         s.set(&Key::Asset, &asset);
-        s.set(&Key::Assets, &Vec::from_array(&env, [asset.clone()]));
         s.set(&Key::Paused, &false);
         s.set(&Key::ProtocolRecipient, &protocol_recipient);
         s.set(&Key::Oracle, &oracle);
-        s.set(&Key::Limits, &Limits::default());
+        s.set(&Key::Registry, &registry);
         s.set(&Key::Revoked, &false);
         s.set(&Key::TotalShares, &0_i128);
         s.set(
@@ -160,66 +129,8 @@ impl AgentVault {
         );
     }
 
-    pub fn allow_protocol(env: Env, protocol: Address) {
-        Self::owner(&env).require_auth();
-        env.storage()
-            .persistent()
-            .set(&Key::Protocol(protocol), &true);
-    }
-
-    pub fn allow_call(
-        env: Env,
-        target: Address,
-        fn_name: Symbol,
-        rule: CallRule,
-    ) -> Result<(), Error> {
-        Self::owner(&env).require_auth();
-        if rule.max_loss_bps > BPS as u32 {
-            return Err(Error::InvalidConfig);
-        }
-        env.storage()
-            .persistent()
-            .set(&Key::Rule(target, fn_name), &rule);
-        Ok(())
-    }
-
-    /// Assets the agent may route through or request; the base asset stays first.
-    pub fn set_assets(env: Env, assets: Vec<Address>) -> Result<(), Error> {
-        Self::owner(&env).require_auth();
-        let base: Address = env.storage().instance().get(&Key::Asset).unwrap();
-        if assets.is_empty() || assets.get_unchecked(0) != base || assets.len() > MAX_ASSETS {
-            return Err(Error::InvalidConfig);
-        }
-        env.storage().instance().set(&Key::Assets, &assets);
-        Ok(())
-    }
-
-    pub fn assets(env: Env) -> Vec<Address> {
-        leash::assets(&env)
-    }
-
-    /// Contracts that legitimately custody funds when `protocol` is called
-    /// (pool, strategy, pair), counted in the balance-conservation check.
-    pub fn set_guards(env: Env, protocol: Address, guards: Vec<Address>) -> Result<(), Error> {
-        Self::owner(&env).require_auth();
-        if guards.len() > MAX_GUARDS {
-            return Err(Error::InvalidConfig);
-        }
-        env.storage()
-            .persistent()
-            .set(&Key::Guards(protocol), &guards);
-        Ok(())
-    }
-
-    pub fn guards(env: Env, protocol: Address) -> Vec<Address> {
-        env.storage()
-            .persistent()
-            .get(&Key::Guards(protocol))
-            .unwrap_or(Vec::new(&env))
-    }
-
     pub fn set_blend(env: Env, pool: Address, reserve_index: u32) {
-        Self::owner(&env).require_auth();
+        Self::owner(env.clone()).require_auth();
         env.storage().instance().set(
             &Key::Blend,
             &BlendPosition {
@@ -230,19 +141,8 @@ impl AgentVault {
     }
 
     pub fn set_paused(env: Env, paused: bool) {
-        Self::owner(&env).require_auth();
+        Self::owner(env.clone()).require_auth();
         env.storage().instance().set(&Key::Paused, &paused);
-    }
-
-    pub fn set_limits(env: Env, limits: Limits) -> Result<(), Error> {
-        Self::owner(&env).require_auth();
-        leash::validate(&limits)?;
-        env.storage().instance().set(&Key::Limits, &limits);
-        Ok(())
-    }
-
-    pub fn limits(env: Env) -> Limits {
-        leash::limits(&env)
     }
 
     pub fn usage(env: Env) -> Usage {
@@ -255,12 +155,12 @@ impl AgentVault {
     }
 
     pub fn revoke_session(env: Env) {
-        Self::owner(&env).require_auth();
+        Self::owner(env.clone()).require_auth();
         env.storage().instance().set(&Key::Revoked, &true);
     }
 
     pub fn rotate_session(env: Env, agent: Address) {
-        Self::owner(&env).require_auth();
+        Self::owner(env.clone()).require_auth();
         env.storage().instance().set(&Key::Agent, &agent);
         env.storage().instance().set(&Key::Revoked, &false);
     }
@@ -283,9 +183,10 @@ impl AgentVault {
     }
 
     pub fn check_drawdown(env: Env) -> Result<bool, Error> {
-        let nav = Self::nav(env.clone())?;
+        let policy = leash::rules(&env)?;
+        let nav = nav_of(&env, &policy.assets)?;
         let price = shares::price(&env, nav)?;
-        if drawdown::breached(&env, price)? {
+        if drawdown::breached(&env, price, policy.limits.max_drawdown_bps)? {
             env.storage().instance().set(&Key::Paused, &true);
         }
         snapshot(&env, nav)?;
@@ -342,7 +243,8 @@ impl AgentVault {
         let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
         let token = token::Client::new(&env, &asset);
         let me = env.current_contract_address();
-        let held = oracle::held(&env);
+        let assets = leash::assets(&env);
+        let held = oracle::held(&env, &assets);
         let priced = match oracle::exit_values(&env, &asset, &held) {
             Some(values) => {
                 let extra = sum(&values)?;
@@ -426,7 +328,7 @@ impl AgentVault {
         }
         .publish(&env);
         if priced.is_some() {
-            let held = oracle::held(&env);
+            let held = oracle::held(&env, &assets);
             if let Some(values) = oracle::exit_values(&env, &asset, &held) {
                 snapshot(&env, nav_with(&env, &asset, sum(&values)?)?)?;
             }
@@ -465,10 +367,11 @@ impl AgentVault {
         if Self::paused(env.clone()) {
             return Err(Error::Paused);
         }
-        let call = leash::inspect(&env, &target, &fn_name, &args)?;
-        let nav_before = Self::nav(env.clone())?;
-        leash::charge(&env, call.value, nav_before)?;
-        let held = perimeter::holdings(&env, &target)?;
+        let policy = leash::rules(&env)?;
+        let call = leash::inspect(&env, &policy, &target, &fn_name, &args)?;
+        let nav_before = nav_of(&env, &policy.assets)?;
+        leash::charge(&env, &policy.limits, call.value, nav_before)?;
+        let held = perimeter::holdings(&env, &policy, &target)?;
         let asset: Address = s.get(&Key::Asset).unwrap();
         let exposed = adapters::exposures(&env, &asset)?;
         if call.rule.approve && call.pull > 0 {
@@ -480,17 +383,16 @@ impl AgentVault {
             );
         }
         let out: Val = env.invoke_contract(&target, &fn_name, args);
-        let nav_after = Self::nav(env.clone())?;
+        let nav_after = nav_of(&env, &policy.assets)?;
         let max_loss = call.rule.max_loss_bps;
         if nav_after < shares::mul_div(&env, nav_before, BPS - max_loss as i128, BPS, true)? {
             return Err(Error::NavDropped);
         }
-        leash::record_loss(&env, nav_before - nav_after, nav_before)?;
-        perimeter::conserved(&env, &target, &held, nav_before, max_loss)?;
-        perimeter::allowances_cleared(&env, &call.spenders)?;
-        perimeter::exposure_within_cap(&env, &asset, &exposed, nav_after)?;
-        if Self::health_factor(env.clone())? < i128::from(leash::limits(&env).min_health_factor_bps)
-        {
+        leash::record_loss(&env, &policy.limits, nav_before - nav_after, nav_before)?;
+        perimeter::conserved(&env, &policy, &target, &held, nav_before, max_loss)?;
+        perimeter::allowances_cleared(&env, &policy, &call.spenders)?;
+        perimeter::exposure_within_cap(&env, &policy, &asset, &exposed, nav_after)?;
+        if Self::health_factor(env.clone())? < i128::from(policy.limits.min_health_factor_bps) {
             return Err(Error::HealthFactorTooLow);
         }
         Executed {
@@ -509,24 +411,31 @@ impl AgentVault {
     /// − debt + other idle assets at strict oracle prices. Fails while the oracle cannot vouch
     /// for a held asset, which blocks deposits and the agent but never withdrawals.
     pub fn nav(env: Env) -> Result<i128, Error> {
-        let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
-        nav_with(&env, &asset, oracle::strict_value(&env, &asset)?)
+        nav_of(&env, &leash::assets(&env))
     }
 
     pub fn oracle(env: Env) -> Address {
         env.storage().instance().get(&Key::Oracle).unwrap()
     }
 
-    pub fn is_protocol(env: &Env, addr: &Address) -> bool {
-        env.storage()
-            .persistent()
-            .get(&Key::Protocol(addr.clone()))
-            .unwrap_or(false)
+    pub fn registry(env: Env) -> Address {
+        env.storage().instance().get(&Key::Registry).unwrap()
     }
 
-    fn owner(env: &Env) -> Address {
+    pub fn owner(env: Env) -> Address {
         env.storage().instance().get(&Key::Owner).unwrap()
     }
+
+    /// Base asset: deposits, withdrawals and NAV are denominated in it.
+    pub fn asset(env: Env) -> Address {
+        env.storage().instance().get(&Key::Asset).unwrap()
+    }
+}
+
+/// NAV counting the idle non-base `assets` at strict oracle prices.
+fn nav_of(env: &Env, assets: &Vec<Address>) -> Result<i128, Error> {
+    let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
+    nav_with(env, &asset, oracle::strict_value(env, &asset, assets)?)
 }
 
 /// Base idle balance + adapter positions + `extra` (other assets already valued in base units).

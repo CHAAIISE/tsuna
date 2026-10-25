@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, vec, Env, Vec};
 
-use crate::{leash, shares, Error, Key, BPS};
+use crate::{shares, Error, Key, BPS};
 
 const WINDOW: u64 = 86_400;
 const HISTORY_TTL: u32 = 34_560;
@@ -130,11 +130,11 @@ pub(crate) fn peak(env: &Env) -> i128 {
     )
 }
 
-pub(crate) fn breached(env: &Env, price: i128) -> Result<bool, Error> {
+pub(crate) fn breached(env: &Env, price: i128, max_drawdown_bps: u32) -> Result<bool, Error> {
     let floor = shares::mul_div(
         env,
         peak(env),
-        BPS - i128::from(leash::limits(env).max_drawdown_bps),
+        BPS - i128::from(max_drawdown_bps),
         BPS,
         true,
     )?;

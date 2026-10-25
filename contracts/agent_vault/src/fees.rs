@@ -25,7 +25,7 @@ pub struct FeesCrystallized {
 
 pub(crate) fn crystallize(env: &Env, nav: i128) -> Result<(), Error> {
     let storage = env.storage().instance();
-    let creator = AgentVault::owner(env);
+    let creator = AgentVault::owner(env.clone());
     let recipient: Address = storage.get(&Key::ProtocolRecipient).unwrap();
     // Interest may cross the fee threshold after simulation. Both balances
     // must be in the read-write footprint even when no fee is due yet.

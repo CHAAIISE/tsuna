@@ -3,9 +3,10 @@ extern crate std;
 use crate::{
     shares::VIRTUAL_SHARES,
     test::{outcome, Fixture, UNIT},
-    ArgRule, Error, WithdrawnInKind,
+    Error, WithdrawnInKind,
 };
 use oracle_router::{testutils::MockReflectorClient, Feed, OracleRouterClient, ReflectorAsset};
+use policy_registry::ArgRule;
 use soroban_sdk::{
     contract, contractimpl, contracttype,
     testutils::{Events, Ledger},
@@ -62,14 +63,12 @@ impl Market {
             .env
             .register_stellar_asset_contract_v2(f.owner.clone())
             .address();
-        f.client()
-            .mock_all_auths()
-            .set_assets(&vec![&f.env, f.asset.clone(), xlm.clone()]);
+        f.set_assets(vec![&f.env, f.asset.clone(), xlm.clone()]);
         let swapper = f.env.register(Swapper, (f.asset.clone(), xlm.clone()));
         token::StellarAssetClient::new(&f.env, &xlm)
             .mock_all_auths()
             .mint(&swapper, &(10_000 * UNIT));
-        f.client().mock_all_auths().allow_protocol(&swapper);
+        f.allow_protocol(&swapper);
         f.allow(
             &swapper,
             "swap",

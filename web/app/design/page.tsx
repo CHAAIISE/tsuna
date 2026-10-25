@@ -22,7 +22,7 @@ export default function DesignPage() {
   return (
     <>
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-card focus:p-4">Skip to content</a>
-      <AppNavigation activePath="/agents" accountAction={<Badge>Stellar testnet</Badge>} />
+      <AppNavigation />
       <PageLayout>
         <PageHeader title="A measured kind of control." description="Leash design system. Clear actions, quiet surfaces, unmistakable boundaries." aside={<Badge variant="secondary">Component library · development only</Badge>} />
         <OnboardingSteps currentStep={1} />

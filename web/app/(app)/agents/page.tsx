@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { AgentsBoard } from "@/components/agents/agents-board";
-import { AccountAction } from "@/components/vault/account-action";
-import { AppNavigation } from "@/components/ui/app-navigation";
 import { PageHeader, PageLayout } from "@/components/ui/page-layout";
 
 export const metadata: Metadata = {
@@ -12,8 +10,6 @@ export const metadata: Metadata = {
 export default function AgentsPage() {
   return (
     <>
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-card focus:p-4">Skip to content</a>
-      <AppNavigation activePath="/agents" accountAction={<AccountAction primary />} />
       <PageLayout>
         <PageHeader title="Agents" description="Every number here comes from on-chain events." />
         <AgentsBoard />

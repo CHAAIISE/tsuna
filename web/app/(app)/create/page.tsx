@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { CreateFlow } from "@/components/create/create-flow";
-import { AppNavigation } from "@/components/ui/app-navigation";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader, PageLayout } from "@/components/ui/page-layout";
 import { serverKey } from "@/lib/fleet/config";
-import { presetCatalog } from "@/lib/fleet/create";
+import { publisherAccount, presetCatalog } from "@/lib/fleet/create";
 
 export const metadata: Metadata = {
   title: "Publish an agent — Leash",
@@ -12,11 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function CreatePage() {
-  const creator = serverKey("LEASH_CREATOR_SECRET")?.publicKey() ?? null;
+  const creator = publisherAccount();
   const ready = creator !== null && serverKey("LEASH_CREATE_FEE_SECRET") !== null;
   return (
     <>
-      <AppNavigation activePath="/create" accountAction={<Badge>Stellar testnet</Badge>} />
       <PageLayout>
         <PageHeader title="Publish an agent" description="Choose a strategy, then the rules it can never break." />
         <CreateFlow presets={presetCatalog()} creator={ready ? creator : null} />

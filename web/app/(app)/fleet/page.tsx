@@ -4,8 +4,6 @@ import Link from "next/link";
 import { cn } from "cn";
 import { FleetConsole } from "@/components/fleet/fleet-console";
 import { FleetSkeleton } from "@/components/fleet/fleet-skeleton";
-import { AppNavigation } from "@/components/ui/app-navigation";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader, PageLayout } from "@/components/ui/page-layout";
 import { isFleetId, type FleetId } from "@/lib/fleet/config";
@@ -47,7 +45,6 @@ export default async function FleetPage({ searchParams }: { searchParams: Promis
   const id: FleetId = isFleetId(requested) ? requested : "demo";
   return (
     <>
-      <AppNavigation activePath="/fleet" accountAction={<Badge>Stellar testnet</Badge>} />
       <PageLayout>
         <PageHeader
           title="Fleet"

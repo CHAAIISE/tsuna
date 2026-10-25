@@ -3,6 +3,8 @@ import { Keypair } from "@stellar/stellar-sdk";
 import { Leash, parseDeployments } from "@leash/sdk";
 import { z } from "zod";
 import testnet from "../../../deployments/testnet.json" with { type: "json" };
+import agentFile from "../../../deployments/agent.testnet.json" with { type: "json" };
+import sdkFile from "../../../deployments/sdk.testnet.json" with { type: "json" };
 import fleetFile from "../../../deployments/fleet.testnet.json" with { type: "json" };
 
 export const FLEET_IDS = ["demo", "test"] as const;
@@ -57,7 +59,8 @@ export function fleetConfig(id: FleetId): FleetConfig | null {
     if (!deployments.factory) return null;
     return {
       id, label: fleetRecord.fleets.demo.label, factory: deployments.factory, adminSecrets: fleetRecord.fleets.demo.adminSecrets,
-      vaults: new Map(deployments.vaults.map(vault => [vault.address, { name: vault.name }])),
+      // Runtime and SDK test vaults share the demo factory, so a patch reaches them too: name them as such.
+      vaults: new Map([...deployments.vaults, ...agentFile.vaults, ...sdkFile.vaults].map(vault => [vault.address, { name: vault.name }])),
     };
   }
   const test = fleetRecord.fleets.test;

@@ -23,7 +23,8 @@ test("the demo fleet shows every factory vault on the factory's executable", asy
   const rows = page.getByTestId("fleet-vault");
   await expect(rows).toHaveCount(state.vaults.length);
   for (const name of ["Prudent", "Leverage", "Liquidity"]) {
-    await expect(rows.filter({ hasText: name })).toHaveCount(1);
+    // Exact name: the runtime test vault on the same factory is called "Agent Prudent (runtime test)".
+    await expect(rows.filter({ has: page.getByText(name, { exact: true }) })).toHaveCount(1);
   }
   for (const vault of state.vaults) {
     const row = page.locator(`[data-testid="fleet-vault"][data-address="${vault.address}"]`);

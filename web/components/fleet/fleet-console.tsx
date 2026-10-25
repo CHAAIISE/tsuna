@@ -100,6 +100,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
           <div className="space-y-1 p-6">
             <p className="text-caption text-muted-foreground">Vault executable · <span className="font-mono">{state.tag}</span></p>
             <p className="text-subheading font-medium" data-testid="current-build">{current ? buildName(current) : "Not published"}</p>
+            {current?.description && <p className="text-caption text-muted-foreground">{current.description}</p>}
             {current && <HashChip hash={current.hash} />}
           </div>
           <div className="space-y-1 p-6">

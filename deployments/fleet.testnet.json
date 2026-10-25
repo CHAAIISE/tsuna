@@ -5,13 +5,18 @@
     {
       "hash": "ecc59f525220bef8a6d816e022ae562bc7e05b378a2605763b695efe47847596",
       "title": "Initial vault build",
-      "description": "agent_vault as deployed with the demo fleet."
+      "description": "agent_vault with agent roles, as first deployed with the demo fleet."
     },
     {
       "hash": "958f66d361916f5e42164787c20aa7b61c3397f28df67450faf6e1c985877157",
       "title": "Rehearsal build 2",
       "description": "Same agent_vault source with the contract meta entry leash_build=2: no behaviour change, used to rehearse an upgrade on the test fleet.",
       "uploadTx": "2ada0157f2dfc923c0e20b5d01c254544e8854b99b40290fbe931c207c1015d8"
+    },
+    {
+      "hash": "92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb",
+      "title": "Protocol upgrade watch",
+      "description": "Each vault reads on-chain the code hash of every protocol it calls. After a protocol upgrade, calls to it are refused (ProtocolChanged) and the vault can be paused until its creator acknowledges the new code."
     }
   ],
   "fleets": {

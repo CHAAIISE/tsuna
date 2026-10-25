@@ -55,3 +55,6 @@ broadcast/
 # Rust
 target/
 test_snapshots/
+
+# Agent run journal written by the web app
+.leash/

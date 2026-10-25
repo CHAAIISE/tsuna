@@ -1,5 +1,5 @@
 import "server-only";
-import { LeashRefusal, presetOf, type LeaderboardRow, type Policy, type PolicyCall, type VaultSummary } from "@leash/sdk";
+import { LeashRefusal, presets, type CallPreset, type LeaderboardRow, type Policy, type PolicyCall, type VaultSummary } from "@leash/sdk";
 import { Address, nativeToScVal, rpc } from "@stellar/stellar-sdk";
 import { passkeyDeployment } from "@/lib/passkey/deployment";
 import { sponsoredContracts } from "@/lib/sponsor/stellar";
@@ -84,8 +84,21 @@ export async function resolveVaultId(id: string): Promise<string | null> {
   return rows.find(entry => entry.address === id)?.address ?? null;
 }
 
+/**
+ * Presets whose rule this call matches. Blend actions share one rule
+ * (`submit_with_allowance` with checked requests), so several can match:
+ * "Blend supply, withdraw, borrow, repay".
+ */
+function presetLabel(call: PolicyCall): string | null {
+  const matches = Object.values(presets).filter((preset): preset is CallPreset =>
+    preset.kind === "call" && preset.fn === call.fn && preset.args.join() === call.rule.args.join());
+  const [first, ...rest] = matches;
+  if (!first) return null;
+  const protocol = first.label.split(" ")[0] ?? "";
+  return [first.label, ...rest.map(preset => preset.label.startsWith(`${protocol} `) ? preset.label.slice(protocol.length + 1) : preset.label)].join(", ");
+}
+
 function callView(call: PolicyCall, adapters: { kind: string; protocol: string }[]): CallView {
-  const preset = presetOf(call);
   return {
     target: call.target,
     targetName: contractName(call.target, adapters),
@@ -93,7 +106,7 @@ function callView(call: PolicyCall, adapters: { kind: string; protocol: string }
     args: call.rule.args,
     maxLossBps: call.rule.max_loss_bps,
     approve: call.rule.approve,
-    preset: preset?.label ?? null,
+    preset: presetLabel(call),
   };
 }
 

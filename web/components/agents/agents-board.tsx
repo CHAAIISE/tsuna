@@ -95,7 +95,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort }: {
               <th scope="col" className="py-3 pr-3 pl-6 font-normal">Agent</th>
               <th scope="col" className="px-3 py-3 font-normal">Creator</th>
               <SortHeader label="Return" sortKey="return" sort={sort} onSort={onSort} />
-              <th scope="col" className="px-3 py-3 font-normal" title="Largest fall of the share price from a previous peak">Worst drawdown</th>
+              <th scope="col" className="px-3 py-3 font-normal whitespace-nowrap" title="Largest fall of the share price from a previous peak">Worst drawdown</th>
               <SortHeader label="TVL" sortKey="tvl" sort={sort} onSort={onSort} />
               <th scope="col" className="px-3 py-3 font-normal">Your deposit</th>
               <SortHeader label="Age" sortKey="age" sort={sort} onSort={onSort} />

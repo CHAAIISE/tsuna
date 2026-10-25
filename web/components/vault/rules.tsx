@@ -78,7 +78,7 @@ function RoleCard({ role, nav }: { role: RoleView; nav: string | null }) {
         <RoleBudget role={role} nav={nav} />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
-            <caption className="pb-2 text-left text-caption text-muted-foreground">{role.calls.length} allowlisted calls — anything else is refused with CallNotAllowed</caption>
+            <caption className="pb-2 text-left text-caption text-muted-foreground">{role.calls.length} allowlisted {role.calls.length === 1 ? "call" : "calls"} — anything else is refused with CallNotAllowed</caption>
             <thead className="border-b text-caption text-muted-foreground">
               <tr><th scope="col" className="py-2 pr-3 font-normal">Contract · function</th><th scope="col" className="px-3 py-2 font-normal">Arguments</th><th scope="col" className="px-3 py-2 font-normal">Max loss</th><th scope="col" className="py-2 pl-3 font-normal">Preset</th></tr>
             </thead>

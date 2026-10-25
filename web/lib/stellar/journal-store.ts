@@ -19,13 +19,13 @@ let queue: Promise<unknown> = Promise.resolve();
 
 async function write(line: string): Promise<void> {
   try {
-    await mkdir(path.dirname(file), { recursive: true });
-    await appendFile(file, line);
+    await mkdir(/*turbopackIgnore: true*/ path.dirname(file), { recursive: true });
+    await appendFile(/*turbopackIgnore: true*/ file, line);
   } catch (error) {
     // Read-only deployments (serverless) still have a writable temp directory.
     if (configured || file.startsWith(tmpdir())) throw error;
     file = path.join(tmpdir(), "leash-agent-journal.jsonl");
-    await appendFile(file, line);
+    await appendFile(/*turbopackIgnore: true*/ file, line);
   }
 }
 
@@ -42,7 +42,7 @@ export async function readJournal(vault: string): Promise<JournalRecord[]> {
   await queue;
   let content: string;
   try {
-    content = await readFile(file, "utf8");
+    content = await readFile(/*turbopackIgnore: true*/ file, "utf8");
   } catch {
     return [];
   }

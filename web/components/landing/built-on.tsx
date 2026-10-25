@@ -14,7 +14,7 @@ function BuiltOn() {
         id="built-on-title"
         overline="Built on"
         title={<>Composed from Stellar&apos;s live protocols, <span className="text-muted-foreground">checked by one contract.</span></>}
-        lead="The status on each line says where it stands today: running on testnet, covered by contract tests, or still being wired in."
+        lead="The status on each line says where it stands today: every brick below runs on Stellar testnet."
       />
       <dl className="mt-14 border-b">
         {bricks.map(brick => (

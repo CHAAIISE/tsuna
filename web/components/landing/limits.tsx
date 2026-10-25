@@ -36,11 +36,12 @@ function Closing() {
         Try to break it. <span className="text-muted-foreground">Create a passkey, get test USDC, and watch the chain say no.</span>
       </h2>
       <div className="mt-10 flex flex-wrap gap-3">
-        <Button asChild size="lg" data-primary>
-          <Link href="/onboarding">Get started</Link>
+        {/* Same action as the hero's primary button: filled, but the hero keeps the single data-primary marker. */}
+        <Button asChild size="lg">
+          <Link href="/agents">Explore agents</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="border-input">
-          <Link href="/bridge">Deposit from Ethereum</Link>
+          <Link href="/onboarding">Get test USDC</Link>
         </Button>
       </div>
     </section>

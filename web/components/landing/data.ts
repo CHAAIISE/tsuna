@@ -160,15 +160,15 @@ export type Brick = { name: string; role: string; status: "testnet" | "tested" |
 
 export const bricks: Brick[] = [
   { name: "Blend", role: "Lending pool the vault supplies to. The leash reads positions and the health factor straight from it.", status: "testnet" },
-  { name: "DeFindex", role: "Second USDC venue for the Prudent strategy. Only deposit and withdraw are allowlisted, never share transfers.", status: "in progress" },
+  { name: "DeFindex", role: "Second USDC venue for the Prudent strategy. Only deposit and withdraw are allowlisted, never share transfers.", status: "testnet" },
   { name: "Soroswap", role: "Swaps for the Leverage strategy and for USDC arriving over CCTP. Every hop must be an allowed asset.", status: "testnet" },
-  { name: "Aquarius", role: "XLM/USDC liquidity for the Liquidity strategy, with LP shares valued back to their underlying tokens.", status: "in progress" },
+  { name: "Aquarius", role: "XLM/USDC liquidity for the Liquidity strategy, with LP shares valued back to their underlying tokens.", status: "testnet" },
   { name: "Reflector", role: "Prices every asset the vault holds, so value is measured at oracle price, never at a pool price.", status: "testnet" },
   { name: "Chainlink Data Feeds", role: "Second source for BTC. If it and Reflector disagree by more than 2 %, the agent is blocked.", status: "testnet" },
   { name: "OpenZeppelin smart accounts + spending_limit", role: "Passkey accounts for depositors, and a capped account the agent pays for its data from.", status: "testnet" },
   { name: "x402 / MPP", role: "How the agent pays per request for rate and risk signals.", status: "testnet" },
   { name: "CCTP", role: "Brings USDC from Ethereum Sepolia into a vault.", status: "testnet" },
-  { name: "CAP-85 executable references", role: "Every vault runs one shared executable, so a fix reaches the whole fleet in one transaction, after a timelock.", status: "tested" },
-  { name: "CAP-86", role: "Rule sets gain new optional fields and old entries still read, with no storage migration.", status: "tested" },
+  { name: "CAP-85 executable references", role: "Every vault runs one shared executable, so a fix reaches the whole fleet in one transaction, after a timelock.", status: "testnet" },
+  { name: "CAP-86", role: "Rule sets gain new optional fields and old entries still read, with no storage migration.", status: "testnet" },
   { name: "SAC trust()", role: "Opens a new account's USDC trustline from a contract call.", status: "testnet" },
 ];

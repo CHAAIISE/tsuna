@@ -83,7 +83,7 @@ function Hero() {
           </p>
           <div className="mt-10 flex flex-wrap gap-3">
             <Button asChild size="lg" data-primary>
-              <Link href="/onboarding">Get started</Link>
+              <Link href="/agents">Explore agents</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-input">
               <a href="#how-it-works">How the leash works</a>

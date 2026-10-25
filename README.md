@@ -285,6 +285,18 @@ One pass over every factory vault (both entry points run `runKeeper` from `@leas
 
 The output is one JSON line per vault and step, with the transaction hash. `/api/keeper` accepts GET or POST with `Authorization: Bearer $KEEPER_TOKEN` (so a scheduler can call it) and returns the same entries.
 
+### Build real snapshot history
+
+```sh
+pnpm tsx scripts/warmup.ts
+```
+
+Runs 5 management cycles for Prudent, Leverage and Liquidity on Stellar testnet, with a 30-second pause between cycles. Each cycle runs the three models sequentially, then the keeper checks the same vaults and records their NAV. Sequential execution avoids transaction-sequence collisions between the shared signing accounts.
+
+The script loads `.env.local` and uses `OPENAI_API_KEY`, `LEASH_AGENT_SECRET` and `LEASH_KEEPER_SECRET`. It checks submitted transactions with `getTransaction`, then reads the actual `NavSnapshot` events through RPC `getEvents` and requires at least 5 new keeper snapshots per vault from this run. `HISTORY` lines report both the new count and the total retained history; NAV and share prices are raw on-chain units.
+
+The model can choose not to trade, including when simulations are refused. Those decisions remain visible in the journal; the keeper still records the real portfolio value. Warmup never fabricates returns, overrides prices, changes policies or unpauses a vault. A paused vault, failed submitted transaction or incomplete keeper check stops the run.
+
 ## Crash scenario
 
 ```sh

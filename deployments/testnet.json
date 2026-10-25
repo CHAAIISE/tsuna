@@ -25,7 +25,8 @@
       "slug": "prudent",
       "strategy": "USDC yield: supplies Blend and deposits in a DeFindex vault that lends on Blend. Stablecoin calls only, 10 bps loss per call.",
       "roles": [
-        "default"
+        "default",
+        "riskoff"
       ],
       "address": "CCRLI4LNEJQGLHVPX56OEIMQ7FVLRD6MLOAKFJHHWS7VD3JUNKV6Z3NF",
       "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
@@ -63,7 +64,12 @@
       ],
       "policyTx": "52d86f0c42214e942506d029b14e510b353f7c511fd8cfde07fecc8799936a86",
       "depositTx": "134e0bae55ff6acac95cb8d01e0c3796465f2e27da58e69482bf365377a95098",
-      "deposit": "3000000000"
+      "deposit": "3000000000",
+      "roleTxs": {
+        "propose": "6937211430bf02c159fd0cf5dad345f099dd6d0ba85ef2435c4920ebbcd8e534",
+        "apply": "a36cd7bdf388129d6765a98cc86a00c1152e92a80e1192df685da15a84e0feb3"
+      },
+      "riskoffMember": "GAXK2P6IE7STS2OERVNCO6U4Q3EMUAJELP3VEXOJYKHKKVCPJTYZHMFD"
     },
     {
       "id": "leverage",
@@ -71,7 +77,8 @@
       "slug": "leverage",
       "strategy": "XLM collateral on Blend with USDC borrowed against it, swapped on Soroswap. Health factor kept above 1.3, 50 bps loss per call.",
       "roles": [
-        "default"
+        "default",
+        "riskoff"
       ],
       "address": "CBAA6ABPK3KCUUD3H6T23UKVNCU5TL6EO5WAXYCRSX3FLO6LB47IKKT3",
       "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
@@ -110,11 +117,20 @@
         {
           "action": "blend-borrow-usdc",
           "tx": "e3fc8e0ed58cabaef1c5c7e38bb0903c30ac56881b5a7dd9cd95196bbdca7185"
+        },
+        {
+          "action": "riskoff-blend-repay",
+          "tx": "b84b8c9a258c3461758eea0d4aa9ea8301f94179577c734c901b20890943e705"
         }
       ],
       "policyTx": "605ec7a489e50ae0de1c95f7a6be7f68019a4228ac97840cc6f95b14f3eaaf2c",
       "depositTx": "1e48208f96cdda4bf2b3a4d49711f35a6053835fe5cf9fe886c91be23a79a797",
-      "deposit": "2000000000"
+      "deposit": "2000000000",
+      "roleTxs": {
+        "propose": "ba9020c223b5490d132f10deb21cd9ee35050b3bd449bffd54524e2816370e1c",
+        "apply": "5985cab13733ffcd0bcd0f6783df8cc8f393d26619ca1d93e30de20ec0f3ba6e"
+      },
+      "riskoffMember": "GAXK2P6IE7STS2OERVNCO6U4Q3EMUAJELP3VEXOJYKHKKVCPJTYZHMFD"
     },
     {
       "id": "liquidity",
@@ -122,7 +138,8 @@
       "slug": "liquidity",
       "strategy": "Liquidity in the Aquarius XLM/USDC-Blend pool, XLM inventory bought on Soroswap. LP valued at oracle prices, 50 bps loss per call.",
       "roles": [
-        "default"
+        "default",
+        "riskoff"
       ],
       "address": "CDGY3M3WNZRZ23VPD473KJGE65H52ZSRRX7LOXAYHFYWJUJO4UDEUJOP",
       "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
@@ -161,7 +178,12 @@
       ],
       "policyTx": "b36f3fc5aae66ea1f7ecbb6584ce6152919be4e5eef1c5652c7cd76a8236e0e6",
       "depositTx": "94c3d117a4b8363d5a18691a17ca7457bb4de288749a2b7dd73af46ec300e522",
-      "deposit": "2000000000"
+      "deposit": "2000000000",
+      "roleTxs": {
+        "propose": "2d1ce3472f8d00c30061b31a4b102bd918f3dca820c25f83fd2e6dabc88e00e4",
+        "apply": "f55f48c7d2c3e19456198b8d113c945aba0237920b26e435aa51cd8c839289ba"
+      },
+      "riskoffMember": "GAXK2P6IE7STS2OERVNCO6U4Q3EMUAJELP3VEXOJYKHKKVCPJTYZHMFD"
     }
   ],
   "admin": "GARIZVNLXADIURNHHVZBYLNEKCKQ3ESEUBYXO2INLOTDEYP4TMXNRYBU",
@@ -190,7 +212,7 @@
   "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
   "vaultRef": "ecc59f525220bef8a6d816e022ae562bc7e05b378a2605763b695efe47847596",
   "liquidity": {
-    "soroswapAlignTx": "4771e62ece6d8663618b6136510a6b6d3ec7e540e199ea92d9cf011cdb12e57a",
+    "soroswapAlignTx": "481d99e350e48dd96dd7704f59921b0bd8ad0e843e72bccceec18eadbe472ad4",
     "soroswapAddLiquidityTx": "3142821775485fbcb20ae03c891f461e801478f6ae75d06a22bdbf1c904331ec",
     "aquariusPool": "CAM2FIEZINPFYA6T6ACWHBJVIOJSJHGMTCSPJK7HFWBRGU2PLU2BED4F",
     "aquariusPoolIndex": "b2e02fcfca6c96f8ad5cbd84e7784a777b36d9c96a2459402c4f458462aab7f0",
@@ -202,6 +224,6 @@
     "defindexCreateTx": "dbf23b9244df145a6b44cdc52a9037ce021eea927d9911393bcddbc99bb14d4d",
     "defindexSeedTx": "548588cd1fc73663f9fffffe6f1052da5d6a5bde32e5efd56b7358b864a7992b",
     "defindexInvestTx": "b534339689c68ae6a9a9107a29380cce22e66b1b7d550332203763d8a7e8ba89",
-    "aquariusAlignTx": "a880b2226c7e35b2de3f965b29a85275dafe63e1a0bff92e375e6eea71867074"
+    "aquariusAlignTx": "a7da61c383c0fd53b86e6763709e8fddfae06e2f8eeb74df226f2b1c7b61d91b"
   }
 }

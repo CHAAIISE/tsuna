@@ -58,6 +58,14 @@ pnpm tsx scripts/seed.ts
 
 `seed.ts` moves the Soroswap XLM/USDC-Blend pair to the router's XLM price with one swap and fills it to 3,000 USDC. It creates an Aquarius 0.1 % XLM/USDC-Blend pool at that price, paying the creation fee in AQUA bought on Aquarius, and fills it with 1,500 USDC. It also creates a DeFindex USDC vault on the Blend strategy, with the admin in every role, and invests its first deposit. Then it deploys the three demo vaults through the factory: Prudent (Blend + DeFindex, 300 USDC), Leverage (XLM collateral and USDC debt on Blend, Soroswap, 200 USDC) and Liquidity (Aquarius LP, Soroswap, 200 USDC). For each one it registers the policy, sets the adapters, deposits, runs the first session-key executions and reads back `nav()`, `owner()`, `registry()`, `oracle()` and `health_factor()`. Steps already recorded are skipped. USDC-Blend is borrowed on Blend and XLM comes from Friendbot when the admin runs low.
 
+Each demo vault also gets a `riskoff` [role](#agent-roles) held by `LEASH_RISKOFF_SECRET`, in `RiskOff` mode. Its quota is tighter than the default role's: 50% of NAV per call, 100% per day, 6 calls per hour and a 50 bps daily loss. Its allowlist only unwinds:
+
+- Prudent: the Blend call and DeFindex `withdraw`.
+- Leverage: the Blend call; the vault grants the pool the allowance a repayment pulls.
+- Liquidity: Aquarius `withdraw`.
+
+Blend requests cannot be filtered by type, so the role keeps the Blend call with vault destinations. The RiskOff outcome checks refuse borrowing and new collateral. A fresh vault registers with the role. A vault registered without it goes through `propose_role`, and the script waits out the 10-minute timelock before `apply_policy`. The role is recorded in `deployments/testnet.json` only once it is in force. The script then has the role repay 0.01 USDC of Leverage's Blend debt through `execute_as`, as a check that the role works.
+
 ## Vault accounting
 
 `deposit(user, amount)` and `withdraw(user, shares)` require the holder's authorization. Deposits and session-key execution stop when paused; withdrawals do not. Shares are internal, non-transferable claims, exposed by `balance(user)` and `total_shares()`.

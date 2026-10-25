@@ -28,6 +28,10 @@ export interface VaultRecord {
   depositTx?: string;
   /** Initial session-key executions, by action name. */
   executions: { action: string; tx: string }[];
+  /** Member key of the `riskoff` role, recorded once the role is in force on-chain. */
+  riskoffMember?: string;
+  /** `propose_role` and `apply_policy` for a role added after registration. */
+  roleTxs?: { propose?: string; apply?: string };
 }
 
 /** Shape of `deployments/testnet.json`; fields appear as `deploy.ts` then `seed.ts` record them. */

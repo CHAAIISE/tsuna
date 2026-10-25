@@ -88,10 +88,47 @@ const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 export const byAddress = (a: string, b: string) =>
   Buffer.compare(new Address(a).toScAddress().toXDR(), new Address(b).toScAddress().toXDR());
 
-/** Optional `PolicyV2` fields: custody contracts per protocol and per-protocol exposure caps (bps). */
+/** `Quota` of a named role: its own per-call, daily, rate and loss budgets. */
+export interface Quota {
+  tx_cap_bps: number;
+  daily_cap_bps: number;
+  calls_per_hour: number;
+  daily_loss_bps: number;
+}
+
+/** Named agent role: a member key with its own allowlist and quota, `RiskOff` calls checked on outcome. */
+export interface RoleSpec {
+  member: string;
+  mode: "Normal" | "RiskOff";
+  calls: Permission[];
+  quota: Quota;
+}
+
+/** Optional `PolicyV2` fields: custody contracts and exposure caps (bps) per protocol, named roles. */
 export interface PolicyExtras {
   guards?: Record<string, string[]>;
   exposureCaps?: Record<string, number>;
+  roles?: Record<string, RoleSpec>;
+}
+
+/** Struct of numeric fields, encoded as a map sorted by field name. */
+const numbers = (values: object) => xdr.ScVal.scvMap(Object.entries(values)
+  .sort(([a], [b]) => byKey(a, b))
+  .map(([key, value]) => field(key, u32(value as number))));
+
+/** `Map<(Address, Symbol), CallRule>`, sorted by target address then function. */
+const callMap = (calls: Permission[]) => xdr.ScVal.scvMap([...calls]
+  .sort((a, b) => byAddress(a.target, b.target) || byKey(a.fn, b.fn))
+  .map(({ target, fn, rule }) => new xdr.ScMapEntry({ key: vec([address(target), symbol(fn)]), val: rule })));
+
+/** `Role` struct of the policy registry, as `propose_role` and `PolicyV2.roles` take it. */
+export function role({ member, mode, calls, quota }: RoleSpec): xdr.ScVal {
+  return xdr.ScVal.scvMap([
+    field("calls", callMap(calls)),
+    field("member", address(member)),
+    field("mode", vec([symbol(mode)])),
+    field("quota", numbers(quota)),
+  ]);
 }
 
 /**
@@ -101,22 +138,22 @@ export interface PolicyExtras {
 export function policy(
   assets: string[], calls: Permission[], protocols: string[], limits: Limits, extras: PolicyExtras = {},
 ): xdr.ScVal {
-  const sorted = [...calls].sort((a, b) => byAddress(a.target, b.target) || byKey(a.fn, b.fn));
   const byEntry = ([a]: [string, unknown], [b]: [string, unknown]) => byAddress(a, b);
   const caps = extras.exposureCaps && Object.entries(extras.exposureCaps).sort(byEntry);
+  const roles = extras.roles && Object.entries(extras.roles).sort(([a], [b]) => byKey(a, b));
   return xdr.ScVal.scvMap([
     field("assets", vec(assets.map(address))),
-    field("calls", xdr.ScVal.scvMap(sorted.map(({ target, fn, rule }) =>
-      new xdr.ScMapEntry({ key: vec([address(target), symbol(fn)]), val: rule })))),
+    field("calls", callMap(calls)),
     field("exposure_caps", caps
       ? xdr.ScVal.scvMap(caps.map(([protocol, bps]) => new xdr.ScMapEntry({ key: address(protocol), val: u32(bps) })))
       : xdr.ScVal.scvVoid()),
     field("guards", xdr.ScVal.scvMap(Object.entries(extras.guards ?? {}).sort(byEntry).map(([protocol, custody]) =>
       new xdr.ScMapEntry({ key: address(protocol), val: vec(custody.map(address)) })))),
-    field("limits", xdr.ScVal.scvMap(Object.entries(limits)
-      .sort(([a], [b]) => byKey(a, b))
-      .map(([key, value]) => field(key, u32(value))))),
+    field("limits", numbers(limits)),
     field("protocols", vec(protocols.map(address))),
+    field("roles", roles
+      ? xdr.ScVal.scvMap(roles.map(([name, spec]) => new xdr.ScMapEntry({ key: symbol(name), val: role(spec) })))
+      : xdr.ScVal.scvVoid()),
   ]);
 }
 

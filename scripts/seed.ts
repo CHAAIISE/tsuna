@@ -4,10 +4,12 @@ import {
   alignSoroswap, aquariusReserves, deadline, deepenSoroswap, ensureAquariusPool, fund, seedAquarius, soroswap,
   soroswapReserves, toAmount, u128, aquarius,
 } from "./lib/liquidity.js";
-import { contractExists } from "./lib/pay.js";
+import { setTimeout as sleep } from "node:timers/promises";
+import { contractExists, ensureAccount } from "./lib/pay.js";
 import {
-  UNIT, adapterKind, address, balance, call, callRule, defaultLimits, fail, i128, policy, read, request, send,
-  signer, simulate, symbol, testnet, u32, vec, type Limits, type Permission, type PolicyExtras, type Reserve,
+  UNIT, adapterKind, address, balance, call, callRule, defaultLimits, fail, i128, policy, read, request, role, send,
+  sendCosigned, signer, simulate, symbol, testnet, u32, vec, type Limits, type Permission, type PolicyExtras,
+  type Quota, type Reserve, type RoleSpec,
 } from "./lib/stellar.js";
 import { readTestnet, writeTestnet, type AdapterName, type VaultRecord } from "./lib/testnet-deployment.js";
 
@@ -21,11 +23,18 @@ const DEFINDEX_SEED = 10n * UNIT;
 /** Loss tolerated per call: stablecoin moves 10 bps, anything priced against XLM 50 bps. */
 const STABLE_BPS = 10;
 const VOLATILE_BPS = 50;
+/** Risk-off role: unwinds only, within a quota tighter than the default role's. */
+const RISKOFF = "riskoff";
+const RISKOFF_QUOTA: Quota = { tx_cap_bps: 5_000, daily_cap_bps: 10_000, calls_per_hour: 6, daily_loss_bps: 50 };
 
 const admin = signer("LEASH_ADMIN_SECRET");
 const agent = signer("LEASH_AGENT_SECRET");
 const keeper = signer("LEASH_KEEPER_SECRET").publicKey();
 const owner = admin.publicKey();
+const riskoff = signer("LEASH_RISKOFF_SECRET");
+const riskoffRole = (plan: VaultPlan): RoleSpec => ({
+  member: riskoff.publicKey(), mode: "RiskOff", calls: plan.riskoff, quota: RISKOFF_QUOTA,
+});
 
 const record = readTestnet();
 const save = () => writeTestnet(record);
@@ -152,6 +161,12 @@ interface VaultPlan {
   limits: Limits;
   adapters: [AdapterName, string][];
   deposit: bigint;
+  /**
+   * Allowlist of the `riskoff` role. Blend requests cannot be filtered by type, so the role
+   * keeps the Blend call with vault destinations; RiskOff outcome checks refuse borrowing,
+   * new collateral and swaps out of the base asset.
+   */
+  riskoff: Permission[];
   /** Initial session-key actions, each run once and recorded by name. */
   steps: [string, (vault: string) => Promise<string>][];
 }
@@ -194,6 +209,10 @@ function plans({ pair, aquariusPool, defindex }: Venues): VaultPlan[] {
       limits: defaultLimits,
       adapters: [["Blend", testnet.pool], ["DeFindex", defindex]],
       deposit: 300n * UNIT,
+      riskoff: [
+        blendCall(STABLE_BPS),
+        { target: defindex, fn: "withdraw", rule: callRule(["Any", "Any", "Vault"], STABLE_BPS, false) },
+      ],
       steps: [
         ["blend-supply", vault => blendRequest(vault, testnet.usdc, 100n * UNIT, 0)],
         ["defindex-deposit", vault => execute(vault, defindex, "deposit", [vec([i128(100n * UNIT)]), vec([i128(0n)]), address(vault), bool(true)])],
@@ -210,6 +229,7 @@ function plans({ pair, aquariusPool, defindex }: Venues): VaultPlan[] {
       limits: { ...defaultLimits, min_health_factor_bps: 13_000 },
       adapters: [["Blend", testnet.pool], ["Soroswap", soroswap.router]],
       deposit: 200n * UNIT,
+      riskoff: [blendCall(VOLATILE_BPS)],
       steps: [
         ["soroswap-buy-xlm", buyXlm],
         ["blend-collateral-xlm", async vault => blendRequest(vault, testnet.xlm, await balance(admin, vault, testnet.xlm), 2)],
@@ -243,6 +263,7 @@ function plans({ pair, aquariusPool, defindex }: Venues): VaultPlan[] {
       limits: defaultLimits,
       adapters: [["Aquarius", aquariusPool], ["Soroswap", soroswap.router]],
       deposit: 200n * UNIT,
+      riskoff: [{ target: aquariusPool, fn: "withdraw", rule: callRule(["Vault", "Any", "Any"], VOLATILE_BPS, false) }],
       steps: [
         ["soroswap-buy-xlm", buyXlm],
         ["aquarius-deposit", async vault => {
@@ -290,7 +311,9 @@ async function ensureVault(plan: VaultPlan): Promise<VaultRecord> {
   }
   const id = vault.address;
   if (!await read<unknown>(admin, registry, "policy", [address(id)])) {
-    const rules = policy(plan.assets, plan.calls, plan.protocols, plan.limits, plan.extras);
+    // A fresh vault gets its risk-off role in the initial policy, in force at once.
+    const extras = { ...plan.extras, roles: { [RISKOFF]: riskoffRole(plan) } };
+    const rules = policy(plan.assets, plan.calls, plan.protocols, plan.limits, extras);
     vault.policyTx = (await send(admin, call(registry, "register", [address(id), rules]))).txHash;
     save();
     console.log(`POLICY ${plan.name} ${vault.policyTx}`);
@@ -318,22 +341,105 @@ async function ensureVault(plan: VaultPlan): Promise<VaultRecord> {
   return vault;
 }
 
+interface StoredPolicy {
+  roles?: Record<string, { member: string; mode: string[]; calls: Record<string, unknown>; quota: Record<string, number> }> | null;
+}
+
+const roleInForce = (stored: StoredPolicy | null) => stored?.roles?.[RISKOFF]?.member === riskoff.publicKey();
+
+/** Proposes the risk-off role on a vault registered without it: `null` once in force, else the apply ETA. */
+async function proposeRiskoff(vault: VaultRecord, plan: VaultPlan): Promise<bigint | null> {
+  if (roleInForce(await read<StoredPolicy | null>(admin, registry, "policy", [address(vault.address)]))) return null;
+  const pendingOf = () => read<{ policy: StoredPolicy; eta: bigint } | null>(admin, registry, "pending_policy", [address(vault.address)]);
+  let pending = await pendingOf();
+  if (!pending || !roleInForce(pending.policy)) {
+    const proposed = await send(admin, call(registry, "propose_role", [address(vault.address), symbol(RISKOFF), role(riskoffRole(plan))]));
+    vault.roleTxs = { propose: proposed.txHash };
+    save();
+    pending = await pendingOf();
+    if (!pending) throw new Error(`propose_role ${proposed.txHash} left no pending policy`);
+    console.log(`ROLE_PROPOSED ${vault.name} ${RISKOFF} eta=${pending.eta} ${proposed.txHash}`);
+  }
+  return pending.eta;
+}
+
+/** Applies the pending role once the registry timelock has passed on-chain. */
+async function applyRiskoff(vault: VaultRecord, eta: bigint): Promise<void> {
+  const wait = Number(eta) * 1000 - Date.now();
+  if (wait > 0) {
+    console.log(`ROLE_TIMELOCK ${vault.name} waiting ${Math.ceil(wait / 1000)} s`);
+    await sleep(wait);
+  }
+  // Ledger close times trail the wall clock by a few seconds.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const applied = await send(admin, call(registry, "apply_policy", [address(vault.address)]));
+      vault.roleTxs = { ...vault.roleTxs, apply: applied.txHash };
+      console.log(`ROLE_APPLIED ${vault.name} ${RISKOFF} ${applied.txHash}`);
+      return;
+    } catch (error) {
+      if (attempt === 12) throw error;
+      await sleep(10_000);
+    }
+  }
+}
+
+function recordRiskoff(vault: VaultRecord): void {
+  vault.roles = ["default", RISKOFF];
+  vault.riskoffMember = riskoff.publicKey();
+  save();
+}
+
+/**
+ * Risk-off proof on Leverage: the role repays a sliver of the Blend debt. The vault grants the
+ * pool the repaid allowance itself; the call passes because the health factor only rises.
+ */
+async function riskoffRepay(vault: VaultRecord): Promise<void> {
+  if (vault.executions.some(done => done.action === "riskoff-blend-repay")) return;
+  await ensureAccount(riskoff);
+  const operation = call(vault.address, "execute_as", [
+    address(riskoff.publicKey()), symbol(RISKOFF), address(testnet.pool), symbol("submit_with_allowance"),
+    vec([address(vault.address), address(vault.address), address(vault.address), vec([request(testnet.usdc, UNIT / 100n, 5)])]),
+  ]);
+  const repaid = await sendCosigned(admin, operation, [riskoff]);
+  vault.executions.push({ action: "riskoff-blend-repay", tx: repaid.txHash });
+  save();
+  console.log(`RISKOFF_REPAY ${vault.name} 0.01 USDC ${repaid.txHash}`);
+}
+
 async function main(): Promise<void> {
   const venues = await seedLiquidity();
-  for (const plan of plans(venues)) {
-    const vault = await ensureVault(plan);
-    const [nav, vaultOwner, vaultRegistry, vaultOracle, shares, health] = await Promise.all([
+  const fleet = plans(venues);
+  const vaults = new Map<VaultPlan, VaultRecord>();
+  for (const plan of fleet) vaults.set(plan, await ensureVault(plan));
+  const pending: [VaultRecord, bigint][] = [];
+  for (const [plan, vault] of vaults) {
+    const eta = await proposeRiskoff(vault, plan);
+    if (eta === null) recordRiskoff(vault);
+    else pending.push([vault, eta]);
+  }
+  for (const [vault, eta] of pending) {
+    await applyRiskoff(vault, eta);
+    recordRiskoff(vault);
+  }
+  const leverage = record.vaults.find(vault => vault.id === "leverage" && vault.factory === factory);
+  if (leverage) await riskoffRepay(leverage);
+  for (const vault of vaults.values()) {
+    const [nav, vaultOwner, vaultRegistry, vaultOracle, shares, health, stored] = await Promise.all([
       read<bigint>(admin, vault.address, "nav"),
       read<string>(admin, vault.address, "owner"),
       read<string>(admin, vault.address, "registry"),
       read<string>(admin, vault.address, "oracle"),
       read<bigint>(admin, vault.address, "balance", [address(owner)]),
       read<bigint>(admin, vault.address, "health_factor"),
+      read<StoredPolicy | null>(admin, registry, "policy", [address(vault.address)]),
     ]);
     // `health_factor()` is i128::MAX without debt.
     const hf = health >= 2n ** 126n ? "none" : `${Number(health) / 10_000}`;
     console.log(`CHECK ${vault.name} ${vault.address} nav=${nav} (${toAmount(nav)} USDC) owner=${vaultOwner} registry=${vaultRegistry} oracle=${vaultOracle} health_factor=${hf} creator_shares=${shares}`);
-    if (nav <= 0n || vaultOwner !== owner || vaultRegistry !== registry || vaultOracle !== oracle) {
+    const riskoffRule = stored?.roles?.[RISKOFF];
+    console.log(`ROLE ${vault.name} ${RISKOFF} member=${riskoffRule?.member} mode=${riskoffRule?.mode.join("")} calls=${Object.keys(riskoffRule?.calls ?? {}).length} quota=${JSON.stringify(riskoffRule?.quota)}`);
+    if (nav <= 0n || vaultOwner !== owner || vaultRegistry !== registry || vaultOracle !== oracle || !roleInForce(stored)) {
       throw new Error(`${vault.name} does not read back as deployed`);
     }
   }

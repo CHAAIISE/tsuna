@@ -6,7 +6,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { fundUsdc } from "./fund-usdc.js";
 import {
-  UNIT, address, balance, build, call, callRule, fail, horizon, i128, read, request, send,
+  UNIT, address, balance, build, call, callRule, deployment, fail, horizon, i128, read, request, send,
   server, signer, simulate, submit, symbol, testnet, u32, vec, type Positions,
 } from "./lib/stellar.js";
 
@@ -16,6 +16,7 @@ async function main(): Promise<void> {
   const attacker = process.env.LEASH_ATTACKER_PUBLIC;
   if (!attacker) throw new Error("Missing LEASH_ATTACKER_PUBLIC");
   await fundUsdc();
+  const oracle = await deployment("oracleRouter");
   execFileSync("stellar", ["contract", "build", "--manifest-path", "contracts/Cargo.toml"], { stdio: "inherit" });
   const wasm = await readFile("contracts/target/wasm32v1-none/release/agent_vault.wasm");
   const uploaded = await send(admin, Operation.uploadContractWasm({ wasm }), true, signer("E2E_USER_SECRET"));
@@ -26,12 +27,13 @@ async function main(): Promise<void> {
     address: new Address(admin.publicKey()), wasmHash,
     constructorArgs: [
       address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc),
-      address(signer("LEASH_KEEPER_SECRET").publicKey()),
+      address(signer("LEASH_KEEPER_SECRET").publicKey()), address(oracle),
     ],
   }));
   assert(deployed.returnValue, "Deployment must return a contract address");
   const vault = scValToNative(deployed.returnValue) as string;
   console.log(`VAULT ${vault} ${deployed.txHash}`);
+  assert.equal(await read<string>(admin, vault, "oracle"), oracle, "Vault must use the deployed oracle router");
   await send(admin, call(vault, "allow_protocol", [address(testnet.pool)]));
   // Zero-amount approvals stay allowlisted as a neutral call; any non-zero one would be
   // refused because the vault requires every allowance to be consumed within the call.

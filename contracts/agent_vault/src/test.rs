@@ -6,28 +6,44 @@ use crate::{
     testutils::{Echo, Lazy, Router, RouterClient, Skimmer},
     AgentVault, AgentVaultClient, ArgRule, CallRule, Error, Executed, NavSnapshot,
 };
+use oracle_router::{
+    testutils::{MockChainlink, MockReflector},
+    OracleRouter,
+};
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, symbol_short,
     testutils::{Address as _, Events, Ledger},
     token, vec, Address, Env, IntoVal, Map, Symbol, Val, Vec,
 };
 
-const UNIT: i128 = 10_000_000;
+pub(crate) const UNIT: i128 = 10_000_000;
 const RATE: i128 = 1_000_000_000_000;
 
-struct Fixture {
-    env: Env,
-    vault: Address,
-    asset: Address,
-    owner: Address,
-    protocol: Address,
-    alice: Address,
-    bob: Address,
-    agent: Address,
+pub(crate) struct Fixture {
+    pub(crate) env: Env,
+    pub(crate) vault: Address,
+    pub(crate) asset: Address,
+    pub(crate) owner: Address,
+    pub(crate) protocol: Address,
+    pub(crate) alice: Address,
+    pub(crate) bob: Address,
+    pub(crate) agent: Address,
+    /// Oracle router quoting in the base asset; the owner is its admin.
+    pub(crate) oracle: Address,
+    pub(crate) reflector: Address,
 }
 
 impl Fixture {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
+        Self::build(true)
+    }
+
+    /// The vault points at an address where no oracle contract exists.
+    pub(crate) fn without_oracle() -> Self {
+        Self::build(false)
+    }
+
+    fn build(oracle_deployed: bool) -> Self {
         let env = Env::default();
         let owner = Address::generate(&env);
         let agent = Address::generate(&env);
@@ -37,6 +53,16 @@ impl Fixture {
         let asset = env
             .register_stellar_asset_contract_v2(owner.clone())
             .address();
+        let reflector = env.register(MockReflector, ());
+        let oracle = if oracle_deployed {
+            let chainlink = env.register(MockChainlink, ());
+            env.register(
+                OracleRouter,
+                (owner.clone(), asset.clone(), reflector.clone(), chainlink),
+            )
+        } else {
+            Address::generate(&env)
+        };
         let vault = env.register(
             AgentVault,
             (
@@ -44,6 +70,7 @@ impl Fixture {
                 agent.clone(),
                 asset.clone(),
                 protocol.clone(),
+                oracle.clone(),
             ),
         );
         let f = Self {
@@ -55,35 +82,37 @@ impl Fixture {
             alice,
             bob,
             agent,
+            oracle,
+            reflector,
         };
         f.mint(&f.alice, 10_000 * UNIT);
         f.mint(&f.bob, 10_000 * UNIT);
         f
     }
 
-    fn client(&self) -> AgentVaultClient<'_> {
+    pub(crate) fn client(&self) -> AgentVaultClient<'_> {
         AgentVaultClient::new(&self.env, &self.vault)
     }
 
-    fn mint(&self, to: &Address, amount: i128) {
+    pub(crate) fn mint(&self, to: &Address, amount: i128) {
         token::StellarAssetClient::new(&self.env, &self.asset)
             .mock_all_auths()
             .mint(to, &amount);
     }
 
-    fn deposit(&self, user: &Address, amount: i128) -> i128 {
+    pub(crate) fn deposit(&self, user: &Address, amount: i128) -> i128 {
         self.client().mock_all_auths().deposit(user, &amount)
     }
 
-    fn withdraw(&self, user: &Address, shares: i128) -> i128 {
+    pub(crate) fn withdraw(&self, user: &Address, shares: i128) -> i128 {
         self.client().mock_all_auths().withdraw(user, &shares)
     }
 
-    fn token_balance(&self, user: &Address) -> i128 {
+    pub(crate) fn token_balance(&self, user: &Address) -> i128 {
         token::Client::new(&self.env, &self.asset).balance(user)
     }
 
-    fn allow(&self, target: &Address, fn_name: &str, args: Vec<ArgRule>, approve: bool) {
+    pub(crate) fn allow(&self, target: &Address, fn_name: &str, args: Vec<ArgRule>, approve: bool) {
         self.allow_with_loss(target, fn_name, args, approve, 5);
     }
 
@@ -106,7 +135,7 @@ impl Fixture {
         );
     }
 
-    fn approve_noop(&self) {
+    pub(crate) fn approve_noop(&self) {
         self.allow(
             &self.asset,
             "approve",
@@ -692,7 +721,7 @@ fn approval(f: &Fixture, amount: i128) -> Vec<Val> {
         .into_val(&f.env)
 }
 
-fn outcome<T>(
+pub(crate) fn outcome<T>(
     result: Result<
         Result<T, soroban_sdk::ConversionError>,
         Result<Error, soroban_sdk::InvokeError>,

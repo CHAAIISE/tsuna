@@ -4,10 +4,13 @@ mod drawdown;
 mod errors;
 mod fees;
 mod leash;
+mod oracle;
 mod perimeter;
 mod shares;
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod test_oracle;
 #[cfg(test)]
 mod testutils;
 
@@ -78,6 +81,7 @@ enum Key {
     Observations,
     Peak(u32, u32),
     Losses,
+    Oracle,
 }
 
 #[contractevent]
@@ -113,6 +117,16 @@ pub struct Withdrawn {
     pub shares: i128,
 }
 
+/// Part of a withdrawal paid in a non-base asset, without conversion.
+#[contractevent]
+pub struct WithdrawnInKind {
+    #[topic]
+    pub user: Address,
+    #[topic]
+    pub asset: Address,
+    pub amount: i128,
+}
+
 #[contract]
 pub struct AgentVault;
 
@@ -124,6 +138,7 @@ impl AgentVault {
         agent: Address,
         asset: Address,
         protocol_recipient: Address,
+        oracle: Address,
     ) {
         let s = env.storage().instance();
         s.set(&Key::Owner, &owner);
@@ -132,6 +147,7 @@ impl AgentVault {
         s.set(&Key::Assets, &Vec::from_array(&env, [asset.clone()]));
         s.set(&Key::Paused, &false);
         s.set(&Key::ProtocolRecipient, &protocol_recipient);
+        s.set(&Key::Oracle, &oracle);
         s.set(&Key::Limits, &Limits::default());
         s.set(&Key::Revoked, &false);
         s.set(&Key::TotalShares, &0_i128);
@@ -312,6 +328,9 @@ impl AgentVault {
         Ok(minted)
     }
 
+    /// Never blocked by pause or by the oracle. Idle non-base assets are valued at exit prices;
+    /// if any of them has no usable price, the holder receives their pro-rata share of every
+    /// asset in kind instead.
     pub fn withdraw(env: Env, user: Address, shares: i128) -> Result<i128, Error> {
         user.require_auth();
         if shares <= 0 {
@@ -320,36 +339,99 @@ impl AgentVault {
         if shares > Self::balance(env.clone(), user.clone()) {
             return Err(Error::InsufficientShares);
         }
-        let nav = Self::nav(env.clone())?;
-        fees::crystallize(&env, nav)?;
-        let supply = shares::effective_supply(&env)?;
-        let entitlement =
-            shares::mul_div(&env, shares, shares::effective_assets(nav)?, supply, false)?;
         let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
         let token = token::Client::new(&env, &asset);
         let me = env.current_contract_address();
+        let held = oracle::held(&env);
+        let priced = match oracle::exit_values(&env, &asset, &held) {
+            Some(values) => {
+                let extra = sum(&values)?;
+                let nav = nav_with(&env, &asset, extra)?;
+                // Fees crystallize only on a priced NAV; an in-kind exit has no profit to measure.
+                fees::crystallize(&env, nav)?;
+                Some((values, extra, nav))
+            }
+            None => None,
+        };
+        let supply = shares::effective_supply(&env)?;
         let idle_before = token.balance(&me);
         let idle_claim = shares::mul_div(&env, idle_before, shares, supply, false)?;
         adapters::unwind(&env, &asset, shares, supply)?;
         // Pay only this holder's idle balance and actual adapter proceeds.
         // Protocol rounding dust belongs to the remaining shares.
-        let available = idle_claim
+        let own = idle_claim
             .checked_add(token.balance(&me) - idle_before)
             .ok_or(Error::ArithmeticOverflow)?;
-        let amount = entitlement.min(available);
-        if amount <= 0 {
+        let mut in_kind: Vec<(Address, i128)> = Vec::new(&env);
+        let amount = match &priced {
+            Some((values, extra, nav)) => {
+                let entitlement =
+                    shares::mul_div(&env, shares, shares::effective_assets(*nav)?, supply, false)?;
+                let extra_claim = shares::mul_div(&env, *extra, shares, supply, false)?;
+                // The holder's share of non-base assets is bought back in base at the exit
+                // price while base liquidity lasts; the rest leaves in kind at that price.
+                let target = entitlement.min(
+                    own.checked_add(extra_claim)
+                        .ok_or(Error::ArithmeticOverflow)?,
+                );
+                let amount = target.min(token.balance(&me));
+                let mut residual = target - amount;
+                for (index, (held_asset, balance)) in held.iter().enumerate() {
+                    let value = values.get_unchecked(index as u32);
+                    if residual <= 0 {
+                        break;
+                    }
+                    if value <= 0 {
+                        continue;
+                    }
+                    let units =
+                        balance.min(shares::mul_div(&env, residual, balance, value, false)?);
+                    if units > 0 {
+                        residual -= shares::mul_div(&env, units, value, balance, true)?;
+                        in_kind.push_back((held_asset, units));
+                    }
+                }
+                amount
+            }
+            None => {
+                for (held_asset, balance) in held.iter() {
+                    let units = shares::mul_div(&env, balance, shares, supply, false)?;
+                    if units > 0 {
+                        in_kind.push_back((held_asset, units));
+                    }
+                }
+                own
+            }
+        };
+        if amount <= 0 && in_kind.is_empty() {
             return Err(Error::InvalidAmount);
         }
         shares::burn(&env, &user, shares)?;
-        token.transfer(&me, &user, &amount);
+        if amount > 0 {
+            token.transfer(&me, &user, &amount);
+        }
+        for (held_asset, units) in in_kind.iter() {
+            token::Client::new(&env, &held_asset).transfer(&me, &user, &units);
+            WithdrawnInKind {
+                user: user.clone(),
+                asset: held_asset,
+                amount: units,
+            }
+            .publish(&env);
+        }
         Withdrawn {
             user,
-            amount,
+            amount: amount.max(0),
             shares,
         }
         .publish(&env);
-        snapshot(&env, Self::nav(env.clone())?)?;
-        Ok(amount)
+        if priced.is_some() {
+            let held = oracle::held(&env);
+            if let Some(values) = oracle::exit_values(&env, &asset, &held) {
+                snapshot(&env, nav_with(&env, &asset, sum(&values)?)?)?;
+            }
+        }
+        Ok(amount.max(0))
     }
 
     pub fn balance(env: Env, user: Address) -> i128 {
@@ -423,17 +505,16 @@ impl AgentVault {
         Ok(out)
     }
 
-    /// Value held by the vault, in units of the base asset: idle balance + Blend supply/collateral − debt.
+    /// Value held by the vault, in units of the base asset: idle balance + Blend supply/collateral
+    /// − debt + other idle assets at strict oracle prices. Fails while the oracle cannot vouch
+    /// for a held asset, which blocks deposits and the agent but never withdrawals.
     pub fn nav(env: Env) -> Result<i128, Error> {
         let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
-        let idle = token::Client::new(&env, &asset).balance(&env.current_contract_address());
-        let nav = idle
-            .checked_add(adapters::nav(&env, &asset)?)
-            .ok_or(Error::ArithmeticOverflow)?;
-        if nav < 0 {
-            return Err(Error::Insolvent);
-        }
-        Ok(nav)
+        nav_with(&env, &asset, oracle::strict_value(&env, &asset)?)
+    }
+
+    pub fn oracle(env: Env) -> Address {
+        env.storage().instance().get(&Key::Oracle).unwrap()
     }
 
     pub fn is_protocol(env: &Env, addr: &Address) -> bool {
@@ -446,6 +527,25 @@ impl AgentVault {
     fn owner(env: &Env) -> Address {
         env.storage().instance().get(&Key::Owner).unwrap()
     }
+}
+
+/// Base idle balance + adapter positions + `extra` (other assets already valued in base units).
+fn nav_with(env: &Env, asset: &Address, extra: i128) -> Result<i128, Error> {
+    let idle = token::Client::new(env, asset).balance(&env.current_contract_address());
+    let nav = idle
+        .checked_add(adapters::nav(env, asset)?)
+        .and_then(|nav| nav.checked_add(extra))
+        .ok_or(Error::ArithmeticOverflow)?;
+    if nav < 0 {
+        return Err(Error::Insolvent);
+    }
+    Ok(nav)
+}
+
+fn sum(values: &Vec<i128>) -> Result<i128, Error> {
+    values.iter().try_fold(0_i128, |total, value| {
+        total.checked_add(value).ok_or(Error::ArithmeticOverflow)
+    })
 }
 
 fn snapshot(env: &Env, nav: i128) -> Result<(), Error> {

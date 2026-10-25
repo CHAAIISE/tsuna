@@ -27,4 +27,8 @@ pub enum Error {
     AllowanceNotCleared = 21,
     ValueLeftPerimeter = 22,
     ExposureCapExceeded = 23,
+    StalePrice = 24,
+    SourcesDisagree = 25,
+    PriceJump = 26,
+    OracleUnavailable = 27,
 }

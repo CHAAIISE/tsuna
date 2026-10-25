@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import {
@@ -18,6 +19,16 @@ export const testnet = {
 } as const;
 export const UNIT = 10_000_000n;
 export const RATE = 1_000_000_000_000n;
+
+/** Address recorded in `deployments/testnet.json` under `name`. */
+export async function deployment(name: string): Promise<string> {
+  const file = JSON.parse(
+    await readFile(new URL("../../deployments/testnet.json", import.meta.url), "utf8"),
+  ) as Record<string, unknown>;
+  const value = file[name];
+  if (typeof value !== "string") throw new Error(`Missing ${name} in deployments/testnet.json`);
+  return value;
+}
 
 export function signer(name: string): Keypair {
   const value = process.env[name];

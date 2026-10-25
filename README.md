@@ -39,7 +39,7 @@ Collateral supply and borrowing use separate transactions because their combined
 
 Rejected calls are submitted despite their failed preflight, using a successful invocation's resource budget and the required allowlist storage key. A rejection counts only when RPC `getTransaction` reports `FAILED` and its vault diagnostics contain the expected contract error code. The script also checks that attacker balances and the vault's Blend positions are unchanged. It then donates 10 test USDC explicitly to exercise performance fees, pauses the vault, checks that deposits are blocked, and redeems the depositor's shares in two withdrawals that unwind Blend. Only protocol fee shares and rounding dust remain invested; at least 5,000 USDC must remain with the admin at completion.
 
-These scripts are testnet transactions, not a local simulation. They spend test XLM on fees and create real lending positions. The vault currently validates idle USDC plus its same-asset Blend position; multi-asset accounting is not supported by this contract yet.
+These scripts are testnet transactions, not a local simulation. They spend test XLM on fees and create real lending positions. The spike vault holds only USDC and its same-asset Blend position; Blend positions are valued in the base asset only, while other allowed assets held idle are valued through the oracle router (see [Oracle](#oracle)). The vault is deployed against the router recorded in `deployments/testnet.json`.
 
 ## Vault accounting
 
@@ -88,3 +88,31 @@ Other refusals: `CallNotAllowed` (1), `DestinationNotVault` (2), `SpenderNotProt
 The leash stops the agent from moving value out of the vault; it does not make an allowlisted protocol safe. A compromised protocol can still lose what it holds, which is why exposure per protocol is capped and drawdowns pause the vault.
 
 The owner can pause the vault (`set_paused`), `revoke_session`, or `rotate_session` to a new key. `check_drawdown()` is permissionless: anyone can pause a vault whose price per share has fallen below its 24-hour peak by more than the configured drawdown. Peaks are kept in a segment tree indexed by observation, so a check touches a logarithmic number of storage entries and skips expired history. None of these switches blocks withdrawals.
+
+## Oracle
+
+`oracle_router` turns Reflector and Chainlink Data Feeds into prices in USDC with 7 decimals: the asset's USD price divided by USDC's USD price. The admin configures a feed per asset (`set_feed(asset, Feed { reflector, chainlink })`, with `reflector` a Reflector `Stellar(address)` or `Other(symbol)` asset and `chainlink` an optional feed ID). An asset without a feed has no price (`NoPriceFeed`), which the vault counts as zero.
+
+| Source | Call | Format | Default maximum age |
+| --- | --- | --- | --- |
+| Reflector testnet `CCYOZJCOPG34LLQQ7N24YXBM7LL62R7ONMZ3G6WZAAYPB5OYKOMJRN63` | `lastprice(asset)` (SEP-40), `prices(asset, 2)` | `i128`, 14 decimals, USD base, 300 s resolution | 900 s |
+| Chainlink Data Feeds proxy testnet `CBUF6IADAWPWIDWRTHJNINKXHG2UTIQ6TU2F2HRAXWAI7OT3KJPKK6O4` | `latest_round(data_id, 18)` | `I256`, 18 decimals | 90,000 s (rounds update on deviation or heartbeat; observed 3 to 10 hours apart on testnet) |
+
+Testnet Chainlink publishes BTC/USD only (`data_id` `01a0b4d920000332000000000000000000000000000000000000000000000000`, [Chainlink docs](https://docs.chain.link/data-feeds/stellar/using-data-feeds-on-chain)). The deployed router (`oracleRouter` in `deployments/testnet.json`) prices USDC-Blend, XLM (Reflector) and wBTC (Reflector + Chainlink, averaged).
+
+Two regimes:
+
+- `price_strict(asset)` serves deposits, `nav()`, `execute` and `check_drawdown`, and fails closed: every configured source must be fresh (`StalePrice`, 2), two sources must agree within `max_deviation_bps` (default 200, else `SourcesDisagree`, 3), and a move above `max_jump_bps` (default 1,500) against the last accepted price within 15 minutes is refused (`PriceJump`, 4) unless both sources agree on it or the two latest Reflector updates of the asset and of USDC hold the new level. Each accepted price is stored with its ledger time (`last_price(asset)`) in temporary storage kept for about a week.
+- `price_for_exit(asset)` serves withdrawals and never fails: the strict price when available; otherwise the last valid price cut by `exit_haircut_bps` (default 500), and never above a price refused as a jump; otherwise `None`.
+
+In the vault, the router's errors become `StalePrice` (24), `SourcesDisagree` (25), `PriceJump` (26), or `OracleUnavailable` (27) when the router cannot be called. While a held asset has no strict price, the agent, deposits and `check_drawdown` are blocked. A withdrawal values held assets at exit prices: the holder's share of them is paid in the base asset while the vault has base liquidity, then in kind at the same price. If any held asset has no exit price, or the base asset has no strict price, the holder receives their pro-rata share of each asset (idle balances and unwound positions) without conversion, and fees wait for the next priced action. `WithdrawnInKind(user, asset, amount)` records each non-base payment.
+
+Demo oracle on testnet only: the `demo` Cargo feature adds admin-only `set_demo(enabled)`, `set_demo_price(asset, price)` (event `DemoPriceSet(asset, price)`) and `clear_demo_price(asset)`. Forced prices bypass sources and the jump breaker and are never stored as last valid prices. `is_demo()` is public in every build and always `false` without the feature, whose functions are absent from the WASM:
+
+```sh
+cd contracts
+cargo test -p oracle-router --features demo
+stellar contract build --package oracle-router                   # production interface
+stellar contract build --package oracle-router --features demo   # testnet crash demo
+stellar contract info interface --wasm target/wasm32v1-none/release/oracle_router.wasm
+```

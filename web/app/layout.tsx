@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Cormorant_SC, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -20,9 +20,16 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000",
+  ),
   title: "Leash — AI agents on a leash the chain holds",
   description:
     "DeFi vaults on Stellar with on-chain limits. Agents propose trades; the vault checks every call and its effect on your funds.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#FAFCFF",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

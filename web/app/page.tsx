@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
+import Link from "next/link";
 
 export default function Home() {
   return (
     <div className="mx-auto min-h-screen max-w-site border-x px-6 sm:px-12">
       <header className="flex items-center justify-between border-b py-6">
-        <span className="font-editorial text-4xl font-semibold">Leash</span>
+        <Link href="/" aria-label="Leash home"><Logo /></Link>
         <span className="rounded-full border px-3 py-1 text-sm text-muted-foreground">
           Stellar testnet
         </span>

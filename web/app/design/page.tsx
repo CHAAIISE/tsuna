@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Logo } from "@/components/logo";
 import { ArrowDownToLine, ArrowRight, LockKeyhole } from "lucide-react";
 import { AppNavigation } from "@/components/ui/app-navigation";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,17 @@ export default function DesignPage() {
                 <div className="flex flex-wrap gap-2"><Badge>On-chain rules</Badge><Badge variant="success">Authorized</Badge><Badge variant="destructive">Blocked</Badge><Badge variant="secondary">Testnet only</Badge></div>
               </CardContent>
               <CardFooter><Button asChild data-primary><a href="#components">Explore components <ArrowRight aria-hidden="true" /></a></Button><Button asChild variant="outline"><a href="#states">View feedback states</a></Button></CardFooter>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>A name with a boundary</CardTitle><CardDescription>The serif L extends into a leash. Its ring is the only blue accent.</CardDescription></CardHeader>
+              <CardContent className="flex flex-wrap items-end gap-8">
+                <Logo className="h-12" />
+                <div className="flex items-end gap-6">
+                  <Logo markOnly className="size-4" />
+                  <Logo markOnly className="size-8" />
+                  <Logo markOnly className="size-16" />
+                </div>
+              </CardContent>
             </Card>
             <Card id="components">
               <CardHeader><CardTitle>Actions & inputs</CardTitle><CardDescription>Primary, secondary, pending and disabled states.</CardDescription></CardHeader>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "cn";
+import { Logo } from "@/components/logo";
 
 const links = [
   { href: "/agents", label: "Agents" },
@@ -14,7 +15,7 @@ function AppNavigation({ activePath, accountAction }: { activePath: string; acco
   return (
     <header className="border-b bg-background">
       <div className="mx-auto flex max-w-app flex-wrap items-center gap-4 px-4 py-4 sm:px-6 lg:flex-nowrap lg:px-0">
-        <Link href="/" aria-label="Leash home" className="shrink-0 font-editorial text-4xl font-semibold">Leash</Link>
+        <Link href="/" aria-label="Leash home" className="shrink-0"><Logo /></Link>
         <div className="ml-auto lg:order-last">{accountAction}</div>
         <nav aria-label="Main navigation" className="flex w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1 lg:ml-8 lg:w-auto lg:bg-transparent">
           {links.map(({ href, label }) => {

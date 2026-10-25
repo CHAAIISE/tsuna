@@ -14,6 +14,7 @@ import { usePasskeyAccount } from "@/lib/hooks/use-passkey-account";
 import { useActivity, useHoldings, useVault } from "@/lib/hooks/use-vault";
 import { explorerAccount, shortAddress } from "@/lib/stellar/format";
 import type { ActivityResponse, TimelineItem, VaultDetail } from "@/lib/stellar/types";
+import { CrashPanel } from "./crash";
 import { DepositPanel } from "./deposit-panel";
 import { VaultKpis } from "./kpis";
 import { Positions } from "./positions";
@@ -143,6 +144,7 @@ export function VaultView({ id }: { id: string }) {
 
           {tab === "overview" && (
             <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" className="space-y-6">
+              <CrashPanel vault={data} />
               <Card className="overflow-hidden">
                 <CardHeader><CardTitle>Positions by protocol</CardTitle><CardDescription>Read from each protocol and valued at the oracle prices the vault itself uses.</CardDescription></CardHeader>
                 <Positions positions={data.positions} exposure={data.exposure} />

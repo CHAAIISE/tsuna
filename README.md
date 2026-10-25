@@ -54,7 +54,7 @@ pnpm tsx scripts/deploy.ts   # --fresh redeploys every contract
 pnpm tsx scripts/seed.ts
 ```
 
-`deploy.ts` builds the contracts (plus `oracle_router` with `--features demo`), then deploys the demo-mode oracle router (USDC, XLM from Reflector; wBTC from Reflector and Chainlink), the policy registry and the vault factory (admins `LEASH_ADMIN_SECRET` and `LEASH_KEEPER_SECRET`, both signing), each with a 10-minute timelock, and publishes the `agent_vault` WASM as `vault-v1`. A contract recorded in `deployments/testnet.json` is reused while it exists and runs the local build. A new registry or factory starts an empty fleet. The production router stays recorded as `oracleRouterStrict`, and `signalBudget` is copied from `deployments/pay.testnet.json`.
+`deploy.ts` builds the contracts (plus `oracle_router` with `--features demo`), then deploys the demo-mode oracle router (USDC, XLM from Reflector; wBTC from Reflector and Chainlink), the policy registry and the vault factory (admins `LEASH_ADMIN_SECRET` and `LEASH_KEEPER_SECRET`, both signing), each with a 10-minute timelock, and publishes the `agent_vault` WASM as `vault-v1`. A contract recorded in `deployments/testnet.json` is reused while it exists and runs the local build. When the factory still serves an older `agent_vault`, the script uploads the new build, calls `propose_ref`, waits out the 10-minute timelock and calls `apply_ref`: every vault of the fleet runs the new code with its state intact (CAP-85). A new registry or factory starts an empty fleet. The production router stays recorded as `oracleRouterStrict`, and `signalBudget` is copied from `deployments/pay.testnet.json`.
 
 `seed.ts` moves the Soroswap XLM/USDC-Blend pair to the router's XLM price with one swap and fills it to 3,000 USDC. It creates an Aquarius 0.1 % XLM/USDC-Blend pool at that price, paying the creation fee in AQUA bought on Aquarius, and fills it with 1,500 USDC. It also creates a DeFindex USDC vault on the Blend strategy, with the admin in every role, and invests its first deposit. Then it deploys the three demo vaults through the factory: Prudent (Blend + DeFindex, 300 USDC), Leverage (XLM collateral and USDC debt on Blend, Soroswap, 200 USDC) and Liquidity (Aquarius LP, Soroswap, 200 USDC). For each one it registers the policy, sets the adapters, deposits, runs the first session-key executions and reads back `nav()`, `owner()`, `registry()`, `oracle()` and `health_factor()`. Steps already recorded are skipped. USDC-Blend is borrowed on Blend and XLM comes from Friendbot when the admin runs low.
 
@@ -238,6 +238,19 @@ The runtime is not a safety control. The model can be fooled, so every menu also
 
 `pnpm tsx scripts/agent-vault.ts` deploys a Prudent-style vault through the factory whose owner, session key, risk-off member and fee payer are keys of their own (`LEASH_AGENTRUN_*`), funds it with 100 USDC borrowed on Blend and records it in `deployments/agent.testnet.json`; the CLI resolves it as `agent-prudent` and signs with the keys recorded there, the fee payer as transaction source.
 
+## TypeScript SDK
+
+`@leash/sdk` (`packages/sdk`) is what the agent runtime and the web app use to talk to the contracts:
+
+- `new Leash({ deployments })` reads `deployments/testnet.json` (or `LEASH_DEPLOYMENTS`); `vaults()` lists every factory vault with NAV, price per share, roles and adapters; `vault(address)` returns a client for reads (`nav`, `positions`, `policy`, `roles`, `usage`, `dailyLoss`, `protocolHash`, `haltedProtocols`), `deposit`/`withdraw`, `simulateExecute`/`execute`, `checkDrawdown`, `checkProtocols` and `acknowledgeProtocol`; `createVault` deploys through the factory and registers the initial policy.
+- `actions.*` build the exact calls the vault makes (Blend `submit_with_allowance` requests, DeFindex, Soroswap, Aquarius); `presets` hold one rule per protocol action (loss tolerance 10 bps between stablecoins, 50 bps with a volatile asset, custody contracts as guards) plus a `riskOff` role, and `composePolicy` turns them into a `PolicyV2`.
+- `execute(member, call, { submitEvenIfRefused: true })` submits a call the vault refuses so the refusal is recorded on-chain: a failed preflight has no budget, so the footprint is the union of valid simulations of the same vault (NAV, counters, registry policy, optionally a valid sibling call for refusals after the protocol call), with the vault's entries read-write and the member's authorization nonce added. `decodeError` names every vault, registry, oracle, factory and signal-budget code.
+- `leaderboard()` pages `NavSnapshot` events with `getEvents`; history is bounded by the RPC's retention (about 7 days on testnet), so each row reports the first snapshot it still sees.
+
+The contract specs are vendored from the release WASM (`pnpm --filter @leash/sdk specs` after `stellar contract build`) and interpreted by the Stellar SDK's `contract.Spec`; generated binding packages pin their own SDK version and browser polyfills, which do not fit this workspace. Maps are sorted in host order before submission.
+
+The test suite includes testnet reads and one write smoke. Its fixtures come from `pnpm --filter @leash/sdk testnet:setup`, which creates the `LEASH_SDKTEST_*` burner keys, borrows test USDC on Blend, deploys a vault with a preset policy and a vault without policy (to simulate `register`), and records them in `deployments/sdk.testnet.json`.
+
 ## Attack scenarios
 
 ```sh
@@ -257,3 +270,34 @@ Each scenario sends a real transaction to a demo vault on testnet and prints `BL
 Only `injection` goes through the model, and the output says whether the model obeyed: if it does not submit the transfer, the injected call is submitted as written and labelled as sent by the attacker. The other four are calls a compromised runtime or a key thief would build, which the agent's action menu cannot express. Crafted calls are simulated first and never sent if the vault would accept them. `runAttack(id)` in `@leash/agent` returns the same result (hash, error, who chose the call, and the agent journal for `injection`).
 
 The Prudent policy allowlists DeFindex `transfer` with an open recipient on purpose, for the `defindex-shares` scenario: the rule passes, and the NAV check after the call refuses any transfer worth more than the call's 10 bps loss tolerance.
+
+## Keeper and protocol upgrades
+
+```sh
+pnpm --filter @leash/agent keeper [vault ...]
+curl -X POST -H "Authorization: Bearer $KEEPER_TOKEN" https://<app>/api/keeper
+```
+
+One pass over every factory vault (both entry points run `runKeeper` from `@leash/agent`, signed by `LEASH_KEEPER_SECRET`):
+
+1. **Protocol upgrades.** Soroban contracts can replace their own code, so an allowlisted protocol could become something else after the creator approved it. Each vault pins the Wasm hash of every protocol it calls: `execute` pins it on first use (`Address::executable()`) and refuses a target whose hash changed with `ProtocolChanged` (37). The keeper reads each protocol's instance entry with `getLedgerEntries` (resolving CAP-85 executable refs) and compares it with `protocol_hash` on the vault; on a mismatch it calls the permissionless `check_protocols`, which re-reads the hash on-chain, pauses the vault and emits `ProtocolUpgraded`. The keeper logs a `protocol upgraded` entry. Withdrawals stay open. The owner resumes with `acknowledge_protocol(protocol, hash)` at the current hash; that lifts the pause only if the watch caused it, never a drawdown pause.
+2. **Drawdown.** `check_drawdown` pauses a vault whose price per share fell more than `max_drawdown_bps` below its rolling 24 h peak, and records a `NavSnapshot`.
+
+The output is one JSON line per vault and step, with the transaction hash. `/api/keeper` accepts GET or POST with `Authorization: Bearer $KEEPER_TOKEN` (so a scheduler can call it) and returns the same entries.
+
+## Crash scenario
+
+```sh
+pnpm tsx scripts/crash-demo.ts
+```
+
+Runs on the Leverage vault, whose router is the demo-mode build (`is_demo()` is true; the price override exists only in that build):
+
+1. The admin sets XLM 30 % below its oracle price with `set_demo_price`.
+2. The yield agent tries to borrow more on Blend: refused `HealthFactorTooLow` (health factor below the 1.3 floor).
+3. The keeper calls `check_drawdown`: the vault is paused.
+4. The risk-off role tries to borrow through `execute_as`: refused `RiskIncreased`.
+5. The risk-off agent (`runAgent` with role `riskoff`) repays the Blend debt while the vault is paused: accepted.
+6. Alice withdraws her shares while the vault is paused.
+
+Each step is checked with `getTransaction`. Afterwards the script clears the price override, unpauses the vault and puts the Leverage position back, so it can run again. The Leverage vault keeps `max_drawdown_bps` at 25: its XLM position is small next to its idle USDC, so a 30 % XLM drop moves the share price by about 44 bps, which never reaches a 20 % limit. The script prints the expected move and stops if it would not breach the limit.

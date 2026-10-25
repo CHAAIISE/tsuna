@@ -3,13 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./keeper": {
+      "types": "./dist/keeper.d.ts",
+      "default": "./dist/keeper.js"
+    }
+  },
   "scripts": {
+    "prepare": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "agent": "tsx src/cli.ts",
-    "attacks": "tsx src/attacks/cli.ts"
+    "attacks": "tsx src/attacks/cli.ts",
+    "keeper": "tsx src/keeper-cli.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.102",

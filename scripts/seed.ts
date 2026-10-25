@@ -7,7 +7,7 @@ import {
 import { setTimeout as sleep } from "node:timers/promises";
 import { contractExists, ensureAccount } from "./lib/pay.js";
 import {
-  UNIT, adapterKind, address, balance, call, callRule, defaultLimits, fail, i128, policy, read, request, send,
+  LEVERAGE_MAX_DRAWDOWN_BPS, UNIT, adapterKind, address, balance, call, callRule, defaultLimits, fail, i128, policy, read, request, send,
   sendCosigned, signer, simulate, symbol, testnet, u32, vec, type Limits, type Permission, type PolicyExtras,
   type Quota, type Reserve, type RoleSpec,
 } from "./lib/stellar.js";
@@ -233,7 +233,7 @@ function plans({ pair, aquariusPool, defindex }: Venues): VaultPlan[] {
       calls: [blendCall(VOLATILE_BPS), swapCall],
       protocols: [testnet.pool, soroswap.router],
       extras: { guards: { [soroswap.router]: [pair] }, exposureCaps: { [testnet.pool]: 7_000 } },
-      limits: { ...defaultLimits, min_health_factor_bps: 13_000 },
+      limits: { ...defaultLimits, min_health_factor_bps: 13_000, max_drawdown_bps: LEVERAGE_MAX_DRAWDOWN_BPS },
       adapters: [["Blend", testnet.pool], ["Soroswap", soroswap.router]],
       deposit: 200n * UNIT,
       riskoff: [blendCall(VOLATILE_BPS)],

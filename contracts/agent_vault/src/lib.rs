@@ -6,6 +6,7 @@ mod fees;
 mod leash;
 mod oracle;
 mod perimeter;
+mod protocols;
 mod roles;
 mod shares;
 #[cfg(test)]
@@ -17,12 +18,15 @@ mod test_oracle;
 #[cfg(test)]
 mod test_policy;
 #[cfg(test)]
+mod test_protocols;
+#[cfg(test)]
 mod test_roles;
 #[cfg(test)]
 mod testutils;
 
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, token, Address, Env, Symbol, Val, Vec,
+    contract, contractevent, contractimpl, contracttype, token, Address, BytesN, Env, Symbol, Val,
+    Vec,
 };
 
 pub use adapters::{Adapter, AdapterKind, MAX_POSITIONS};
@@ -30,6 +34,7 @@ pub use errors::Error;
 pub use leash::{LossBucket, Usage};
 use oracle::Prices;
 use policy_registry::RoleMode;
+pub use protocols::{ProtocolAcknowledged, ProtocolPinned, ProtocolUpgraded};
 
 const BPS: i128 = 10_000;
 
@@ -56,6 +61,12 @@ enum Key {
     /// Budget counters of a named role; the default role keeps `Usage` and `Losses`.
     RoleUsage(Symbol),
     RoleLosses(Symbol),
+    /// Wasm hash the vault trusts for a contract it calls or allowlists.
+    ProtocolHash(Address),
+    /// Protocols whose code changed since it was pinned, awaiting the owner's review.
+    HaltedProtocols,
+    /// Set while the pause in force comes from the protocol watch alone.
+    WatchPaused,
 }
 
 #[contractevent]
@@ -172,6 +183,7 @@ impl AgentVault {
     pub fn set_paused(env: Env, paused: bool) {
         Self::owner(env.clone()).require_auth();
         env.storage().instance().set(&Key::Paused, &paused);
+        protocols::forget_watch_pause(&env);
     }
 
     pub fn usage(env: Env) -> Usage {
@@ -227,9 +239,36 @@ impl AgentVault {
         let price = shares::price(&env, nav)?;
         if drawdown::breached(&env, price, policy.limits.max_drawdown_bps)? {
             env.storage().instance().set(&Key::Paused, &true);
+            protocols::forget_watch_pause(&env);
         }
         snapshot(&env, nav)?;
         Ok(Self::paused(env))
+    }
+
+    /// Permissionless. Pins the code of every allowlisted protocol not pinned yet, and pauses
+    /// the vault when one runs code other than the pinned one. Returns the changed protocols.
+    pub fn check_protocols(env: Env) -> Result<Vec<Address>, Error> {
+        Ok(protocols::check(&env, &leash::rules(&env)?.protocols))
+    }
+
+    /// Trusts `protocol`'s new code after review. `hash` must be the code it runs now, so an
+    /// upgrade landing between review and acknowledgement is not trusted blindly.
+    pub fn acknowledge_protocol(
+        env: Env,
+        protocol: Address,
+        hash: BytesN<32>,
+    ) -> Result<(), Error> {
+        Self::owner(env.clone()).require_auth();
+        protocols::acknowledge(&env, &protocol, hash)
+    }
+
+    /// Wasm hash the vault trusts for `protocol`, once pinned.
+    pub fn protocol_hash(env: Env, protocol: Address) -> Option<BytesN<32>> {
+        protocols::pinned(&env, &protocol)
+    }
+
+    pub fn halted_protocols(env: Env) -> Vec<Address> {
+        protocols::halted(&env)
     }
 
     pub fn deposit(env: Env, user: Address, amount: i128) -> Result<i128, Error> {
@@ -454,6 +493,8 @@ impl AgentVault {
         // One price per asset for the whole call: before and after are valued alike.
         let mut prices = Prices::strict(&env, &asset);
         let call = leash::inspect(&env, &policy, &target, &fn_name, &args, &mut prices)?;
+        // Only allowlisted targets get pinned; a refused call never reaches the protocol check.
+        protocols::verify(&env, &target)?;
         let before = valuation(&env, &policy.assets, &mut prices)?;
         let prepared = adapters::prepare(
             &env,

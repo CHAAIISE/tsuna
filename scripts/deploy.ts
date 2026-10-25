@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 import { nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import { contractExists, ensureAccount, ensureWasm } from "./lib/pay.js";
 import {
@@ -42,6 +43,29 @@ const sha256 = (file: string) => createHash("sha256").update(readFileSync(file))
 /** A recorded contract is reused while it exists and runs the local build, unless `--fresh`. */
 async function reusable(id: string | undefined, recorded: string | undefined, built: string): Promise<string | undefined> {
   return !fresh && id && recorded === built && await contractExists(id) ? id : undefined;
+}
+
+interface PendingRef { wasm_hash: Uint8Array; eta: bigint }
+
+/** `propose_ref` (unless already pending), waits out the factory timelock, then `apply_ref`. */
+async function upgradeFleet(factory: string, tag: xdr.ScVal, built: string, transactions: Record<string, string>): Promise<void> {
+  const pendingRef = () => read<PendingRef | null>(admin, factory, "pending_ref", [tag]);
+  let pending = await pendingRef();
+  if (!pending || Buffer.from(pending.wasm_hash).toString("hex") !== built) {
+    const proposed = await sendCosigned(admin, call(factory, "propose_ref", [tag, xdr.ScVal.scvBytes(Buffer.from(built, "hex"))]), [keeper]);
+    transactions.factoryProposeRef = proposed.txHash;
+    pending = await pendingRef();
+    if (!pending) throw new Error("propose_ref left no pending ref");
+    console.log(`VAULT_REF_PROPOSED ${built} eta=${pending.eta} ${proposed.txHash}`);
+  }
+  const eta = Number(pending.eta);
+  for (let left = eta - Date.now() / 1000; left > -10; left = eta - Date.now() / 1000) {
+    console.log(`VAULT_REF_TIMELOCK ${Math.ceil(left) + 10}s left`);
+    await sleep(Math.min(60, left + 10) * 1000);
+  }
+  const applied = await sendCosigned(admin, call(factory, "apply_ref", [tag]), [keeper]);
+  transactions.factoryApplyRef = applied.txHash;
+  console.log(`FLEET_UPGRADED ${built} ${applied.txHash}`);
 }
 
 async function main(): Promise<void> {
@@ -124,12 +148,11 @@ async function main(): Promise<void> {
     return served ? Buffer.from(served).toString("hex") : undefined;
   };
   let factory = await reusable(previous.factory, previous.wasm?.vaultFactory, sha256(releaseWasm("vault_factory")));
-  // A factory still serving an older vault build gets upgraded through propose_ref/apply_ref
-  // (timelocked); the deploy script starts a fleet on the local build instead.
   const served = factory && await servedBy(factory);
   if (factory && served && served !== built) {
-    console.log(`VAULT_FACTORY ${factory} serves agent_vault ${served}; deploying a factory for ${built}`);
-    factory = undefined;
+    // Existing vaults run the factory's executable ref (CAP-85): one timelocked ref update
+    // moves the whole fleet to the local build, state included.
+    await upgradeFleet(factory, tag, built, transactions);
   }
   if (!factory) {
     const deployed = await deployContract(admin, "vault_factory", [

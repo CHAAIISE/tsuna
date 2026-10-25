@@ -18,3 +18,7 @@ export { knownVaults, resolveKeys, resolveVault } from "./runtime/targets.js";
 export type { VaultTarget } from "./runtime/targets.js";
 export { ATTACKS, ATTACK_IDS, POISONED_NEWS_FILE, runAttack } from "./attacks/scenarios.js";
 export type { Attack, AttackId, AttackOptions, AttackResult } from "./attacks/scenarios.js";
+export { runKeeper } from "./keeper.js";
+export type { KeeperEntry, KeeperOptions, KeeperReport, KeeperTx } from "./keeper.js";
+export { currentHashes, executableHash, planProtocolChecks } from "./watch-protocols.js";
+export type { ProtocolPlan, ProtocolUpgrade, WatchedVault } from "./watch-protocols.js";

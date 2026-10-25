@@ -74,6 +74,12 @@ export const defaultLimits = {
 };
 export type Limits = typeof defaultLimits;
 
+/**
+ * Drawdown breaker of the Leverage vault, sized to its XLM book (a small share of NAV): a 30 %
+ * XLM crash breaches it, ordinary daily XLM moves do not. The 20 % default could never trip.
+ */
+export const LEVERAGE_MAX_DRAWDOWN_BPS = 25;
+
 /** One allowlisted `(target, fn)` pair and its `CallRule`. */
 export interface Permission {
   target: string;

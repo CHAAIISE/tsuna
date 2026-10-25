@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.7.1",
+    "@leash/agent": "workspace:*",
     "@leash/sdk": "workspace:*",
     "@stellar/mpp": "0.7.1",
     "@stellar/stellar-sdk": "^17.4.0",

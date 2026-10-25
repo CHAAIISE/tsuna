@@ -48,4 +48,7 @@ pub enum Error {
     NotRoleMember = 35,
     /// A RiskOff call left the vault riskier or poorer than it found it.
     RiskIncreased = 36,
+    /// The target runs code other than the Wasm hash the vault pinned for it; the owner must
+    /// review and acknowledge the new code first.
+    ProtocolChanged = 37,
 }

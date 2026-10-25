@@ -49,6 +49,11 @@ export interface ExecuteOptions {
    * Pre-call refusals need none.
    */
   footprintFrom?: Call;
+  /**
+   * Read-only operations adding state the refused call reads but no valid call of the same
+   * member does, such as the price oracle a lending pool consults only to check a new borrow.
+   */
+  footprintOps?: xdr.Operation[];
 }
 
 const RATE_SCALAR = 1_000_000_000_000n;
@@ -306,11 +311,32 @@ export class VaultClient {
       new Contract(registry).call("policy", address(this.address)),
     ];
     if (opts.footprintFrom) siblings.push(this.executeOperation(member.publicKey(), opts.footprintFrom, role));
+    if (opts.footprintOps) siblings.push(...opts.footprintOps);
     return this.chain.submitRefused({ source, member, operation, siblings, writable: [this.address], fallback: "vault" });
   }
 
   /** Permissionless drawdown check: pauses the vault past its drawdown limit. */
   async checkDrawdown(caller: Keypair): Promise<TxResult> {
     return this.chain.invoke(caller, this.op("check_drawdown"), [caller], "vault");
+  }
+
+  /** Wasm hash (hex) the vault pinned for `protocol`, `null` before its first use. */
+  async protocolHash(protocol: string): Promise<string | null> {
+    const hash = await this.view<Uint8Array | null>("protocol_hash", [address(protocol)]);
+    return hash ? Buffer.from(hash).toString("hex") : null;
+  }
+
+  /** Protocols whose upgrade paused the vault and that the owner has not acknowledged yet. */
+  haltedProtocols(): Promise<string[]> { return this.view("halted_protocols"); }
+
+  /** Permissionless: pins unseen protocol hashes and pauses the vault if a pinned one changed. */
+  async checkProtocols(caller: Keypair): Promise<TxResult> {
+    return this.chain.invoke(caller, this.op("check_protocols"), [caller], "vault");
+  }
+
+  /** Owner revalidates `protocol` at its current Wasm hash; lifts a pause the upgrade caused. */
+  async acknowledgeProtocol(owner: Keypair, protocol: string, wasmHash: string): Promise<TxResult> {
+    const hash = xdr.ScVal.scvBytes(Buffer.from(wasmHash, "hex"));
+    return this.chain.invoke(owner, this.op("acknowledge_protocol", [address(protocol), hash]), [owner], "vault");
   }
 }

@@ -49,6 +49,7 @@ export const VAULT_ERRORS: Table = {
   34: ["RoleNotFound", "The policy in force defines no role with this name."],
   35: ["NotRoleMember", "The signer is not the member of this role."],
   36: ["RiskIncreased", "A risk-off call left the vault riskier or poorer than before."],
+  37: ["ProtocolChanged", "The protocol's code changed since the vault pinned it; the owner must review and acknowledge it."],
 };
 
 /** `policy_registry` `Error`. */

@@ -3,7 +3,8 @@ extern crate std;
 use crate::{
     adapters::blend::Request,
     shares::{PRICE_SCALE, VIRTUAL_SHARES},
-    AgentVault, AgentVaultClient, ArgRule, Error, Executed, NavSnapshot,
+    testutils::{Echo, Lazy, Router, RouterClient, Skimmer},
+    AgentVault, AgentVaultClient, ArgRule, CallRule, Error, Executed, NavSnapshot,
 };
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, symbol_short,
@@ -43,7 +44,6 @@ impl Fixture {
                 agent.clone(),
                 asset.clone(),
                 protocol.clone(),
-                5u32,
             ),
         );
         let f = Self {
@@ -83,17 +83,41 @@ impl Fixture {
         token::Client::new(&self.env, &self.asset).balance(user)
     }
 
-    fn approve_noop(&self) {
+    fn allow(&self, target: &Address, fn_name: &str, args: Vec<ArgRule>, approve: bool) {
+        self.allow_with_loss(target, fn_name, args, approve, 5);
+    }
+
+    fn allow_with_loss(
+        &self,
+        target: &Address,
+        fn_name: &str,
+        args: Vec<ArgRule>,
+        approve: bool,
+        max_loss_bps: u32,
+    ) {
         self.client().mock_all_auths().allow_call(
+            target,
+            &Symbol::new(&self.env, fn_name),
+            &CallRule {
+                args,
+                max_loss_bps,
+                approve,
+            },
+        );
+    }
+
+    fn approve_noop(&self) {
+        self.allow(
             &self.asset,
-            &symbol_short!("approve"),
-            &vec![
+            "approve",
+            vec![
                 &self.env,
                 ArgRule::Vault,
                 ArgRule::Any,
                 ArgRule::Amount,
                 ArgRule::Any,
             ],
+            false,
         );
         self.client().mock_all_auths().execute(
             &self.asset,
@@ -108,61 +132,57 @@ impl Fixture {
         );
     }
 
-    fn invest(&self, amount: i128, request_type: u32) -> Address {
+    /// Registers an allowlisted Blend-like pool without investing.
+    fn blend_pool(&self) -> Address {
         let pool = self.env.register(BlendMock, (self.asset.clone(),));
         self.client().mock_all_auths().set_blend(&pool, &3);
         self.client().mock_all_auths().allow_protocol(&pool);
-        self.client().mock_all_auths().allow_call(
-            &self.asset,
-            &symbol_short!("approve"),
-            &vec![
-                &self.env,
-                ArgRule::Vault,
-                ArgRule::Protocol,
-                ArgRule::Amount,
-                ArgRule::Any,
-            ],
-        );
-        self.client().mock_all_auths().allow_call(
+        self.allow(
             &pool,
-            &Symbol::new(&self.env, "submit_with_allowance"),
-            &vec![
+            "submit_with_allowance",
+            vec![
                 &self.env,
                 ArgRule::Vault,
                 ArgRule::Vault,
                 ArgRule::Vault,
                 ArgRule::BlendRequests,
             ],
+            true,
         );
-        self.client().mock_all_auths().execute(
-            &self.asset,
-            &symbol_short!("approve"),
-            &(
-                self.vault.clone(),
-                pool.clone(),
+        pool
+    }
+
+    fn submit(&self, pool: &Address, amount: i128, request_type: u32) -> Result<(), Error> {
+        let requests = vec![
+            &self.env,
+            Request {
+                address: self.asset.clone(),
                 amount,
-                self.env.ledger().sequence() + 10,
-            )
-                .into_val(&self.env),
-        );
-        self.client().mock_all_auths().execute(
-            &pool,
-            &Symbol::new(&self.env, "submit_with_allowance"),
-            &(
-                self.vault.clone(),
-                self.vault.clone(),
-                self.vault.clone(),
-                vec![
-                    &self.env,
-                    Request {
-                        address: self.asset.clone(),
-                        amount,
-                        request_type,
-                    },
-                ],
-            )
-                .into_val(&self.env),
-        );
+                request_type,
+            },
+        ];
+        outcome(
+            self.client().mock_all_auths().try_execute(
+                pool,
+                &Symbol::new(&self.env, "submit_with_allowance"),
+                &(
+                    self.vault.clone(),
+                    self.vault.clone(),
+                    self.vault.clone(),
+                    requests,
+                )
+                    .into_val(&self.env),
+            ),
+        )
+    }
+
+    /// Single-protocol tests invest the whole vault, above the default exposure cap.
+    fn invest(&self, amount: i128, request_type: u32) -> Address {
+        let mut limits = self.client().limits();
+        limits.max_exposure_bps = 10_000;
+        self.client().mock_all_auths().set_limits(&limits);
+        let pool = self.blend_pool();
+        self.submit(&pool, amount, request_type).unwrap();
         pool
     }
 }
@@ -178,6 +198,7 @@ enum MockKey {
     Collateral(Address),
     Debt(Address),
     Rate,
+    Sink,
 }
 
 #[contractimpl]
@@ -189,6 +210,11 @@ impl BlendMock {
 
     pub fn set_rate(env: Env, rate: i128) {
         env.storage().instance().set(&MockKey::Rate, &rate);
+    }
+
+    /// Simulates a compromised pool: inflows go to `sink` while positions are still credited.
+    pub fn set_sink(env: Env, sink: Address) {
+        env.storage().instance().set(&MockKey::Sink, &sink);
     }
 
     pub fn get_positions(env: Env, address: Address) -> Map<Symbol, Val> {
@@ -293,7 +319,8 @@ impl BlendMock {
             net += delta;
         }
         if net < 0 {
-            token.transfer_from(&me, &spender, &me, &-net);
+            let dest: Address = s.get(&MockKey::Sink).unwrap_or(me.clone());
+            token.transfer_from(&me, &spender, &dest, &-net);
         } else if net > 0 {
             token.transfer(&me, &to, &net);
         }
@@ -617,10 +644,11 @@ fn withdrawal_reduces_blend_collateral_and_debt_in_same_call() {
 fn rejected_execute_rolls_back_asset_loss_and_fee_state() {
     let f = Fixture::new();
     let shares = f.deposit(&f.alice, 1_000 * UNIT);
-    f.client().mock_all_auths().allow_call(
+    f.allow(
         &f.asset,
-        &symbol_short!("burn"),
-        &vec![&f.env, ArgRule::Vault, ArgRule::Amount],
+        "burn",
+        vec![&f.env, ArgRule::Vault, ArgRule::Amount],
+        false,
     );
     let mark = f.client().high_water_mark();
     assert!(matches!(
@@ -640,16 +668,17 @@ fn rejected_execute_rolls_back_asset_loss_and_fee_state() {
 
 fn configure_approval(f: &Fixture) {
     f.client().mock_all_auths().allow_protocol(&f.owner);
-    f.client().mock_all_auths().allow_call(
+    f.allow(
         &f.asset,
-        &symbol_short!("approve"),
-        &vec![
+        "approve",
+        vec![
             &f.env,
             ArgRule::Vault,
             ArgRule::Protocol,
             ArgRule::Amount,
             ArgRule::Any,
         ],
+        false,
     );
 }
 
@@ -663,14 +692,38 @@ fn approval(f: &Fixture, amount: i128) -> Vec<Val> {
         .into_val(&f.env)
 }
 
-fn approve(
-    f: &Fixture,
-    amount: i128,
-) -> Result<Result<(), soroban_sdk::ConversionError>, Result<Error, soroban_sdk::InvokeError>> {
-    f.client()
-        .mock_all_auths()
-        .try_execute(&f.asset, &symbol_short!("approve"), &approval(f, amount))
-        .map(|result| result.map(|_| ()))
+fn outcome<T>(
+    result: Result<
+        Result<T, soroban_sdk::ConversionError>,
+        Result<Error, soroban_sdk::InvokeError>,
+    >,
+) -> Result<(), Error> {
+    match result {
+        Ok(_) => Ok(()),
+        Err(Ok(error)) => Err(error),
+        Err(Err(error)) => panic!("unexpected host error {error:?}"),
+    }
+}
+
+/// Allowlists the neutral `Echo` protocol, which pulls and returns a budgeted amount.
+fn configure_probe(f: &Fixture) -> Address {
+    let echo = f.env.register(Echo, ());
+    f.client().mock_all_auths().allow_protocol(&echo);
+    f.allow(
+        &echo,
+        "take",
+        vec![&f.env, ArgRule::Any, ArgRule::Vault, ArgRule::Amount],
+        true,
+    );
+    echo
+}
+
+fn probe(f: &Fixture, echo: &Address, amount: i128) -> Result<(), Error> {
+    outcome(f.client().mock_all_auths().try_execute(
+        echo,
+        &symbol_short!("take"),
+        &(f.asset.clone(), f.vault.clone(), amount).into_val(&f.env),
+    ))
 }
 
 #[test]
@@ -759,35 +812,37 @@ fn arg_count_mismatch_rejects_missing_and_extra_arguments() {
 fn tx_cap_exceeded_rejects_one_unit_above_boundary() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
-    configure_approval(&f);
+    let echo = configure_probe(&f);
     let mut limits = f.client().limits();
     limits.tx_cap_bps = 1_000;
     f.client().mock_all_auths().set_limits(&limits);
-    assert_eq!(approve(&f, 10 * UNIT + 1), Err(Ok(Error::TxCapExceeded)));
+    assert_eq!(probe(&f, &echo, 10 * UNIT + 1), Err(Error::TxCapExceeded));
     assert_eq!(f.client().usage().calls, 0);
-    approve(&f, 10 * UNIT).unwrap().unwrap();
+    probe(&f, &echo, 10 * UNIT).unwrap();
+    // The vault-issued approval was fully consumed within the call.
     assert_eq!(
-        token::Client::new(&f.env, &f.asset).allowance(&f.vault, &f.owner),
-        10 * UNIT
+        token::Client::new(&f.env, &f.asset).allowance(&f.vault, &echo),
+        0
     );
     assert_eq!(f.client().usage().spent, 10 * UNIT);
+    assert_eq!(f.client().nav(), 100 * UNIT);
 }
 
 #[test]
 fn daily_cap_exceeded_accumulates_and_resets_only_at_utc_day() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
-    configure_approval(&f);
+    let echo = configure_probe(&f);
     let mut limits = f.client().limits();
     limits.daily_cap_bps = 1_000;
     f.client().mock_all_auths().set_limits(&limits);
-    approve(&f, 6 * UNIT).unwrap().unwrap();
-    assert_eq!(approve(&f, 4 * UNIT + 1), Err(Ok(Error::DailyCapExceeded)));
-    approve(&f, 4 * UNIT).unwrap().unwrap();
+    probe(&f, &echo, 6 * UNIT).unwrap();
+    assert_eq!(probe(&f, &echo, 4 * UNIT + 1), Err(Error::DailyCapExceeded));
+    probe(&f, &echo, 4 * UNIT).unwrap();
     f.env.ledger().with_mut(|ledger| ledger.timestamp = 86_399);
-    assert_eq!(approve(&f, 1), Err(Ok(Error::DailyCapExceeded)));
+    assert_eq!(probe(&f, &echo, 1), Err(Error::DailyCapExceeded));
     f.env.ledger().with_mut(|ledger| ledger.timestamp = 86_400);
-    approve(&f, 10 * UNIT).unwrap().unwrap();
+    probe(&f, &echo, 10 * UNIT).unwrap();
     assert_eq!(f.client().usage().spent, 10 * UNIT);
     assert_eq!(f.client().usage().day, 1);
 }
@@ -795,17 +850,17 @@ fn daily_cap_exceeded_accumulates_and_resets_only_at_utc_day() {
 #[test]
 fn rate_limited_counts_zero_amount_calls_and_resets_at_hour() {
     let f = Fixture::new();
-    configure_approval(&f);
+    let echo = configure_probe(&f);
     let mut limits = f.client().limits();
     limits.calls_per_hour = 2;
     f.client().mock_all_auths().set_limits(&limits);
-    approve(&f, 0).unwrap().unwrap();
-    approve(&f, 0).unwrap().unwrap();
+    probe(&f, &echo, 0).unwrap();
+    probe(&f, &echo, 0).unwrap();
     f.env.ledger().with_mut(|ledger| ledger.timestamp = 3_599);
-    assert_eq!(approve(&f, 0), Err(Ok(Error::RateLimited)));
+    assert_eq!(probe(&f, &echo, 0), Err(Error::RateLimited));
     assert_eq!(f.client().usage().calls, 2);
     f.env.ledger().with_mut(|ledger| ledger.timestamp = 3_600);
-    approve(&f, 0).unwrap().unwrap();
+    probe(&f, &echo, 0).unwrap();
     assert_eq!(f.client().usage().calls, 1);
 }
 
@@ -813,13 +868,13 @@ fn rate_limited_counts_zero_amount_calls_and_resets_at_hour() {
 fn paused_execution_and_revoked_session_leave_withdrawals_open() {
     let f = Fixture::new();
     let shares = f.deposit(&f.alice, 100 * UNIT);
-    configure_approval(&f);
+    let echo = configure_probe(&f);
     f.client().mock_all_auths().set_paused(&true);
-    assert_eq!(approve(&f, 0), Err(Ok(Error::Paused)));
+    assert_eq!(probe(&f, &echo, 0), Err(Error::Paused));
     f.client().mock_all_auths().set_paused(&false);
     f.client().mock_all_auths().revoke_session();
     assert_eq!(f.client().session(), None);
-    assert_eq!(approve(&f, 0), Err(Ok(Error::SessionRevoked)));
+    assert_eq!(probe(&f, &echo, 0), Err(Error::SessionRevoked));
     assert!((f.withdraw(&f.alice, shares) - 100 * UNIT).abs() <= 1);
 }
 
@@ -949,32 +1004,18 @@ fn nav_dropped_rolls_back_malicious_protocol_state_allowance_and_usage() {
     f.deposit(&f.alice, 100 * UNIT);
     let thief = f.env.register(Exfiltrator, ());
     f.client().mock_all_auths().allow_protocol(&thief);
-    f.client().mock_all_auths().allow_call(
-        &f.asset,
-        &symbol_short!("approve"),
-        &vec![
-            &f.env,
-            ArgRule::Vault,
-            ArgRule::Protocol,
-            ArgRule::Amount,
-            ArgRule::Any,
-        ],
-    );
-    f.client().mock_all_auths().execute(
-        &f.asset,
-        &symbol_short!("approve"),
-        &(f.vault.clone(), thief.clone(), 10 * UNIT, 100u32).into_val(&f.env),
-    );
-    f.client().mock_all_auths().allow_call(
+    // The vault itself grants the allowance; the thief uses it to pay a third party.
+    f.allow(
         &thief,
-        &symbol_short!("steal"),
-        &vec![
+        "steal",
+        vec![
             &f.env,
             ArgRule::Any,
             ArgRule::Vault,
             ArgRule::Any,
             ArgRule::Amount,
         ],
+        true,
     );
     let usage = f.client().usage();
     let attacker_balance = f.token_balance(&f.bob);
@@ -995,7 +1036,7 @@ fn nav_dropped_rolls_back_malicious_protocol_state_allowance_and_usage() {
     assert_eq!(f.client().usage(), usage);
     assert_eq!(
         token::Client::new(&f.env, &f.asset).allowance(&f.vault, &thief),
-        10 * UNIT
+        0
     );
 }
 
@@ -1051,7 +1092,14 @@ fn amount_rules_reject_negative_malformed_and_foreign_asset_requests() {
     let f = Fixture::new();
     f.deposit(&f.alice, 100 * UNIT);
     configure_approval(&f);
-    assert_eq!(approve(&f, -1), Err(Ok(Error::InvalidAmount)));
+    assert_eq!(
+        outcome(f.client().mock_all_auths().try_execute(
+            &f.asset,
+            &symbol_short!("approve"),
+            &approval(&f, -1)
+        )),
+        Err(Error::InvalidAmount)
+    );
     assert_eq!(
         f.client()
             .mock_all_auths()
@@ -1064,6 +1112,14 @@ fn amount_rules_reject_negative_malformed_and_foreign_asset_requests() {
         Some(Ok(Error::InvalidAmount))
     );
     let pool = f.invest(UNIT, 0);
+    // An allowed asset is still refused by the single-asset Blend valuation.
+    let other = f
+        .env
+        .register_stellar_asset_contract_v2(f.owner.clone())
+        .address();
+    f.client()
+        .mock_all_auths()
+        .set_assets(&vec![&f.env, f.asset.clone(), other.clone()]);
     assert_eq!(
         f.client()
             .mock_all_auths()
@@ -1077,7 +1133,7 @@ fn amount_rules_reject_negative_malformed_and_foreign_asset_requests() {
                     vec![
                         &f.env,
                         Request {
-                            address: f.bob.clone(),
+                            address: other.clone(),
                             amount: UNIT,
                             request_type: 0
                         }
@@ -1158,10 +1214,241 @@ fn risk_configuration_requires_owner_and_rejects_unsafe_values() {
             max_drawdown_bps: 10_001,
             ..limits.clone()
         },
+        crate::Limits {
+            daily_loss_bps: 10_001,
+            ..limits.clone()
+        },
+        crate::Limits {
+            max_exposure_bps: 0,
+            ..limits.clone()
+        },
     ] {
         assert_eq!(
             f.client().mock_all_auths().try_set_limits(&invalid),
             Err(Ok(Error::InvalidConfig))
         );
     }
+    let rule = CallRule {
+        args: vec![&f.env],
+        max_loss_bps: 10_001,
+        approve: false,
+    };
+    assert_eq!(
+        f.client()
+            .mock_all_auths()
+            .try_allow_call(&f.asset, &symbol_short!("approve"), &rule),
+        Err(Ok(Error::InvalidConfig))
+    );
+    // The base asset must stay first so Blend requests and NAV keep their unit.
+    assert_eq!(
+        f.client()
+            .mock_all_auths()
+            .try_set_assets(&vec![&f.env, f.bob.clone()]),
+        Err(Ok(Error::InvalidConfig))
+    );
+}
+
+#[test]
+fn asset_not_allowed_blocks_fake_token_route_and_foreign_blend_request() {
+    let f = Fixture::new();
+    f.deposit(&f.alice, 100 * UNIT);
+    let xlm = f
+        .env
+        .register_stellar_asset_contract_v2(f.owner.clone())
+        .address();
+    let fake = f
+        .env
+        .register_stellar_asset_contract_v2(f.bob.clone())
+        .address();
+    f.client()
+        .mock_all_auths()
+        .set_assets(&vec![&f.env, f.asset.clone(), xlm.clone()]);
+    let router = f.env.register(Router, ());
+    f.client().mock_all_auths().allow_protocol(&router);
+    f.allow(
+        &router,
+        "swap_exact_tokens_for_tokens",
+        vec![
+            &f.env,
+            ArgRule::Amount,
+            ArgRule::Any,
+            ArgRule::Assets,
+            ArgRule::Vault,
+            ArgRule::Any,
+        ],
+        false,
+    );
+    let swap = |path: Vec<Address>| {
+        outcome(f.client().mock_all_auths().try_execute(
+            &router,
+            &Symbol::new(&f.env, "swap_exact_tokens_for_tokens"),
+            &(UNIT, 0_i128, path, f.vault.clone(), 0_u64).into_val(&f.env),
+        ))
+    };
+    let usage = f.client().usage();
+    assert_eq!(
+        swap(vec![&f.env, f.asset.clone(), fake.clone(), xlm.clone()]),
+        Err(Error::AssetNotAllowed)
+    );
+    assert_eq!(f.client().usage(), usage);
+    assert_eq!(RouterClient::new(&f.env, &router).last_path(), None);
+    swap(vec![&f.env, f.asset.clone(), xlm.clone()]).unwrap();
+    assert_eq!(
+        RouterClient::new(&f.env, &router).last_path(),
+        Some(vec![&f.env, f.asset.clone(), xlm])
+    );
+    let pool = f.blend_pool();
+    let requests = vec![
+        &f.env,
+        Request {
+            address: fake,
+            amount: UNIT,
+            request_type: 0,
+        },
+    ];
+    assert_eq!(
+        outcome(f.client().mock_all_auths().try_execute(
+            &pool,
+            &Symbol::new(&f.env, "submit_with_allowance"),
+            &(f.vault.clone(), f.vault.clone(), f.vault.clone(), requests).into_val(&f.env),
+        )),
+        Err(Error::AssetNotAllowed)
+    );
+}
+
+#[test]
+fn daily_loss_exceeded_stops_repeated_skims_under_per_call_tolerance() {
+    let f = Fixture::new();
+    f.deposit(&f.alice, 1_000 * UNIT);
+    let skimmer = f.env.register(Skimmer, ());
+    f.client().mock_all_auths().allow_protocol(&skimmer);
+    f.allow_with_loss(
+        &skimmer,
+        "skim",
+        vec![
+            &f.env,
+            ArgRule::Any,
+            ArgRule::Vault,
+            ArgRule::Amount,
+            ArgRule::Any,
+        ],
+        true,
+        50,
+    );
+    let skim = |amount: i128| {
+        outcome(f.client().mock_all_auths().try_execute(
+            &skimmer,
+            &symbol_short!("skim"),
+            &(f.asset.clone(), f.vault.clone(), amount, f.bob.clone()).into_val(&f.env),
+        ))
+    };
+    let bob = f.token_balance(&f.bob);
+    // 0.49% passes the 0.50% per-call tolerance once...
+    skim(1_000 * UNIT).unwrap();
+    assert_eq!(f.client().daily_loss(), 49 * UNIT / 10);
+    // ...but a second skim would take the 24 h total to 0.98%.
+    let nav = f.client().nav();
+    assert_eq!(skim(nav), Err(Error::DailyLossExceeded));
+    assert_eq!(f.client().nav(), nav);
+    assert_eq!(f.client().daily_loss(), 49 * UNIT / 10);
+    // The window slides hour by hour: still blocked at 23 h, free again at 24 h.
+    f.env
+        .ledger()
+        .with_mut(|ledger| ledger.timestamp = 23 * 3_600);
+    assert_eq!(skim(nav), Err(Error::DailyLossExceeded));
+    f.env
+        .ledger()
+        .with_mut(|ledger| ledger.timestamp = 24 * 3_600);
+    assert_eq!(f.client().daily_loss(), 0);
+    skim(nav).unwrap();
+    assert_eq!(
+        f.token_balance(&f.bob) - bob,
+        49 * UNIT / 10 + nav * 49 / 10_000
+    );
+}
+
+#[test]
+fn allowance_not_cleared_when_protocol_leaves_approval_unspent() {
+    let f = Fixture::new();
+    f.deposit(&f.alice, 100 * UNIT);
+    let lazy = f.env.register(Lazy, ());
+    f.client().mock_all_auths().allow_protocol(&lazy);
+    f.allow(
+        &lazy,
+        "deposit",
+        vec![&f.env, ArgRule::Any, ArgRule::Vault, ArgRule::Amount],
+        true,
+    );
+    let token = token::Client::new(&f.env, &f.asset);
+    assert_eq!(
+        outcome(f.client().mock_all_auths().try_execute(
+            &lazy,
+            &symbol_short!("deposit"),
+            &(f.asset.clone(), f.vault.clone(), 10 * UNIT).into_val(&f.env),
+        )),
+        Err(Error::AllowanceNotCleared)
+    );
+    assert_eq!(token.allowance(&f.vault, &lazy), 0);
+    // A standing approval chosen by the agent is refused the same way.
+    configure_approval(&f);
+    assert_eq!(
+        outcome(f.client().mock_all_auths().try_execute(
+            &f.asset,
+            &symbol_short!("approve"),
+            &approval(&f, UNIT)
+        )),
+        Err(Error::AllowanceNotCleared)
+    );
+    assert_eq!(token.allowance(&f.vault, &f.owner), 0);
+    assert_eq!(f.client().usage().calls, 0);
+}
+
+#[test]
+fn value_left_perimeter_when_pool_misreports_positions() {
+    let f = Fixture::new();
+    f.deposit(&f.alice, 1_000 * UNIT);
+    let pool = f.invest(100 * UNIT, 0);
+    let bob = f.token_balance(&f.bob);
+    // The pool credits the supply in get_positions but sends the tokens away.
+    BlendMockClient::new(&f.env, &pool).set_sink(&f.bob);
+    assert_eq!(
+        f.submit(&pool, 100 * UNIT, 0),
+        Err(Error::ValueLeftPerimeter)
+    );
+    assert_eq!(f.token_balance(&f.bob), bob);
+    assert_eq!(f.token_balance(&f.vault), 900 * UNIT);
+    assert_eq!(f.client().nav(), 1_000 * UNIT);
+    // Funds moved to a custody contract the owner declared stay inside the perimeter.
+    let custody = Address::generate(&f.env);
+    BlendMockClient::new(&f.env, &pool).set_sink(&custody);
+    f.client()
+        .mock_all_auths()
+        .set_guards(&pool, &vec![&f.env, custody.clone()]);
+    f.submit(&pool, 100 * UNIT, 0).unwrap();
+    assert_eq!(f.token_balance(&custody), 100 * UNIT);
+}
+
+#[test]
+fn exposure_cap_exceeded_on_over_concentration_in_one_protocol() {
+    let f = Fixture::new();
+    f.deposit(&f.alice, 1_000 * UNIT);
+    let pool = f.blend_pool();
+    assert_eq!(f.client().limits().max_exposure_bps, 5_000);
+    assert_eq!(
+        f.submit(&pool, 500 * UNIT + 1, 2),
+        Err(Error::ExposureCapExceeded)
+    );
+    assert_eq!(f.token_balance(&pool), 0);
+    f.submit(&pool, 500 * UNIT, 2).unwrap();
+    assert_eq!(f.token_balance(&pool), 500 * UNIT);
+    // Collateral counts gross: borrowing against it does not free capacity.
+    f.submit(&pool, 200 * UNIT, 4).unwrap();
+    assert_eq!(f.submit(&pool, 1, 2), Err(Error::ExposureCapExceeded));
+    // Above a tightened cap, shrinking the position stays possible; growing it does not.
+    let mut limits = f.client().limits();
+    limits.max_exposure_bps = 3_000;
+    f.client().mock_all_auths().set_limits(&limits);
+    f.submit(&pool, 100 * UNIT, 3).unwrap();
+    assert_eq!(f.token_balance(&pool), 200 * UNIT);
+    assert_eq!(f.submit(&pool, 1, 2), Err(Error::ExposureCapExceeded));
 }

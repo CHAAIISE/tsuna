@@ -1,6 +1,6 @@
 pub(crate) mod blend;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, Env, Vec};
 
 use crate::{BlendPosition, Error, Key};
 
@@ -24,6 +24,19 @@ pub(crate) fn health_factor(env: &Env, asset: &Address) -> Result<i128, Error> {
         Some(position) => blend::health_factor(env, asset, &position),
         None => Ok(i128::MAX),
     }
+}
+
+/// Gross value held in each protocol, before netting any debt against it.
+pub(crate) fn exposures(env: &Env, asset: &Address) -> Result<Vec<(Address, i128)>, Error> {
+    let mut out = Vec::new(env);
+    if let Some(position) = env
+        .storage()
+        .instance()
+        .get::<_, BlendPosition>(&Key::Blend)
+    {
+        out.push_back((position.pool.clone(), blend::gross(env, asset, &position)?));
+    }
+    Ok(out)
 }
 
 pub(crate) fn unwind(env: &Env, asset: &Address, shares: i128, supply: i128) -> Result<(), Error> {

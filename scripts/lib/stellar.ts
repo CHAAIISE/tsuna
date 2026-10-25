@@ -40,6 +40,15 @@ export function request(asset: string, amount: bigint, type: number): xdr.ScVal 
   ]);
 }
 
+/** `CallRule` struct: fields are encoded as a map sorted by key. */
+export function callRule(args: string[], maxLossBps: number, approve: boolean): xdr.ScVal {
+  return xdr.ScVal.scvMap([
+    new xdr.ScMapEntry({ key: symbol("approve"), val: xdr.ScVal.scvBool(approve) }),
+    new xdr.ScMapEntry({ key: symbol("args"), val: vec(args.map(rule => vec([symbol(rule)]))) }),
+    new xdr.ScMapEntry({ key: symbol("max_loss_bps"), val: u32(maxLossBps) }),
+  ]);
+}
+
 export async function build(key: Keypair, operation: xdr.Operation): Promise<Transaction> {
   return new TransactionBuilder(await server.getAccount(key.publicKey()), {
     fee: "10000", networkPassphrase: Networks.TESTNET,

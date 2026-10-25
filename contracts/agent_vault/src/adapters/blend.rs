@@ -80,6 +80,13 @@ pub(crate) fn nav(env: &Env, asset: &Address, position: &BlendPosition) -> Resul
         .ok_or(Error::ArithmeticOverflow)
 }
 
+pub(crate) fn gross(env: &Env, asset: &Address, position: &BlendPosition) -> Result<i128, Error> {
+    let p = load(env, asset, position)?;
+    mul_div(env, p.supply, p.b_rate, SCALAR, false)?
+        .checked_add(mul_div(env, p.collateral, p.b_rate, SCALAR, false)?)
+        .ok_or(Error::ArithmeticOverflow)
+}
+
 pub(crate) fn health_factor(
     env: &Env,
     asset: &Address,
@@ -137,7 +144,7 @@ pub(crate) fn unwind(
         .map(|r| r.amount)
         .unwrap_or(0);
     if repay > 0 {
-        token.approve(&me, &position.pool, &repay, &(env.ledger().sequence() + 1));
+        token.approve(&me, &position.pool, &repay, &env.ledger().sequence());
     }
     let _: Val = env.invoke_contract(
         &position.pool,

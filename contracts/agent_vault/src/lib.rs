@@ -4,18 +4,23 @@ mod drawdown;
 mod errors;
 mod fees;
 mod leash;
+mod perimeter;
 mod shares;
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod testutils;
 
 use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, token, Address, Env, Symbol, Val, Vec,
 };
 
 pub use errors::Error;
-pub use leash::{Limits, Usage};
+pub use leash::{Limits, LossBucket, Usage};
 
 const BPS: i128 = 10_000;
+const MAX_ASSETS: u32 = 8;
+const MAX_GUARDS: u32 = 4;
 
 /// Constraint on one positional argument of an allowlisted call.
 #[contracttype]
@@ -30,6 +35,19 @@ pub enum ArgRule {
     Amount,
     /// Sum of same-base-asset Blend request amounts; never net deposits against withdrawals.
     BlendRequests,
+    /// `Vec<Address>` whose every element is one of the vault's allowed assets (e.g. a swap path).
+    Assets,
+}
+
+/// Allowlist entry for one `(target, fn)` pair.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CallRule {
+    pub args: Vec<ArgRule>,
+    /// NAV and perimeter loss tolerated for one call (e.g. 10 stable-to-stable, 50 volatile).
+    pub max_loss_bps: u32,
+    /// The vault grants the target an allowance for the pulled amount, expiring this ledger.
+    pub approve: bool,
 }
 
 #[contracttype]
@@ -44,11 +62,12 @@ enum Key {
     Owner,
     Agent,
     Asset,
-    MaxLossBps,
+    Assets,
     Paused,
     Blend,
     Rule(Address, Symbol),
     Protocol(Address),
+    Guards(Address),
     ProtocolRecipient,
     TotalShares,
     Shares(Address),
@@ -58,6 +77,7 @@ enum Key {
     Revoked,
     Observations,
     Peak(u32, u32),
+    Losses,
 }
 
 #[contractevent]
@@ -104,16 +124,12 @@ impl AgentVault {
         agent: Address,
         asset: Address,
         protocol_recipient: Address,
-        max_loss_bps: u32,
-    ) -> Result<(), Error> {
-        if max_loss_bps > BPS as u32 {
-            return Err(Error::InvalidConfig);
-        }
+    ) {
         let s = env.storage().instance();
         s.set(&Key::Owner, &owner);
         s.set(&Key::Agent, &agent);
         s.set(&Key::Asset, &asset);
-        s.set(&Key::MaxLossBps, &max_loss_bps);
+        s.set(&Key::Assets, &Vec::from_array(&env, [asset.clone()]));
         s.set(&Key::Paused, &false);
         s.set(&Key::ProtocolRecipient, &protocol_recipient);
         s.set(&Key::Limits, &Limits::default());
@@ -126,7 +142,6 @@ impl AgentVault {
                 supply: shares::VIRTUAL_SHARES,
             },
         );
-        Ok(())
     }
 
     pub fn allow_protocol(env: Env, protocol: Address) {
@@ -136,11 +151,55 @@ impl AgentVault {
             .set(&Key::Protocol(protocol), &true);
     }
 
-    pub fn allow_call(env: Env, target: Address, fn_name: Symbol, rules: Vec<ArgRule>) {
+    pub fn allow_call(
+        env: Env,
+        target: Address,
+        fn_name: Symbol,
+        rule: CallRule,
+    ) -> Result<(), Error> {
         Self::owner(&env).require_auth();
+        if rule.max_loss_bps > BPS as u32 {
+            return Err(Error::InvalidConfig);
+        }
         env.storage()
             .persistent()
-            .set(&Key::Rule(target, fn_name), &rules);
+            .set(&Key::Rule(target, fn_name), &rule);
+        Ok(())
+    }
+
+    /// Assets the agent may route through or request; the base asset stays first.
+    pub fn set_assets(env: Env, assets: Vec<Address>) -> Result<(), Error> {
+        Self::owner(&env).require_auth();
+        let base: Address = env.storage().instance().get(&Key::Asset).unwrap();
+        if assets.is_empty() || assets.get_unchecked(0) != base || assets.len() > MAX_ASSETS {
+            return Err(Error::InvalidConfig);
+        }
+        env.storage().instance().set(&Key::Assets, &assets);
+        Ok(())
+    }
+
+    pub fn assets(env: Env) -> Vec<Address> {
+        leash::assets(&env)
+    }
+
+    /// Contracts that legitimately custody funds when `protocol` is called
+    /// (pool, strategy, pair), counted in the balance-conservation check.
+    pub fn set_guards(env: Env, protocol: Address, guards: Vec<Address>) -> Result<(), Error> {
+        Self::owner(&env).require_auth();
+        if guards.len() > MAX_GUARDS {
+            return Err(Error::InvalidConfig);
+        }
+        env.storage()
+            .persistent()
+            .set(&Key::Guards(protocol), &guards);
+        Ok(())
+    }
+
+    pub fn guards(env: Env, protocol: Address) -> Vec<Address> {
+        env.storage()
+            .persistent()
+            .get(&Key::Guards(protocol))
+            .unwrap_or(Vec::new(&env))
     }
 
     pub fn set_blend(env: Env, pool: Address, reserve_index: u32) {
@@ -172,6 +231,11 @@ impl AgentVault {
 
     pub fn usage(env: Env) -> Usage {
         leash::usage(&env)
+    }
+
+    /// NAV lost to executions over the rolling 24 h window, in base-asset units.
+    pub fn daily_loss(env: Env) -> Result<i128, Error> {
+        leash::daily_loss(&env)
     }
 
     pub fn revoke_session(env: Env) {
@@ -319,15 +383,30 @@ impl AgentVault {
         if Self::paused(env.clone()) {
             return Err(Error::Paused);
         }
-        let amount = leash::amount(&env, &target, &fn_name, &args)?;
+        let call = leash::inspect(&env, &target, &fn_name, &args)?;
         let nav_before = Self::nav(env.clone())?;
-        leash::charge(&env, amount, nav_before)?;
+        leash::charge(&env, call.value, nav_before)?;
+        let held = perimeter::holdings(&env, &target)?;
+        let asset: Address = s.get(&Key::Asset).unwrap();
+        let exposed = adapters::exposures(&env, &asset)?;
+        if call.rule.approve && call.pull > 0 {
+            token::Client::new(&env, &asset).approve(
+                &env.current_contract_address(),
+                &target,
+                &call.pull,
+                &env.ledger().sequence(),
+            );
+        }
         let out: Val = env.invoke_contract(&target, &fn_name, args);
         let nav_after = Self::nav(env.clone())?;
-        let max_loss: u32 = s.get(&Key::MaxLossBps).unwrap();
+        let max_loss = call.rule.max_loss_bps;
         if nav_after < shares::mul_div(&env, nav_before, BPS - max_loss as i128, BPS, true)? {
             return Err(Error::NavDropped);
         }
+        leash::record_loss(&env, nav_before - nav_after, nav_before)?;
+        perimeter::conserved(&env, &target, &held, nav_before, max_loss)?;
+        perimeter::allowances_cleared(&env, &call.spenders)?;
+        perimeter::exposure_within_cap(&env, &asset, &exposed, nav_after)?;
         if Self::health_factor(env.clone())? < i128::from(leash::limits(&env).min_health_factor_bps)
         {
             return Err(Error::HealthFactorTooLow);

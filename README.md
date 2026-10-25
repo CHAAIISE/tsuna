@@ -35,7 +35,7 @@ pnpm tsx scripts/spike.ts
 
 Collateral supply and borrowing use separate transactions because their combined resource fee can exceed Stellar's 32-bit inner transaction fee limit. The transaction helper supports a fee bump when resource fees exceed that limit. The WASM upload is sponsored by the Alice testnet burner (`E2E_USER_SECRET`); upload rent on testnet can consume thousands of test XLM.
 
-`spike.ts` builds with `stellar contract build`, uploads the WASM, deploys a fresh vault, configures its call and argument rules, and deposits 100 test USDC in exchange for shares. The configured session key approves Blend and supplies the funds through `submit_with_allowance`. The script checks the resulting supply position and NAV, then submits two rejected calls: a direct token transfer and a Blend withdrawal addressed to the attacker.
+`spike.ts` builds with `stellar contract build`, uploads the WASM, deploys a fresh vault, configures its call and argument rules, and deposits 100 test USDC in exchange for shares. The session key supplies 40 USDC to Blend through `submit_with_allowance`; the vault grants the pool an allowance for exactly that amount, valid for the current ledger only, and checks it is consumed. The script prints the simulated resource cost of that `execute`, checks the resulting supply position, NAV and zero residual allowance, then submits two rejected calls: a direct token transfer and a Blend withdrawal addressed to the attacker.
 
 Rejected calls are submitted despite their failed preflight, using a successful invocation's resource budget and the required allowlist storage key. A rejection counts only when RPC `getTransaction` reports `FAILED` and its vault diagnostics contain the expected contract error code. The script also checks that attacker balances and the vault's Blend positions are unchanged. It then donates 10 test USDC explicitly to exercise performance fees, pauses the vault, checks that deposits are blocked, and redeems the depositor's shares in two withdrawals that unwind Blend. Only protocol fee shares and rounding dust remain invested; at least 5,000 USDC must remain with the admin at completion.
 
@@ -63,7 +63,7 @@ stellar contract build
 
 ## Session limits
 
-`execute(target, fn, args)` is the only path for the session key. In order, it checks that the session is not revoked, the vault is not paused, `(target, fn)` is allowlisted with one rule per argument, and each argument satisfies its rule. `Amount` arguments and same-asset `BlendRequests` (summed, never netted) are charged against the limits set by the owner with `set_limits`:
+`execute(target, fn, args)` is the only path for the session key. In order, it checks that the session is not revoked, the vault is not paused, `(target, fn)` is allowlisted with one rule per argument, and each argument satisfies its rule. The owner registers each pair with `allow_call(target, fn, CallRule { args, max_loss_bps, approve })`. Argument rules are `Any`, `Vault`, `Protocol`, `Amount`, `BlendRequests` and `Assets` (a `Vec<Address>` such as a swap path, where every element must be in `set_assets`, else `AssetNotAllowed` (19)). `Amount` arguments and same-asset `BlendRequests` (summed, never netted) are charged against the limits set by the owner with `set_limits`:
 
 | Limit | Default | Error |
 | --- | --- | --- |
@@ -71,8 +71,20 @@ stellar contract build
 | Amount per UTC day, in bps of NAV at each call | 100,000 | `DailyCapExceeded` (15) |
 | Calls per clock hour, including zero-amount calls | 60 | `RateLimited` (16) |
 | Blend health factor after the call, in bps | 13,000 | `HealthFactorTooLow` (17) |
+| NAV lost by executions over a rolling 24 h window (hourly buckets), in bps of NAV | 50 | `DailyLossExceeded` (20) |
+| Gross value in one protocol after a call that grows it, in bps of NAV | 5,000 | `ExposureCapExceeded` (23) |
 | Price-per-share drop from the rolling 24-hour peak | 2,000 | pause via `check_drawdown` |
 
-After the call, NAV must not fall more than `max_loss_bps` (constructor) or the whole transaction reverts with `NavDropped` (5), including any protocol state, allowance and usage counters it wrote. Other refusals: `CallNotAllowed` (1), `DestinationNotVault` (2), `SpenderNotProtocol` (3), `ArgCountMismatch` (4), `Paused` (6), `SessionRevoked` (18). Successful calls emit `Executed(target, fn, nav_before, nav_after)`.
+When a rule has `approve`, the vault itself grants the target an allowance for the amount the call may pull (the `Amount` arguments, or the net Blend inflow), expiring at the current ledger; the session key never chooses an approval. After the call, every post-condition must hold or the whole transaction reverts, including any protocol state, allowance and usage counters it wrote:
+
+- NAV must not fall more than the rule's `max_loss_bps` (e.g. 10 for stable-to-stable, 50 for volatile pairs): `NavDropped` (5).
+- Losses are added to the rolling 24 h budget, so repeated calls just under the per-call tolerance cannot drain the vault: `DailyLossExceeded` (20). `daily_loss()` reports the amount used.
+- Allowances from the vault to the target and to every `Protocol` argument must be back to zero for every allowed asset: `AllowanceNotCleared` (21).
+- Token balances are summed over the perimeter (the vault, the target and the custody contracts declared with `set_guards`, such as a pool or strategy) and must be conserved per asset within the rule's tolerance: `ValueLeftPerimeter` (22). This check reads balances directly, so a protocol that keeps reporting a position while sending the tokens elsewhere is still caught.
+- No protocol's gross position may grow beyond the exposure cap. Calls that shrink a position stay allowed, so interest drift never blocks de-risking: `ExposureCapExceeded` (23).
+
+Other refusals: `CallNotAllowed` (1), `DestinationNotVault` (2), `SpenderNotProtocol` (3), `ArgCountMismatch` (4), `Paused` (6), `SessionRevoked` (18). Successful calls emit `Executed(target, fn, nav_before, nav_after)`.
+
+The leash stops the agent from moving value out of the vault; it does not make an allowlisted protocol safe. A compromised protocol can still lose what it holds, which is why exposure per protocol is capped and drawdowns pause the vault.
 
 The owner can pause the vault (`set_paused`), `revoke_session`, or `rotate_session` to a new key. `check_drawdown()` is permissionless: anyone can pause a vault whose price per share has fallen below its 24-hour peak by more than the configured drawdown. Peaks are kept in a segment tree indexed by observation, so a check touches a logarithmic number of storage entries and skips expired history. None of these switches blocks withdrawals.

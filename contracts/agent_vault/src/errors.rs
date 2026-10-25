@@ -22,4 +22,9 @@ pub enum Error {
     RateLimited = 16,
     HealthFactorTooLow = 17,
     SessionRevoked = 18,
+    AssetNotAllowed = 19,
+    DailyLossExceeded = 20,
+    AllowanceNotCleared = 21,
+    ValueLeftPerimeter = 22,
+    ExposureCapExceeded = 23,
 }

@@ -6,7 +6,7 @@ import {
 } from "@stellar/stellar-sdk";
 import { fundUsdc } from "./fund-usdc.js";
 import {
-  UNIT, address, balance, build, call, fail, horizon, i128, read, request, send,
+  UNIT, address, balance, build, call, callRule, fail, horizon, i128, read, request, send,
   server, signer, simulate, submit, symbol, testnet, u32, vec, type Positions,
 } from "./lib/stellar.js";
 
@@ -26,15 +26,17 @@ async function main(): Promise<void> {
     address: new Address(admin.publicKey()), wasmHash,
     constructorArgs: [
       address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc),
-      address(signer("LEASH_KEEPER_SECRET").publicKey()), u32(5),
+      address(signer("LEASH_KEEPER_SECRET").publicKey()),
     ],
   }));
   assert(deployed.returnValue, "Deployment must return a contract address");
   const vault = scValToNative(deployed.returnValue) as string;
   console.log(`VAULT ${vault} ${deployed.txHash}`);
   await send(admin, call(vault, "allow_protocol", [address(testnet.pool)]));
-  await send(admin, call(vault, "allow_call", [address(testnet.usdc), symbol("approve"), vec(["Vault", "Protocol", "Amount", "Any"].map(rule => vec([symbol(rule)])))]));
-  await send(admin, call(vault, "allow_call", [address(testnet.pool), symbol("submit_with_allowance"), vec(["Vault", "Vault", "Vault", "BlendRequests"].map(rule => vec([symbol(rule)])))]));
+  // Zero-amount approvals stay allowlisted as a neutral call; any non-zero one would be
+  // refused because the vault requires every allowance to be consumed within the call.
+  await send(admin, call(vault, "allow_call", [address(testnet.usdc), symbol("approve"), callRule(["Vault", "Protocol", "Amount", "Any"], 10, false)]));
+  await send(admin, call(vault, "allow_call", [address(testnet.pool), symbol("submit_with_allowance"), callRule(["Vault", "Vault", "Vault", "BlendRequests"], 10, true)]));
   await send(admin, call(vault, "set_blend", [address(testnet.pool), u32(3)]));
   const amount = 100n * UNIT;
   const deposited = await send(admin, call(vault, "deposit", [address(admin.publicKey()), i128(amount)]));
@@ -43,18 +45,23 @@ async function main(): Promise<void> {
   assert.equal(shares, amount * 1_000_000_000n, "First deposit must mint offset shares");
   console.log(`DEPOSITED ${deposited.txHash} assets=${amount} shares=${shares}`);
   const navBefore = await read<bigint>(admin, vault, "nav");
-  const expiry = (await server.getLatestLedger()).sequence + 1_000;
-  const approveArgs = [address(testnet.usdc), symbol("approve"), vec([address(vault), address(testnet.pool), i128(amount), u32(expiry)])];
-  const approved = await send(agent, call(vault, "execute", approveArgs));
-  console.log(`APPROVED ${approved.txHash}`);
-  const supplyArgs = [address(testnet.pool), symbol("submit_with_allowance"), vec([address(vault), address(vault), address(vault), vec([request(testnet.usdc, amount, 0)])])];
+  // The default exposure cap allows at most half of the NAV in one protocol.
+  const supplyAmount = amount * 2n / 5n;
+  const supplyArgs = [address(testnet.pool), symbol("submit_with_allowance"), vec([address(vault), address(vault), address(vault), vec([request(testnet.usdc, supplyAmount, 0)])])];
+  const { simulation: cost } = await simulate(agent, call(vault, "execute", supplyArgs));
+  const { resources } = cost.transactionData.build();
+  const { readOnly, readWrite } = resources.footprint;
+  console.log(`EXECUTE_COST instructions=${resources.instructions} read_entries=${readOnly.length + readWrite.length} write_entries=${readWrite.length} disk_read_bytes=${resources.diskReadBytes} write_bytes=${resources.writeBytes} resource_fee=${cost.minResourceFee}`);
   const supplied = await send(agent, call(vault, "execute", supplyArgs));
   const positions = await read<Positions>(admin, testnet.pool, "get_positions", [address(vault)]);
   const navAfter = await read<bigint>(admin, vault, "nav");
   assert((positions.supply[3] ?? 0n) > 0n, "Vault must own Blend supply tokens");
-  assert.equal(await balance(admin, vault), 0n, "All idle USDC must be invested");
+  assert.equal(await balance(admin, vault), amount - supplyAmount, "Only the supplied amount may leave idle");
+  assert.equal(await read<bigint>(admin, testnet.usdc, "allowance", [address(vault), address(testnet.pool)]), 0n,
+    "The vault-issued allowance must be fully consumed");
   assert(navAfter * 10_000n >= navBefore * 9_995n, "Supply must conserve NAV within five basis points");
   console.log(`AUTHORIZED ${supplied.txHash} NAV ${navBefore} -> ${navAfter}`);
+  const expiry = (await server.getLatestLedger()).sequence + 1_000;
 
   const attackerBefore = (await horizon.loadAccount(attacker)).balances;
   for (const attack of [

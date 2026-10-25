@@ -33,6 +33,8 @@
 @theme inline {
   --font-sans: var(--font-inter);
   --font-editorial: var(--font-cormorant);
+  --font-overline: var(--font-cormorant-sc);
+  --font-mono: var(--font-jetbrains);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -62,6 +64,22 @@
   --radius-lg: var(--radius);
   --radius-xl: 1.25rem;
   --container-site: 75rem;
+  --container-app: 78.75rem;
+  --text-page: 2.375rem;
+  --text-page--line-height: 2.75rem;
+  --text-section: 1.5rem;
+  --text-section--line-height: 2rem;
+  --text-subheading: 1.125rem;
+  --text-subheading--line-height: 1.625rem;
+  --text-table: 0.9375rem;
+  --text-table--line-height: 1.375rem;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+  --tracking-overline: 0.18em;
+  --shadow-card: 0 1px 1px rgb(0 0 0 / 0.1), 0 0 2px rgb(0 0 0 / 0.08);
+  --shadow-editorial: 0 16px 32px rgb(50 50 93 / 0.12);
+  --spacing-table-row: 3.9375rem;
+  --default-transition-duration: 180ms;
   --text-hero: 3.5rem;
   --text-hero--line-height: 1.1;
   --text-hero--letter-spacing: -0.02em;
@@ -74,5 +92,27 @@
 
   body {
     @apply bg-background font-sans text-foreground antialiased;
+    font-weight: 450;
+  }
+
+  button:not(:disabled), summary, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  summary {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

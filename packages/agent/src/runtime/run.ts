@@ -109,6 +109,7 @@ export async function runAgent(options: RunAgentOptions): Promise<RunAgentResult
     instructions: systemPrompt(strategy, target),
     prompt: [
       `Run one management cycle of ${target.name} now (${new Date().toISOString()}).`,
+      news ? "Check today's market news for incidents affecting the vault's venues before deciding." : "",
       options.prompt ?? "",
     ].join(" ").trim(),
     tools,

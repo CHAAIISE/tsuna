@@ -223,3 +223,17 @@ Each payload states its method. Both protocols use a signed Soroban authorizatio
 The x402 facilitator runs in-process. The public testnet facilitator named in the Stellar docs (x402.org) refuses these payments: its verifier caps settlement fees at 50,000 stroops (a smart-account transfer simulates at about 465,000) and expects SAC transfer events only, while the policy emits its own. The stock `@stellar/mpp` server only accepts `G…` payers, so the MPP charge keeps its method schema with a verifier that accepts contract accounts.
 
 `buySignal(kind, options)` in `@leash/agent` runs the 402 flow, signs with the session key, and returns `{ data, paymentTxHash }` or a typed refusal such as `SpendingLimitExceeded` (3221). With a `refusalSubmitter`, the refused payment is submitted anyway so the refusal is a `FAILED` transaction on-chain; its resources come from the same transfer reduced to one stroop. `pay-signal.ts` starts the web app on port 3217, buys one x402 and one MPP signal, verifies both hashes are `SUCCESS`, confirms that a third payment fails on-chain with the policy error, and stops the server. A budget that already spent in the current window is replaced by a fresh one.
+
+## Agent runtime
+
+`@leash/agent` runs one bounded management cycle of a vault with the Vercel AI SDK and OpenAI (`OPENAI_MODEL`, default `gpt-4.1-mini`), at most 6 model steps:
+
+```sh
+pnpm --filter @leash/agent agent run <vault|prudent|leverage|liquidity> [--role riskoff] [--inject <file|url>] [--news <file|url>]
+```
+
+The model gets Zod-typed tools: `read_rates` (Blend reserve APRs from the v2 rate model, the DeFindex vault's allocation, the Aquarius pool state), `read_positions` (NAV, positions per protocol, health factor, the role's usage), `read_prices` (the vault's oracle router), `simulate` and `propose_execute`, plus `buy_signal` when `LEASH_SIGNALS_URL` points at the web app and `fetch_market_news` when a page is given. Strategies (Prudent, Leverage, Liquidity, Risk-off) are a mandate and a menu of action names; the model picks an action and decimal amounts, and the runtime builds the vault calls with `actions.*` from `@leash/sdk`. Risk-off acts through `execute_as` under the vault's `riskoff` role.
+
+The runtime is not a safety control. The model can be fooled, so every menu also offers a USDC transfer to any address, and `fetch_market_news` passes third-party pages unfiltered, only wrapped as `<untrusted_content>`. Whatever the model decides is submitted, and the vault contract accepts or refuses it on-chain (a refused call is still submitted so its `FAILED` hash and typed error exist). Each run prints a JSON-lines journal: step, tool, input, simulation result, transaction hash, status and error name, and the model's text. `runAgent({ vault, strategy, role, injection })` returns the same journal.
+
+`pnpm tsx scripts/agent-vault.ts` deploys a Prudent-style vault through the factory whose owner, session key, risk-off member and fee payer are keys of their own (`LEASH_AGENTRUN_*`), funds it with 100 USDC borrowed on Blend and records it in `deployments/agent.testnet.json`; the CLI resolves it as `agent-prudent` and signs with the keys recorded there, the fee payer as transaction source.

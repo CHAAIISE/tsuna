@@ -35,8 +35,28 @@ pnpm tsx scripts/spike.ts
 
 Collateral supply and borrowing use separate transactions because their combined resource fee can exceed Stellar's 32-bit inner transaction fee limit. The transaction helper supports a fee bump when resource fees exceed that limit. The WASM upload is sponsored by the Alice testnet burner (`E2E_USER_SECRET`); upload rent on testnet can consume thousands of test XLM.
 
-`spike.ts` builds with `stellar contract build`, uploads the WASM, deploys a fresh vault, configures its call and argument rules, and transfers 100 test USDC to it. The configured session key approves Blend and supplies the funds through `submit_with_allowance`. The script checks the resulting supply position and NAV, then submits two rejected calls: a direct token transfer and a Blend withdrawal addressed to the attacker.
+`spike.ts` builds with `stellar contract build`, uploads the WASM, deploys a fresh vault, configures its call and argument rules, and deposits 100 test USDC in exchange for shares. The configured session key approves Blend and supplies the funds through `submit_with_allowance`. The script checks the resulting supply position and NAV, then submits two rejected calls: a direct token transfer and a Blend withdrawal addressed to the attacker.
 
-Rejected calls are submitted despite their failed preflight, using a successful invocation's resource budget and the required allowlist storage key. A rejection counts only when RPC `getTransaction` reports `FAILED` and its vault diagnostics contain the expected contract error code. The script also checks that attacker balances and the vault's Blend positions are unchanged. Each run creates a new vault and leaves its 100 USDC invested; at least 5,000 USDC must remain with the admin at completion.
+Rejected calls are submitted despite their failed preflight, using a successful invocation's resource budget and the required allowlist storage key. A rejection counts only when RPC `getTransaction` reports `FAILED` and its vault diagnostics contain the expected contract error code. The script also checks that attacker balances and the vault's Blend positions are unchanged. It then donates 10 test USDC explicitly to exercise performance fees, pauses the vault, checks that deposits are blocked, and redeems the depositor's shares in two withdrawals that unwind Blend. Only protocol fee shares and rounding dust remain invested; at least 5,000 USDC must remain with the admin at completion.
 
 These scripts are testnet transactions, not a local simulation. They spend test XLM on fees and create real lending positions. The vault currently validates idle USDC plus its same-asset Blend position; multi-asset accounting is not supported by this contract yet.
+
+## Vault accounting
+
+`deposit(user, amount)` and `withdraw(user, shares)` require the holder's authorization. Deposits and session-key execution stop when paused; withdrawals do not. Shares are internal, non-transferable claims, exposed by `balance(user)` and `total_shares()`.
+
+Conversions use one virtual base-asset unit and 1,000,000,000 virtual shares: `shares = floor(amount × (total_shares + 1e9) / (NAV + 1))`. The 9-decimal offset makes donation-driven inflation expensive without rounding normal deposits to zero; a deposit that would mint zero shares is rejected. `price_per_share()` reports base-asset units per raw share, scaled by `1e18` (initial value `1e9`). The demo USDC has 7 decimals. Intermediate products use 256-bit arithmetic when needed.
+
+Withdrawals unwind each configured Blend supply, collateral and debt position in proportion to the redeemed shares, including the virtual-share denominator. Repayment and releases are netted in one pool call; temporary repayment allowances are cleared. Payment is capped at the holder's NAV claim and includes only their proportion of idle assets plus actual unwind proceeds. Protocol rounding and virtual-share dust stay in the vault, rather than being taken from remaining holders. Availability still depends on Blend liquidity and its own risk checks.
+
+Performance fees crystallize on deposit, withdrawal and successful execution: 10% of gains above the per-share high-water mark. New shares give 99% of that commission to the creator and 1% to the protocol recipient configured at deployment. No assets leave the vault for crystallization; fee holders redeem shares normally. The mark stores an exact post-fee asset/share ratio, stays unchanged through losses, and does not charge again on recovery to the same price. Deposits are priced after old profits have been charged. Direct donations count as gains; the script's donation is not a claim of earned yield.
+
+Fee-recipient balances are touched on every crystallization, including when the fee is zero. This keeps their Soroban read-write footprint stable when lending interest crosses a fee threshold between simulation and inclusion.
+
+`NavSnapshot` records post-action NAV, price per share and ledger timestamp for deposits, withdrawals and successful executions. `Deposited`, `Withdrawn` and `FeesCrystallized` record amounts and share movements. Unit scenarios cover first and subsequent deposits, donation attacks, authorization, rejected and partial withdrawals, pause exits from Blend, debt repayment, fees, loss recovery, rollback, snapshots and large balances:
+
+```sh
+cd contracts
+cargo test -p agent-vault
+stellar contract build
+```

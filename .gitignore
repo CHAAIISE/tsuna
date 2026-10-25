@@ -54,3 +54,4 @@ broadcast/
 
 # Rust
 target/
+test_snapshots/

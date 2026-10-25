@@ -24,7 +24,10 @@ async function main(): Promise<void> {
   const wasmHash = Buffer.from(scValToNative(uploaded.returnValue) as Uint8Array);
   const deployed = await send(admin, Operation.createCustomContract({
     address: new Address(admin.publicKey()), wasmHash,
-    constructorArgs: [address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc), u32(5)],
+    constructorArgs: [
+      address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc),
+      address(signer("LEASH_KEEPER_SECRET").publicKey()), u32(5),
+    ],
   }));
   assert(deployed.returnValue, "Deployment must return a contract address");
   const vault = scValToNative(deployed.returnValue) as string;
@@ -34,7 +37,11 @@ async function main(): Promise<void> {
   await send(admin, call(vault, "allow_call", [address(testnet.pool), symbol("submit_with_allowance"), vec(["Vault", "Vault", "Vault", "Any"].map(rule => vec([symbol(rule)])))]));
   await send(admin, call(vault, "set_blend", [address(testnet.pool), u32(3)]));
   const amount = 100n * UNIT;
-  await send(admin, call(testnet.usdc, "transfer", [address(admin.publicKey()), address(vault), i128(amount)]));
+  const deposited = await send(admin, call(vault, "deposit", [address(admin.publicKey()), i128(amount)]));
+  assert(deposited.returnValue, "Deposit must return shares");
+  const shares = scValToNative(deposited.returnValue) as bigint;
+  assert.equal(shares, amount * 1_000_000_000n, "First deposit must mint offset shares");
+  console.log(`DEPOSITED ${deposited.txHash} assets=${amount} shares=${shares}`);
   const navBefore = await read<bigint>(admin, vault, "nav");
   const expiry = (await server.getLatestLedger()).sequence + 1_000;
   const approveArgs = [address(testnet.usdc), symbol("approve"), vec([address(vault), address(testnet.pool), i128(amount), u32(expiry)])];
@@ -100,8 +107,45 @@ async function main(): Promise<void> {
   }
   assert.deepEqual((await horizon.loadAccount(attacker)).balances, attackerBefore, "Attacker balances must remain unchanged");
   assert.deepEqual(await read<Positions>(admin, testnet.pool, "get_positions", [address(vault)]), positions, "Rejected attacks must not modify Blend positions");
+  // A testnet donation exercises fee accounting; it is not protocol yield.
+  await send(admin, call(testnet.usdc, "transfer", [address(admin.publicKey()), address(vault), i128(10n * UNIT)]));
+  const crystallized = await send(agent, call(vault, "execute", [
+    address(testnet.usdc), symbol("approve"),
+    vec([address(vault), address(testnet.pool), i128(0n), u32(expiry)]),
+  ]));
+  const protocolShares = await read<bigint>(admin, vault, "balance", [address(signer("LEASH_KEEPER_SECRET").publicKey())]);
+  const totalShares = await read<bigint>(admin, vault, "total_shares");
+  const feeNav = await read<bigint>(admin, vault, "nav");
+  const protocolValue = protocolShares * (feeNav + 1n) / (totalShares + 1_000_000_000n);
+  assert(protocolValue >= UNIT / 100n - 1n && protocolValue <= UNIT / 100n + UNIT / 1_000n,
+    "Protocol must receive 1% of the 10% performance commission");
+  assert((await read<bigint>(admin, vault, "balance", [address(admin.publicKey())])) > shares,
+    "Creator must receive fee shares");
+  console.log(`FEES_CRYSTALLIZED ${crystallized.txHash} protocol_value=${protocolValue}`);
+  await send(admin, call(vault, "set_paused", [xdr.ScVal.scvBool(true)]));
+  const pausedDeposit = await server.simulateTransaction(await build(admin,
+    call(vault, "deposit", [address(admin.publicKey()), i128(UNIT)])));
+  assert(rpc.Api.isSimulationError(pausedDeposit) && pausedDeposit.error.includes("Error(Contract, #6)"),
+    "Paused vault must reject deposits");
+  const beforeWithdrawal = await balance(admin, admin.publicKey());
+  const partial = await send(admin, call(vault, "withdraw", [address(admin.publicKey()), i128(shares / 2n)]));
+  assert(partial.returnValue, "Withdrawal must return assets");
+  const partialAmount = scValToNative(partial.returnValue) as bigint;
+  assert.equal((await balance(admin, admin.publicKey())) - beforeWithdrawal, partialAmount);
+  assert(partialAmount >= 109n * UNIT / 2n - UNIT / 100n && partialAmount <= 109n * UNIT / 2n + UNIT / 100n,
+    "Partial paused withdrawal must return principal plus net gains");
+  const partialPositions = await read<Positions>(admin, testnet.pool, "get_positions", [address(vault)]);
+  assert((partialPositions.supply[3] ?? 0n) < (positions.supply[3] ?? 0n),
+    "Withdrawal must unwind the Blend position");
+  console.log(`WITHDRAWN_PAUSED ${partial.txHash} assets=${partialAmount}`);
+  const remaining = await read<bigint>(admin, vault, "balance", [address(admin.publicKey())]);
+  const redeemed = await send(admin, call(vault, "withdraw", [address(admin.publicKey()), i128(remaining)]));
+  assert.equal(await read<bigint>(admin, vault, "balance", [address(admin.publicKey())]), 0n);
+  const residual = await read<bigint>(admin, vault, "nav");
+  assert(residual >= 0n && residual <= UNIT / 50n, "Only protocol commission and rounding dust may remain");
+  console.log(`REDEEMED_PAUSED ${redeemed.txHash} residual_nav=${residual}`);
   assert((await balance(admin, admin.publicKey())) >= 5_000n * UNIT, "Admin must retain at least 5,000 USDC");
-  console.log("PASS allowance supply and both on-chain refusals; funds unchanged by attacks");
+  console.log("PASS deposit, Blend supply, both on-chain refusals, performance fees and paused redemptions");
 }
 
 main().catch(fail);

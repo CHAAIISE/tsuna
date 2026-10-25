@@ -47,6 +47,17 @@ pnpm tsx scripts/check-adapters.ts
 
 `check-adapters.ts` deploys a vault with the Blend and DeFindex adapters (DeFindex USDC vault `CBMVK2JK6NTOT2O4HNQAIQFJY232BHKGLIMXDVQVHIIZKDACXDFZDWHN`), deposits 100 USDC and has the session key put 40 USDC in each protocol. The DeFindex deposit is simulated first to check that the session key's signature is the only authorization required: the vault authorizes the DeFindex `transfer` itself. The script then reads `nav()` on-chain and recomputes it from raw protocol reads (idle USDC, Blend `get_positions` × `get_reserve` rates, DeFindex `balance` × `get_asset_amounts_per_shares`, non-base amounts through the oracle router), prints both and fails unless they differ by less than 1 bps. It repeats the comparison after withdrawing half of the depositor's shares and checks that both positions were halved.
 
+## Testnet deployment
+
+```sh
+pnpm tsx scripts/deploy.ts   # --fresh redeploys every contract
+pnpm tsx scripts/seed.ts
+```
+
+`deploy.ts` builds the contracts (plus `oracle_router` with `--features demo`), then deploys the demo-mode oracle router (USDC, XLM from Reflector; wBTC from Reflector and Chainlink), the policy registry and the vault factory (admins `LEASH_ADMIN_SECRET` and `LEASH_KEEPER_SECRET`, both signing), each with a 10-minute timelock, and publishes the `agent_vault` WASM as `vault-v1`. A contract recorded in `deployments/testnet.json` is reused while it exists and runs the local build. A new registry or factory starts an empty fleet. The production router stays recorded as `oracleRouterStrict`, and `signalBudget` is copied from `deployments/pay.testnet.json`.
+
+`seed.ts` moves the Soroswap XLM/USDC-Blend pair to the router's XLM price with one swap and fills it to 3,000 USDC. It creates an Aquarius 0.1 % XLM/USDC-Blend pool at that price, paying the creation fee in AQUA bought on Aquarius, and fills it with 1,500 USDC. It also creates a DeFindex USDC vault on the Blend strategy, with the admin in every role, and invests its first deposit. Then it deploys the three demo vaults through the factory: Prudent (Blend + DeFindex, 300 USDC), Leverage (XLM collateral and USDC debt on Blend, Soroswap, 200 USDC) and Liquidity (Aquarius LP, Soroswap, 200 USDC). For each one it registers the policy, sets the adapters, deposits, runs the first session-key executions and reads back `nav()`, `owner()`, `registry()`, `oracle()` and `health_factor()`. Steps already recorded are skipped. USDC-Blend is borrowed on Blend and XLM comes from Friendbot when the admin runs low.
+
 ## Vault accounting
 
 `deposit(user, amount)` and `withdraw(user, shares)` require the holder's authorization. Deposits and session-key execution stop when paused; withdrawals do not. Shares are internal, non-transferable claims, exposed by `balance(user)` and `total_shares()`.

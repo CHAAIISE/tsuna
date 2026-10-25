@@ -4,7 +4,7 @@ import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import {
   Address, Contract, Horizon, Keypair, Networks, Operation, SorobanDataBuilder, Transaction, TransactionBuilder,
-  nativeToScVal, rpc, scValToNative, xdr,
+  authorizeEntry, nativeToScVal, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 import type { FeeBumpTransaction } from "@stellar/stellar-sdk";
 
@@ -84,21 +84,35 @@ export interface Permission {
 const field = (key: string, val: xdr.ScVal) => new xdr.ScMapEntry({ key: symbol(key), val });
 /** Ordinal string order, as the host sorts symbols (unlike `localeCompare`). */
 const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+/** Host order of addresses (their `ScAddress` XDR), which strkey string order does not follow. */
+export const byAddress = (a: string, b: string) =>
+  Buffer.compare(new Address(a).toScAddress().toXDR(), new Address(b).toScAddress().toXDR());
+
+/** Optional `PolicyV2` fields: custody contracts per protocol and per-protocol exposure caps (bps). */
+export interface PolicyExtras {
+  guards?: Record<string, string[]>;
+  exposureCaps?: Record<string, number>;
+}
 
 /**
- * `PolicyV2` struct of the policy registry, without guards or per-protocol exposure caps.
+ * `PolicyV2` struct of the policy registry.
  * Soroban maps must be sorted: struct fields by name, calls by target address then function.
  */
-export function policy(assets: string[], calls: Permission[], protocols: string[], limits: Limits): xdr.ScVal {
-  const sorted = [...calls].sort((a, b) =>
-    Buffer.compare(new Address(a.target).toScAddress().toXDR(), new Address(b.target).toScAddress().toXDR())
-    || byKey(a.fn, b.fn));
+export function policy(
+  assets: string[], calls: Permission[], protocols: string[], limits: Limits, extras: PolicyExtras = {},
+): xdr.ScVal {
+  const sorted = [...calls].sort((a, b) => byAddress(a.target, b.target) || byKey(a.fn, b.fn));
+  const byEntry = ([a]: [string, unknown], [b]: [string, unknown]) => byAddress(a, b);
+  const caps = extras.exposureCaps && Object.entries(extras.exposureCaps).sort(byEntry);
   return xdr.ScVal.scvMap([
     field("assets", vec(assets.map(address))),
     field("calls", xdr.ScVal.scvMap(sorted.map(({ target, fn, rule }) =>
       new xdr.ScMapEntry({ key: vec([address(target), symbol(fn)]), val: rule })))),
-    field("exposure_caps", xdr.ScVal.scvVoid()),
-    field("guards", xdr.ScVal.scvMap([])),
+    field("exposure_caps", caps
+      ? xdr.ScVal.scvMap(caps.map(([protocol, bps]) => new xdr.ScMapEntry({ key: address(protocol), val: u32(bps) })))
+      : xdr.ScVal.scvVoid()),
+    field("guards", xdr.ScVal.scvMap(Object.entries(extras.guards ?? {}).sort(byEntry).map(([protocol, custody]) =>
+      new xdr.ScMapEntry({ key: address(protocol), val: vec(custody.map(address)) })))),
     field("limits", xdr.ScVal.scvMap(Object.entries(limits)
       .sort(([a], [b]) => byKey(a, b))
       .map(([key, value]) => field(key, u32(value))))),
@@ -168,11 +182,38 @@ export async function send(key: Keypair, operation: xdr.Operation, soroban = tru
 }
 
 /**
- * Deploys the release build of `contract` with `constructorArgs`, uploading its WASM only when
- * the network does not already hold that exact code.
+ * Sends `operation` from `key` after `cosigners` sign the authorization entries naming them
+ * (e.g. the second admin of a 2-of-2 contract). The signed entries are simulated again so the
+ * resource estimate covers their signature checks.
  */
-export async function deployContract(admin: Keypair, contract: string, constructorArgs: xdr.ScVal[]) {
-  const wasm = await readFile(new URL(`../../contracts/target/wasm32v1-none/release/${contract}.wasm`, import.meta.url));
+export async function sendCosigned(key: Keypair, operation: xdr.Operation, cosigners: Keypair[]) {
+  if (operation.body.type !== "invokeHostFunction") throw new Error("Expected a contract invocation");
+  const { simulation } = await simulate(key, operation);
+  const validUntil = (await server.getLatestLedger()).sequence + 100;
+  const auth = await Promise.all((simulation.result?.auth ?? []).map(async entry => {
+    if (entry.credentials.type === "sorobanCredentialsSourceAccount") return entry;
+    for (const cosigner of cosigners) {
+      // `forAddress` makes the SDK refuse an entry that does not name this cosigner.
+      const signed = await authorizeEntry(entry, cosigner, validUntil, Networks.TESTNET, cosigner.publicKey()).catch(() => null);
+      if (signed) return signed;
+    }
+    throw new Error("An authorization entry names no provided cosigner");
+  }));
+  return send(key, Operation.invokeHostFunction({ func: operation.body.value.hostFunction, auth }));
+}
+
+/** Release build of `contract` from `stellar contract build`. */
+export const releaseWasm = (contract: string) =>
+  fileURLToPath(new URL(`../../contracts/target/wasm32v1-none/release/${contract}.wasm`, import.meta.url));
+
+/**
+ * Deploys the WASM at `wasmFile` (by default the release build of `contract`) with
+ * `constructorArgs`, uploading it only when the network does not already hold that exact code.
+ */
+export async function deployContract(
+  admin: Keypair, contract: string, constructorArgs: xdr.ScVal[], wasmFile = releaseWasm(contract),
+) {
+  const wasm = await readFile(wasmFile);
   const wasmHash = createHash("sha256").update(wasm).digest();
   try {
     await server.getContractWasmByHash(wasmHash);
@@ -185,7 +226,7 @@ export async function deployContract(admin: Keypair, contract: string, construct
     address: new Address(admin.publicKey()), wasmHash, constructorArgs,
   }));
   if (!deployed.returnValue) throw new Error(`Deployment of ${contract} returned no address`);
-  return { id: scValToNative(deployed.returnValue) as string, txHash: deployed.txHash };
+  return { id: scValToNative(deployed.returnValue) as string, txHash: deployed.txHash, wasmHash: wasmHash.toString("hex") };
 }
 
 /** `AdapterKind` unit variant of the vault: `Blend`, `DeFindex`, `Aquarius`, `Soroswap` or `Xoxno`. */

@@ -1,4 +1,207 @@
 {
   "network": "testnet",
-  "oracleRouter": "CC6YLAANVM52KNNQAJAWMWREX52ZCGJEWGBGSQGPH4LLDKCHOYE2FQUZ"
+  "oracleRouter": "CCQW2UW5BDDKQYJXGXFGLDQOSBHTVWRNNRJTYYE52RKI7MS7GXGAYN4G",
+  "oracleRouterStrict": "CC6YLAANVM52KNNQAJAWMWREX52ZCGJEWGBGSQGPH4LLDKCHOYE2FQUZ",
+  "wasm": {
+    "oracleRouterDemo": "84c4c2eb2c464dc2717c8dcb604bd2b8153c65e91ecb8175cd8dee4b8a441e11",
+    "policyRegistry": "6cb452fccf0a11f63139468ac1944502b7ab944945e373a1248b0a340a4b645d",
+    "vaultFactory": "03850acaf57c195d750e66e9451679e00721367b80b79a0ae5aa20e58154f8ec",
+    "agentVault": "ecc59f525220bef8a6d816e022ae562bc7e05b378a2605763b695efe47847596"
+  },
+  "transactions": {
+    "oracleRouterDeploy": "3159b23d828fe8d65fcc013c89ad9d1bb2858a0444d96c3a55dcba918151ef48",
+    "oracleFeedUSDC": "5044de0a9fad1145ca069078958498b5767e44029aeb0e2448b1bf2f8b8cafde",
+    "oracleFeedXLM": "70f5f99c7004192237c97036db521f8f3ad01314ba5b4e3a22bb478f15297e7a",
+    "oracleFeedwBTC": "b802cd87b3d86992a4410bcbc6f8d2de717b723615cdfc5f8ba6df8cea4130b9",
+    "oracleDemoMode": "7929fe78a2cf070ceb3f801e709885e3dd18f54ed9f74a54c96d546373001286",
+    "policyRegistryDeploy": "9a8cce9a7d2909909567c1ea5978ce6733284ca2933414b3912677a9886ef015",
+    "factoryDeploy": "c2e8f36ccd2a08ab11acee2bf3870f71c2b2fcc04c91150f908bd768e5a171b6",
+    "factorySetRef": "95cf6cff50abae4e083de52521ce001b7f4e38b4e382ffa1b7d2fcf13e70aa82"
+  },
+  "vaults": [
+    {
+      "id": "prudent",
+      "name": "Prudent",
+      "slug": "prudent",
+      "strategy": "USDC yield: supplies Blend and deposits in a DeFindex vault that lends on Blend. Stablecoin calls only, 10 bps loss per call.",
+      "roles": [
+        "default"
+      ],
+      "address": "CCRLI4LNEJQGLHVPX56OEIMQ7FVLRD6MLOAKFJHHWS7VD3JUNKV6Z3NF",
+      "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
+      "owner": "GARIZVNLXADIURNHHVZBYLNEKCKQ3ESEUBYXO2INLOTDEYP4TMXNRYBU",
+      "agent": "GCNAX2DH52MFMP35OTEPRZDOFZVR5XTGLTOE34UTLLL4HMXJWT3TJPQ3",
+      "registry": "CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN",
+      "oracle": "CCQW2UW5BDDKQYJXGXFGLDQOSBHTVWRNNRJTYYE52RKI7MS7GXGAYN4G",
+      "assets": [
+        "CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU"
+      ],
+      "adapters": [
+        {
+          "kind": "Blend",
+          "protocol": "CCEBVDYM32YNYCVNRXQKDFFPISJJCV557CDZEIRBEE4NCV4KHPQ44HGF"
+        },
+        {
+          "kind": "DeFindex",
+          "protocol": "CDTXTXCYXNHVRSQUWOP4UW6DGW23Y4ZYT2WMFC4BKHOEOR3CUB3JXKVQ"
+        }
+      ],
+      "deployTx": "c5b93e5eb1fab27600f993fd861ac5123f74eae2fde908225ce46509f08b4c61",
+      "adapterTxs": [
+        "ff7b6eb446e4e17c486b306be0a28d8dc0143fb427f23fd99d73cc64265a501a",
+        "cd90477b4054939f829637f1bb756949c0508767e053d084921a472c7e287f53"
+      ],
+      "executions": [
+        {
+          "action": "blend-supply",
+          "tx": "bc86783942f0776a52e5c0e95ea54d22a8ad110c9d7b2f8396c67dfb72815eb2"
+        },
+        {
+          "action": "defindex-deposit",
+          "tx": "200a6c7a6bc3064cd82f0d79a4d8bf583d32dc4a602cf0eb94b9fc627f36497f"
+        }
+      ],
+      "policyTx": "52d86f0c42214e942506d029b14e510b353f7c511fd8cfde07fecc8799936a86",
+      "depositTx": "134e0bae55ff6acac95cb8d01e0c3796465f2e27da58e69482bf365377a95098",
+      "deposit": "3000000000"
+    },
+    {
+      "id": "leverage",
+      "name": "Leverage",
+      "slug": "leverage",
+      "strategy": "XLM collateral on Blend with USDC borrowed against it, swapped on Soroswap. Health factor kept above 1.3, 50 bps loss per call.",
+      "roles": [
+        "default"
+      ],
+      "address": "CBAA6ABPK3KCUUD3H6T23UKVNCU5TL6EO5WAXYCRSX3FLO6LB47IKKT3",
+      "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
+      "owner": "GARIZVNLXADIURNHHVZBYLNEKCKQ3ESEUBYXO2INLOTDEYP4TMXNRYBU",
+      "agent": "GCNAX2DH52MFMP35OTEPRZDOFZVR5XTGLTOE34UTLLL4HMXJWT3TJPQ3",
+      "registry": "CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN",
+      "oracle": "CCQW2UW5BDDKQYJXGXFGLDQOSBHTVWRNNRJTYYE52RKI7MS7GXGAYN4G",
+      "assets": [
+        "CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU",
+        "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+      ],
+      "adapters": [
+        {
+          "kind": "Blend",
+          "protocol": "CCEBVDYM32YNYCVNRXQKDFFPISJJCV557CDZEIRBEE4NCV4KHPQ44HGF"
+        },
+        {
+          "kind": "Soroswap",
+          "protocol": "CCJUD55AG6W5HAI5LRVNKAE5WDP5XGZBUDS5WNTIVDU7O264UZZE7BRD"
+        }
+      ],
+      "deployTx": "5f984b388179c3ab194753bafe995ca747a06983eab213604586fe60b16b0128",
+      "adapterTxs": [
+        "2492bd17504313e30cd45659979dbab5d1f97be5241f532ca0248be8572fd18f",
+        "d0aa36eb3252add7da6507b974dbbceb1024d5a4a8c54e49843ca53900fb9f89"
+      ],
+      "executions": [
+        {
+          "action": "soroswap-buy-xlm",
+          "tx": "5aa61e215e5474edcb8e93dd416b8701fdfb06f4177410aaf7065566131ec254"
+        },
+        {
+          "action": "blend-collateral-xlm",
+          "tx": "757065bc8a403e1b6477bd7427d8e1a477e07e5e0dbb572a3286df5c24000200"
+        },
+        {
+          "action": "blend-borrow-usdc",
+          "tx": "e3fc8e0ed58cabaef1c5c7e38bb0903c30ac56881b5a7dd9cd95196bbdca7185"
+        }
+      ],
+      "policyTx": "605ec7a489e50ae0de1c95f7a6be7f68019a4228ac97840cc6f95b14f3eaaf2c",
+      "depositTx": "1e48208f96cdda4bf2b3a4d49711f35a6053835fe5cf9fe886c91be23a79a797",
+      "deposit": "2000000000"
+    },
+    {
+      "id": "liquidity",
+      "name": "Liquidity",
+      "slug": "liquidity",
+      "strategy": "Liquidity in the Aquarius XLM/USDC-Blend pool, XLM inventory bought on Soroswap. LP valued at oracle prices, 50 bps loss per call.",
+      "roles": [
+        "default"
+      ],
+      "address": "CDGY3M3WNZRZ23VPD473KJGE65H52ZSRRX7LOXAYHFYWJUJO4UDEUJOP",
+      "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
+      "owner": "GARIZVNLXADIURNHHVZBYLNEKCKQ3ESEUBYXO2INLOTDEYP4TMXNRYBU",
+      "agent": "GCNAX2DH52MFMP35OTEPRZDOFZVR5XTGLTOE34UTLLL4HMXJWT3TJPQ3",
+      "registry": "CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN",
+      "oracle": "CCQW2UW5BDDKQYJXGXFGLDQOSBHTVWRNNRJTYYE52RKI7MS7GXGAYN4G",
+      "assets": [
+        "CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU",
+        "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+      ],
+      "adapters": [
+        {
+          "kind": "Aquarius",
+          "protocol": "CAM2FIEZINPFYA6T6ACWHBJVIOJSJHGMTCSPJK7HFWBRGU2PLU2BED4F"
+        },
+        {
+          "kind": "Soroswap",
+          "protocol": "CCJUD55AG6W5HAI5LRVNKAE5WDP5XGZBUDS5WNTIVDU7O264UZZE7BRD"
+        }
+      ],
+      "deployTx": "4df1e5589599a948205d685ffab361340b6ac6bf1878041212820fbfeb173a1b",
+      "adapterTxs": [
+        "c4ceb7719573d3eadb20589224b9ca4613c1207077e89297d1752d25ef092d0c",
+        "7c41c956cc8d1d1f57ffaf2b7186893e67dd2cf9e098538d0553fef0bee8c5a1"
+      ],
+      "executions": [
+        {
+          "action": "soroswap-buy-xlm",
+          "tx": "958ec6b33450b15ac8c899093256810ff7e0f5a31d411f3d878e4d5a1ed18631"
+        },
+        {
+          "action": "aquarius-deposit",
+          "tx": "b7f5d7482511b374529c087425e376245cef85bb284ca40ead421d08b574c7eb"
+        }
+      ],
+      "policyTx": "b36f3fc5aae66ea1f7ecbb6584ce6152919be4e5eef1c5652c7cd76a8236e0e6",
+      "depositTx": "94c3d117a4b8363d5a18691a17ca7457bb4de288749a2b7dd73af46ec300e522",
+      "deposit": "2000000000"
+    }
+  ],
+  "admin": "GARIZVNLXADIURNHHVZBYLNEKCKQ3ESEUBYXO2INLOTDEYP4TMXNRYBU",
+  "agent": "GCNAX2DH52MFMP35OTEPRZDOFZVR5XTGLTOE34UTLLL4HMXJWT3TJPQ3",
+  "keeper": "GCCUZXGZ4UZXL2PTXRNGQCQYKDIDL3JGHNSHEOE3X2JPCJ3CUVOOJBT4",
+  "signalBudget": "CDCFBQKZPACXNWPY362GEJZCBVHQTHMET67QSQ6K4WUMTIFEEZVSKKPL",
+  "timelocks": {
+    "policySecs": 600,
+    "factorySecs": 600
+  },
+  "protocols": {
+    "reflector": "CCYOZJCOPG34LLQQ7N24YXBM7LL62R7ONMZ3G6WZAAYPB5OYKOMJRN63",
+    "chainlink": "CBUF6IADAWPWIDWRTHJNINKXHG2UTIQ6TU2F2HRAXWAI7OT3KJPKK6O4",
+    "soroswapRouter": "CCJUD55AG6W5HAI5LRVNKAE5WDP5XGZBUDS5WNTIVDU7O264UZZE7BRD",
+    "soroswapFactory": "CDP3HMUH6SMS3S7NPGNDJLULCOXXEPSHY4JKUKMBNQMATHDHWXRRJTBY",
+    "soroswapPairXlmUsdc": "CBR76WMT6J733CCVBP23M2EL5QGP5HXLPEFNFZGZ7IB6QHOJAHP7YM3V",
+    "soroswapPairUsdcBridge": "CB5RQPROXU5NSELOVMTJADHRJZ6QPNBUBPEAVA4CCJJ4O2WBSMQD2IBX",
+    "aquariusRouter": "CBCFTQSPDBAIZ6R6PJQKSQWKNKWH2QIV3I4J72SHWBIK3ADRRAM5A6GD",
+    "aquariusPoolXlmUsdc": "CAM2FIEZINPFYA6T6ACWHBJVIOJSJHGMTCSPJK7HFWBRGU2PLU2BED4F",
+    "blendPool": "CCEBVDYM32YNYCVNRXQKDFFPISJJCV557CDZEIRBEE4NCV4KHPQ44HGF",
+    "defindexFactory": "CDSCWE4GLNBYYTES2OCYDFQA2LLY4RBIAX6ZI32VSUXD7GO6HRPO4A32",
+    "defindexVault": "CDTXTXCYXNHVRSQUWOP4UW6DGW23Y4ZYT2WMFC4BKHOEOR3CUB3JXKVQ",
+    "defindexBlendUsdcStrategy": "CALLOM5I7XLQPPOPQMYAHUWW4N7O3JKT42KQ4ASEEVBXDJQNJOALFSUY"
+  },
+  "policyRegistry": "CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN",
+  "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
+  "vaultRef": "ecc59f525220bef8a6d816e022ae562bc7e05b378a2605763b695efe47847596",
+  "liquidity": {
+    "soroswapAlignTx": "4771e62ece6d8663618b6136510a6b6d3ec7e540e199ea92d9cf011cdb12e57a",
+    "soroswapAddLiquidityTx": "3142821775485fbcb20ae03c891f461e801478f6ae75d06a22bdbf1c904331ec",
+    "aquariusPool": "CAM2FIEZINPFYA6T6ACWHBJVIOJSJHGMTCSPJK7HFWBRGU2PLU2BED4F",
+    "aquariusPoolIndex": "b2e02fcfca6c96f8ad5cbd84e7784a777b36d9c96a2459402c4f458462aab7f0",
+    "aquaTrustTx": "1f2080c0fe3af373f84433639f09bf9c10aad9fb6d157f0e4e3330d899b4ae94",
+    "aquaBuyTx": "824332c6bc3ef271de8c1c98ed12bd83ec7dd736ee3fe96c633636deee148144",
+    "aquariusCreateTx": "f8d2faa45deb3e364989c072c5213c8231bc5cdcc5d7c92d1113700daa60cc73",
+    "aquariusDepositTx": "4dfb9bd68cc1297b060e5b78302a1c1dafdd8bf6f76618a9a43ad6002f6a0f52",
+    "defindexVault": "CDTXTXCYXNHVRSQUWOP4UW6DGW23Y4ZYT2WMFC4BKHOEOR3CUB3JXKVQ",
+    "defindexCreateTx": "dbf23b9244df145a6b44cdc52a9037ce021eea927d9911393bcddbc99bb14d4d",
+    "defindexSeedTx": "548588cd1fc73663f9fffffe6f1052da5d6a5bde32e5efd56b7358b864a7992b",
+    "defindexInvestTx": "b534339689c68ae6a9a9107a29380cce22e66b1b7d550332203763d8a7e8ba89",
+    "aquariusAlignTx": "a880b2226c7e35b2de3f965b29a85275dafe63e1a0bff92e375e6eea71867074"
+  }
 }

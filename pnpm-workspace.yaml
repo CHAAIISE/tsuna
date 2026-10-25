@@ -1,0 +1,16 @@
+packages:
+  - web
+  - packages/*
+
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@4.0.126'
+  - '@ai-sdk/openai@4.0.102'
+  - '@ai-sdk/provider-utils@5.0.68'
+  - '@ai-sdk/provider@4.0.34'
+  - ai@7.0.153
+  - '@stellar/stellar-sdk@17.4.0'
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

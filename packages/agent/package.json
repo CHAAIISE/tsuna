@@ -1,0 +1,24 @@
+{
+  "name": "@leash/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.102",
+    "@leash/sdk": "workspace:*",
+    "@stellar/stellar-sdk": "^17.4.0",
+    "ai": "^7.0.153",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

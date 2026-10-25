@@ -1,0 +1,29 @@
+{
+  "name": "leash",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeFi vaults on Stellar with on-chain limits for AI agents.",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --dir web dev",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
+    "contracts:test": "cargo test --manifest-path contracts/Cargo.toml --workspace"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.19.0",
+    "eslint": "^9.39.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vitest": "^5.0.5"
+  }
+}

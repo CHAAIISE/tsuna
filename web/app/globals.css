@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+:root {
+  --background: #FAFCFF;
+  --foreground: #1B1B1B;
+  --card: #FFFFFF;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --heading: #061B31;
+  --primary: #2973FF;
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #0F5AE6;
+  --secondary: #F5F5F5;
+  --secondary-foreground: var(--foreground);
+  --muted: #F8FAFD;
+  --muted-foreground: #50617A;
+  --accent: var(--secondary);
+  --accent-foreground: var(--foreground);
+  --border: #E5EDF5;
+  --input: #D6D9DD;
+  --chip: #F0F2F5;
+  --success: #1FA67D;
+  --loss: #ED7088;
+  --destructive: #BC002D;
+  --destructive-soft: #FCEFF2;
+  --ring: var(--primary);
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-editorial: var(--font-cormorant);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-heading: var(--heading);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-chip: var(--chip);
+  --color-success: var(--success);
+  --color-loss: var(--loss);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-ring: var(--ring);
+  --radius-sm: 0.375rem;
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: 1.25rem;
+  --container-site: 75rem;
+  --text-hero: 3.5rem;
+  --text-hero--line-height: 1.1;
+  --text-hero--letter-spacing: -0.02em;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}

@@ -20,5 +20,10 @@ export { ATTACKS, ATTACK_IDS, POISONED_NEWS_FILE, runAttack } from "./attacks/sc
 export type { Attack, AttackId, AttackOptions, AttackResult } from "./attacks/scenarios.js";
 export { runKeeper } from "./keeper.js";
 export type { KeeperEntry, KeeperOptions, KeeperReport, KeeperTx } from "./keeper.js";
+export {
+  CRASH_BPS, CRASH_STEPS, CRASH_VAULT_ID, CrashError, CrashScenario, budgetRepayAmount, formatAmount, formatHealth, readCrashLive,
+  refusedBorrowAmount,
+} from "./crash.js";
+export type { CrashKeys, CrashLive, CrashOptions, CrashStep, CrashStepResult, CrashTx } from "./crash.js";
 export { currentHashes, executableHash, planProtocolChecks } from "./watch-protocols.js";
 export type { ProtocolPlan, ProtocolUpgrade, WatchedVault } from "./watch-protocols.js";

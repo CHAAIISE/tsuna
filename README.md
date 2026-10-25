@@ -136,6 +136,7 @@ stellar contract build --package oracle-router                   # production in
 stellar contract build --package oracle-router --features demo   # testnet crash demo
 stellar contract info interface --wasm target/wasm32v1-none/release/oracle_router.wasm
 ```
+
 ## Cross-chain deposit (CCTP)
 
 ```sh
@@ -147,6 +148,7 @@ USDC moves from Ethereum Sepolia to a vault on Stellar testnet in five steps: `d
 The script prepares everything it needs and is safe to rerun: the bridge recipient (`LEASH_BRIDGE_USER_SECRET`, created and funded with Friendbot when absent), its Circle and Blend USDC trustlines opened with the SAC `trust` function, a test vault deployed from the uploaded `agent_vault` WASM (or `LEASH_BRIDGE_VAULT`), and the Circle-USDC / Blend-USDC Soroswap pair kept at 1:1 with 1,000 of each token. The ops account (`LEASH_CCTP_OPS_SECRET`) pays for `mint_and_forward`, seeds the pair with Circle USDC bought on the Stellar DEX and Blend USDC borrowed against XLM, and keeps Blend USDC to swap the pair back to 1:1 after bridged swaps move it. The swap must return at least 99.5 % of its input; nothing is burned when the pool cannot meet that floor. Addresses are recorded in `deployments/cctp.testnet.json`.
 
 `/bridge` runs the same pipeline from the server-side Sepolia test wallet (`POST /api/bridge`, one run at a time; `GET /api/bridge` returns the steps and transaction hashes). Jobs are kept in a JSON file in the OS temporary directory, 20 at most; on serverless hosts they last as long as the instance.
+
 ## Agent payments
 
 Agents pay for market signals from a signal budget: an OpenZeppelin smart account (`contracts/signal_budget`, `stellar-accounts` 0.8). The admin rule belongs to the operations account; the session rule lets the agent key sign transfers of Blend testnet USDC only, metered by the OZ `spending_limit` policy at 5 USDC per 17,280 ledgers (about a day).

@@ -218,8 +218,8 @@
   "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
   "vaultRef": "92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb",
   "liquidity": {
-    "soroswapAlignTx": "e4bdfb9a439db4bd0ec7d482fca8eda589e2e68b694ab8087a9f9b115cedbd56",
-    "soroswapAddLiquidityTx": "3142821775485fbcb20ae03c891f461e801478f6ae75d06a22bdbf1c904331ec",
+    "soroswapAlignTx": "39836480c1e1bb7675e34908a205e97861052103966ac4409acdabb23e89e6e9",
+    "soroswapAddLiquidityTx": "10ec3877dcb23d9a7b9e6018f4f2589ee3294b1e54264c1024640703fed82c65",
     "aquariusPool": "CAM2FIEZINPFYA6T6ACWHBJVIOJSJHGMTCSPJK7HFWBRGU2PLU2BED4F",
     "aquariusPoolIndex": "b2e02fcfca6c96f8ad5cbd84e7784a777b36d9c96a2459402c4f458462aab7f0",
     "aquaTrustTx": "1f2080c0fe3af373f84433639f09bf9c10aad9fb6d157f0e4e3330d899b4ae94",
@@ -230,6 +230,6 @@
     "defindexCreateTx": "dbf23b9244df145a6b44cdc52a9037ce021eea927d9911393bcddbc99bb14d4d",
     "defindexSeedTx": "548588cd1fc73663f9fffffe6f1052da5d6a5bde32e5efd56b7358b864a7992b",
     "defindexInvestTx": "b534339689c68ae6a9a9107a29380cce22e66b1b7d550332203763d8a7e8ba89",
-    "aquariusAlignTx": "d28fddfebbd21da32ffeb5b7ab81dab6b36835807fce7f7100d07df38a2969cb"
+    "aquariusAlignTx": "78c9bc01a37b60651cd387f01007ffe554ee3266e609cb99bd9f876684dab61e"
   }
 }

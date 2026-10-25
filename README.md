@@ -305,6 +305,19 @@ The script loads `.env.local` and uses `OPENAI_API_KEY`, `LEASH_AGENT_SECRET` an
 
 The model can choose not to trade, including when simulations are refused. Those decisions remain visible in the journal; the keeper still records the real portfolio value. Warmup never fabricates returns, overrides prices, changes policies or unpauses a vault. A paused vault, failed submitted transaction or incomplete keeper check stops the run.
 
+### Maintain the demo pools
+
+```sh
+pnpm tsx scripts/align-liquidity.ts
+pnpm --filter @leash/agent agent run liquidity
+```
+
+Testnet pools have no external arbitrage keeping them at the oracle price. The maintenance command adds liquidity to the existing Soroswap XLM/USDC-Blend pair up to a 15,000 USDC reserve, then swaps the admin's funds to align that pair and the Aquarius pool with the current strict oracle price. It uses `LEASH_ADMIN_SECRET`, borrows test USDC from Blend when needed, and funds XLM through Friendbot. Successful pool-maintenance hashes are recorded in `deployments/testnet.json`; no vault policy, price override or pause state is changed.
+
+The final output quotes 5, 10, 25 and 50 USDC against the actual Soroswap reserves, including its 30 bps fee, and compares each output with the unchanged oracle minimum (50 bps below fair value). The command fails if a 5 or 10 USDC swap would miss that minimum. Larger swaps can still fail: depth, fees and price drift all count. Run maintenance again when the oracle moves or repeated swaps skew the pair.
+
+[Soroswap `#507`](https://docs.soroswap.finance/amm/technical-reference/error-codes) means insufficient output, not a vault refusal. A deposit failing with [SAC `#10`](https://developers.stellar.org/docs/tokens/stellar-asset-contract#contract-errors) can instead mean insufficient XLM: a rejected swap bought nothing. Size the Aquarius deposit from confirmed idle balances and the pool's reserve ratio, not from a proposed swap's expected proceeds.
+
 ## Crash scenario
 
 ```sh

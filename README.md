@@ -136,3 +136,14 @@ stellar contract build --package oracle-router                   # production in
 stellar contract build --package oracle-router --features demo   # testnet crash demo
 stellar contract info interface --wasm target/wasm32v1-none/release/oracle_router.wasm
 ```
+## Cross-chain deposit (CCTP)
+
+```sh
+pnpm tsx scripts/cctp-demo.ts            # add --resume <sepolia burn hash> to continue after a burn
+```
+
+USDC moves from Ethereum Sepolia to a vault on Stellar testnet in five steps: `depositForBurnWithHook` on Sepolia (domain 0 → 27), Circle's Iris attestation, `CctpForwarder.mint_and_forward` on Stellar, a Soroswap swap from Circle USDC to the Blend USDC the vault holds, and the vault `deposit`. Both `mintRecipient` and `destinationCaller` are the `CctpForwarder` contract; the Stellar recipient is only in the hook data (24 zero bytes, version and length as big-endian u32, then the strkey), validated before any burn. Each burn uses Fast finality with `maxFee` read from Iris. Amounts are six-decimal in the CCTP message and scaled ×10 on Stellar; the script checks the recipient receives exactly `(amount − feeExecuted) × 10`.
+
+The script prepares everything it needs and is safe to rerun: the bridge recipient (`LEASH_BRIDGE_USER_SECRET`, created and funded with Friendbot when absent), its Circle and Blend USDC trustlines opened with the SAC `trust` function, a test vault deployed from the uploaded `agent_vault` WASM (or `LEASH_BRIDGE_VAULT`), and the Circle-USDC / Blend-USDC Soroswap pair kept at 1:1 with 1,000 of each token. The ops account (`LEASH_CCTP_OPS_SECRET`) pays for `mint_and_forward`, seeds the pair with Circle USDC bought on the Stellar DEX and Blend USDC borrowed against XLM, and keeps Blend USDC to swap the pair back to 1:1 after bridged swaps move it. The swap must return at least 99.5 % of its input; nothing is burned when the pool cannot meet that floor. Addresses are recorded in `deployments/cctp.testnet.json`.
+
+`/bridge` runs the same pipeline from the server-side Sepolia test wallet (`POST /api/bridge`, one run at a time; `GET /api/bridge` returns the steps and transaction hashes). Jobs are kept in a JSON file in the OS temporary directory, 20 at most; on serverless hosts they last as long as the instance.

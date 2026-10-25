@@ -32,4 +32,14 @@ pub enum Error {
     OracleUnavailable = 27,
     /// The creator has not registered this vault's policy yet: the agent can do nothing.
     PolicyMissing = 28,
+    /// An adapter can only be set for a protocol the policy allowlists.
+    ProtocolNotAllowed = 29,
+    /// A protocol already has another adapter, or still holds value and cannot be removed.
+    AdapterInUse = 30,
+    /// More protocol positions than the vault can value within one transaction.
+    TooManyPositions = 31,
+    /// A swap's minimum output is below the oracle quote less the call's loss tolerance.
+    SlippageTooLoose = 32,
+    /// The vault holds too little of a debt asset to repay any of the leaver's share.
+    RepaymentUnavailable = 33,
 }

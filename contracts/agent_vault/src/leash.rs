@@ -1,9 +1,9 @@
 use policy_registry::{ArgRule, CallRule, Limits, PolicyV2};
 use soroban_sdk::{
-    contracttype, symbol_short, vec, Address, Env, IntoVal, Symbol, TryFromVal, Val, Vec,
+    contracttype, symbol_short, vec, Address, Env, IntoVal, Map, Symbol, TryFromVal, Val, Vec,
 };
 
-use crate::{adapters::blend::Request, shares, Error, Key, BPS};
+use crate::{adapters::blend::Request, oracle::Prices, shares, Error, Key, BPS};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -24,10 +24,10 @@ pub struct LossBucket {
 /// What the pre-checks learned about one proposed call.
 pub(crate) struct Call {
     pub rule: CallRule,
-    /// Base-asset amount charged to the transaction and daily budgets.
+    /// Base-asset value charged to the transaction and daily budgets.
     pub value: i128,
-    /// Net base-asset amount the target may pull from the vault.
-    pub pull: i128,
+    /// Net amount of each asset the target may pull from the vault.
+    pub pulls: Map<Address, i128>,
     /// Every address that could hold an allowance from this call.
     pub spenders: Vec<Address>,
 }
@@ -60,6 +60,7 @@ pub(crate) fn inspect(
     target: &Address,
     fn_name: &Symbol,
     args: &Vec<Val>,
+    prices: &mut Prices,
 ) -> Result<Call, Error> {
     let rule = policy.rule(target, fn_name).ok_or(Error::CallNotAllowed)?;
     if rule.args.len() != args.len() {
@@ -67,9 +68,10 @@ pub(crate) fn inspect(
     }
     let me = env.current_contract_address();
     let allowed = &policy.assets;
+    let base = allowed.get_unchecked(0);
     let mut spenders = Vec::from_array(env, [target.clone()]);
     let mut value: i128 = 0;
-    let mut pull: i128 = 0;
+    let mut pulls: Map<Address, i128> = Map::new(env);
     for (arg_rule, arg) in rule.args.iter().zip(args.iter()) {
         match arg_rule {
             ArgRule::Any => {}
@@ -92,29 +94,43 @@ pub(crate) fn inspect(
                     return Err(Error::InvalidAmount);
                 }
                 value = add(value, amount)?;
-                pull = add(pull, amount)?;
+                pulls.set(
+                    base.clone(),
+                    add(pulls.get(base.clone()).unwrap_or(0), amount)?,
+                );
             }
             ArgRule::BlendRequests => {
                 let requests =
                     Vec::<Request>::try_from_val(env, &arg).map_err(|_| Error::InvalidAmount)?;
-                let asset = allowed.get_unchecked(0);
-                let (mut inflow, mut outflow) = (0_i128, 0_i128);
+                let mut flows: Map<Address, (i128, i128)> = Map::new(env);
                 for request in requests {
                     if !allowed.contains(&request.address) {
                         return Err(Error::AssetNotAllowed);
                     }
-                    // Blend positions are valued in the base asset only.
-                    if request.address != asset || request.request_type > 5 || request.amount < 0 {
+                    if request.request_type > 5 || request.amount < 0 {
                         return Err(Error::InvalidAmount);
                     }
-                    value = add(value, request.amount)?;
+                    // Valued like a debt: a reserve the oracle cannot price would be invisible
+                    // to the NAV, so it is refused rather than budgeted at zero.
+                    let worth = prices
+                        .debt(env, &request.address, request.amount)?
+                        .ok_or(Error::OracleUnavailable)?;
+                    value = add(value, worth)?;
+                    let (mut inflow, mut outflow) =
+                        flows.get(request.address.clone()).unwrap_or((0, 0));
                     match request.request_type {
                         0 | 2 | 5 => inflow = add(inflow, request.amount)?,
                         _ => outflow = add(outflow, request.amount)?,
                     }
+                    flows.set(request.address, (inflow, outflow));
                 }
-                // Blend nets transfers per token, so it pulls only the excess inflow.
-                pull = add(pull, (inflow - outflow).max(0))?;
+                // Blend nets transfers per token, so it pulls only each token's excess inflow.
+                for (asset, (inflow, outflow)) in flows.iter() {
+                    if inflow > outflow {
+                        let pulled = pulls.get(asset.clone()).unwrap_or(0);
+                        pulls.set(asset, add(pulled, inflow - outflow)?);
+                    }
+                }
             }
             ArgRule::Assets => {
                 let list =
@@ -130,7 +146,7 @@ pub(crate) fn inspect(
     Ok(Call {
         rule,
         value,
-        pull,
+        pulls,
         spenders,
     })
 }

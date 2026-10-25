@@ -1,7 +1,7 @@
 use policy_registry::PolicyV2;
 use soroban_sdk::{token, Address, Env, Vec};
 
-use crate::{adapters, shares::mul_div, Error, BPS};
+use crate::{shares::mul_div, Error, BPS};
 
 /// Contracts whose token balances count as "still ours" during a call to `target`:
 /// the vault, the target and the custody contracts the policy declares for it.
@@ -88,11 +88,11 @@ pub(crate) fn allowances_cleared(
 pub(crate) fn exposure_within_cap(
     env: &Env,
     policy: &PolicyV2,
-    asset: &Address,
     before: &Vec<(Address, i128)>,
+    after: &Vec<(Address, i128)>,
     nav: i128,
 ) -> Result<(), Error> {
-    for (protocol, value) in adapters::exposures(env, asset)? {
+    for (protocol, value) in after.iter() {
         let cap = mul_div(env, nav, policy.exposure_cap(&protocol).into(), BPS, false)?;
         let previous = before
             .iter()

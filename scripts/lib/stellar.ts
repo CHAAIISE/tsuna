@@ -1,8 +1,9 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import {
-  Address, Contract, Horizon, Keypair, Networks, SorobanDataBuilder, Transaction, TransactionBuilder,
+  Address, Contract, Horizon, Keypair, Networks, Operation, SorobanDataBuilder, Transaction, TransactionBuilder,
   nativeToScVal, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 import type { FeeBumpTransaction } from "@stellar/stellar-sdk";
@@ -165,6 +166,30 @@ export async function send(key: Keypair, operation: xdr.Operation, soroban = tru
   if (result.status !== rpc.Api.GetTransactionStatus.SUCCESS) throw new Error(`Transaction FAILED: ${result.txHash}`);
   return result;
 }
+
+/**
+ * Deploys the release build of `contract` with `constructorArgs`, uploading its WASM only when
+ * the network does not already hold that exact code.
+ */
+export async function deployContract(admin: Keypair, contract: string, constructorArgs: xdr.ScVal[]) {
+  const wasm = await readFile(new URL(`../../contracts/target/wasm32v1-none/release/${contract}.wasm`, import.meta.url));
+  const wasmHash = createHash("sha256").update(wasm).digest();
+  try {
+    await server.getContractWasmByHash(wasmHash);
+    console.log(`WASM_PRESENT ${contract} ${wasmHash.toString("hex")}`);
+  } catch {
+    const uploaded = await send(admin, Operation.uploadContractWasm({ wasm }));
+    console.log(`WASM_UPLOADED ${contract} ${uploaded.txHash}`);
+  }
+  const deployed = await send(admin, Operation.createCustomContract({
+    address: new Address(admin.publicKey()), wasmHash, constructorArgs,
+  }));
+  if (!deployed.returnValue) throw new Error(`Deployment of ${contract} returned no address`);
+  return { id: scValToNative(deployed.returnValue) as string, txHash: deployed.txHash };
+}
+
+/** `AdapterKind` unit variant of the vault: `Blend`, `DeFindex`, `Aquarius`, `Soroswap` or `Xoxno`. */
+export const adapterKind = (kind: "Blend" | "DeFindex" | "Aquarius" | "Soroswap" | "Xoxno") => vec([symbol(kind)]);
 
 export async function balance(key: Keypair, owner: string, asset: string = testnet.usdc): Promise<bigint> {
   return read<bigint>(key, asset, "balance", [address(owner)]);

@@ -1,4 +1,11 @@
-//! Protocol doubles used to attack the vault from inside an allowlisted call.
+//! Protocol doubles used to attack the vault from inside an allowlisted call, and mocks of
+//! the protocols the adapters integrate.
+
+pub(crate) mod aquarius;
+pub(crate) mod blend;
+pub(crate) mod defindex;
+pub(crate) mod soroswap;
+pub(crate) mod xoxno;
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env, Vec};
 

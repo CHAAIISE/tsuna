@@ -10,6 +10,8 @@ mod shares;
 #[cfg(test)]
 mod test;
 #[cfg(test)]
+mod test_adapters;
+#[cfg(test)]
 mod test_oracle;
 #[cfg(test)]
 mod test_policy;
@@ -20,17 +22,12 @@ use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, token, Address, Env, Symbol, Val, Vec,
 };
 
+pub use adapters::{Adapter, AdapterKind, MAX_POSITIONS};
 pub use errors::Error;
 pub use leash::{LossBucket, Usage};
+use oracle::Prices;
 
 const BPS: i128 = 10_000;
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BlendPosition {
-    pub pool: Address,
-    pub reserve_index: u32,
-}
 
 #[contracttype]
 enum Key {
@@ -38,7 +35,9 @@ enum Key {
     Agent,
     Asset,
     Paused,
-    Blend,
+    Adapters,
+    /// XOXNO account (position NFT id) the vault owns at a controller.
+    Account(Address),
     ProtocolRecipient,
     TotalShares,
     Shares(Address),
@@ -129,15 +128,25 @@ impl AgentVault {
         );
     }
 
-    pub fn set_blend(env: Env, pool: Address, reserve_index: u32) {
+    /// Values and unwinds `protocol` with the `kind` adapter. The protocol must be allowlisted
+    /// in the registry policy, and at most [`MAX_POSITIONS`] adapters may hold positions.
+    pub fn set_adapter(env: Env, kind: AdapterKind, protocol: Address) -> Result<(), Error> {
         Self::owner(env.clone()).require_auth();
-        env.storage().instance().set(
-            &Key::Blend,
-            &BlendPosition {
-                pool,
-                reserve_index,
-            },
-        );
+        adapters::register(&env, &leash::rules(&env)?, kind, protocol)
+    }
+
+    /// Refused while the protocol still holds value or debt for the vault.
+    pub fn remove_adapter(env: Env, protocol: Address) -> Result<(), Error> {
+        Self::owner(env.clone()).require_auth();
+        adapters::remove(
+            &env,
+            &protocol,
+            &mut Prices::strict(&env, &Self::asset(env.clone())),
+        )
+    }
+
+    pub fn adapters(env: Env) -> Vec<Adapter> {
+        adapters::list(&env)
     }
 
     pub fn set_paused(env: Env, paused: bool) {
@@ -177,9 +186,10 @@ impl AgentVault {
         env.storage().instance().get(&Key::Paused).unwrap_or(false)
     }
 
+    /// Lowest health factor across lending positions in bps, at strict oracle prices.
     pub fn health_factor(env: Env) -> Result<i128, Error> {
-        let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
-        adapters::health_factor(&env, &asset)
+        let mut prices = Prices::strict(&env, &Self::asset(env.clone()));
+        Ok(strict_book(&env, &mut prices)?.health)
     }
 
     pub fn check_drawdown(env: Env) -> Result<bool, Error> {
@@ -229,9 +239,11 @@ impl AgentVault {
         Ok(minted)
     }
 
-    /// Never blocked by pause or by the oracle. Idle non-base assets are valued at exit prices;
-    /// if any of them has no usable price, the holder receives their pro-rata share of every
-    /// asset in kind instead.
+    /// Never blocked by pause or by the oracle. The vault exits the holder's share of every
+    /// protocol position itself. Non-base assets are valued at exit prices; if any of them has
+    /// no usable price, the holder receives their pro-rata share of every asset in kind instead.
+    /// A leveraged position is exited only as far as its debt can be repaid from idle balances,
+    /// so fewer shares than requested may be redeemed: the event and balances show how many.
     pub fn withdraw(env: Env, user: Address, shares: i128) -> Result<i128, Error> {
         user.require_auth();
         if shares <= 0 {
@@ -244,48 +256,55 @@ impl AgentVault {
         let token = token::Client::new(&env, &asset);
         let me = env.current_contract_address();
         let assets = leash::assets(&env);
-        let held = oracle::held(&env, &assets);
-        let priced = match oracle::exit_values(&env, &asset, &held) {
-            Some(values) => {
-                let extra = sum(&values)?;
-                let nav = nav_with(&env, &asset, extra)?;
-                // Fees crystallize only on a priced NAV; an in-kind exit has no profit to measure.
-                fees::crystallize(&env, nav)?;
-                Some((values, extra, nav))
-            }
-            None => None,
-        };
+        let mut prices = Prices::exit(&env, &asset);
+        let nav = exit_nav(&env, &asset, &assets, &mut prices)?;
+        if let Some(nav) = nav {
+            // Fees crystallize only on a priced NAV; an in-kind exit has no profit to measure.
+            fees::crystallize(&env, nav)?;
+        }
         let supply = shares::effective_supply(&env)?;
-        let idle_before = token.balance(&me);
-        let idle_claim = shares::mul_div(&env, idle_before, shares, supply, false)?;
-        adapters::unwind(&env, &asset, shares, supply)?;
-        // Pay only this holder's idle balance and actual adapter proceeds.
-        // Protocol rounding dust belongs to the remaining shares.
-        let own = idle_claim
-            .checked_add(token.balance(&me) - idle_before)
+        let shares = adapters::exitable(&env, shares, supply, nav.is_some())?;
+        if shares == 0 {
+            return Err(Error::RepaymentUnavailable);
+        }
+        let before = balances(&env, &assets);
+        adapters::unwind(&env, shares, supply)?;
+        let after = balances(&env, &assets);
+        // The holder's claim on each asset: their pro-rata idle balance plus every unwind
+        // proceed. Protocol rounding dust belongs to the remaining shares.
+        let own = shares::mul_div(&env, before.get_unchecked(0), shares, supply, false)?
+            .checked_add(after.get_unchecked(0) - before.get_unchecked(0))
             .ok_or(Error::ArithmeticOverflow)?;
         let mut in_kind: Vec<(Address, i128)> = Vec::new(&env);
-        let amount = match &priced {
-            Some((values, extra, nav)) => {
+        let amount = match nav {
+            Some(nav) => {
                 let entitlement =
-                    shares::mul_div(&env, shares, shares::effective_assets(*nav)?, supply, false)?;
-                let extra_claim = shares::mul_div(&env, *extra, shares, supply, false)?;
+                    shares::mul_div(&env, shares, shares::effective_assets(nav)?, supply, false)?;
+                let mut claim = own;
+                for (index, held_asset) in assets.iter().enumerate().skip(1) {
+                    let index = index as u32;
+                    let (idle, now) = (before.get_unchecked(index), after.get_unchecked(index));
+                    let idle_value = prices.value(&env, &held_asset, idle)?.unwrap_or(0);
+                    let proceeds = prices.delta(&env, &held_asset, now - idle)?.unwrap_or(0);
+                    claim = claim
+                        .checked_add(shares::mul_div(&env, idle_value, shares, supply, false)?)
+                        .and_then(|claim| claim.checked_add(proceeds))
+                        .ok_or(Error::ArithmeticOverflow)?;
+                }
                 // The holder's share of non-base assets is bought back in base at the exit
                 // price while base liquidity lasts; the rest leaves in kind at that price.
-                let target = entitlement.min(
-                    own.checked_add(extra_claim)
-                        .ok_or(Error::ArithmeticOverflow)?,
-                );
+                let target = entitlement.min(claim);
                 let amount = target.min(token.balance(&me));
                 let mut residual = target - amount;
-                for (index, (held_asset, balance)) in held.iter().enumerate() {
-                    let value = values.get_unchecked(index as u32);
+                for (index, held_asset) in assets.iter().enumerate().skip(1) {
                     if residual <= 0 {
                         break;
                     }
-                    if value <= 0 {
-                        continue;
-                    }
+                    let balance = after.get_unchecked(index as u32);
+                    let value = match prices.value(&env, &held_asset, balance)? {
+                        Some(value) if value > 0 => value,
+                        _ => continue,
+                    };
                     let units =
                         balance.min(shares::mul_div(&env, residual, balance, value, false)?);
                     if units > 0 {
@@ -296,8 +315,12 @@ impl AgentVault {
                 amount
             }
             None => {
-                for (held_asset, balance) in held.iter() {
-                    let units = shares::mul_div(&env, balance, shares, supply, false)?;
+                for (index, held_asset) in assets.iter().enumerate().skip(1) {
+                    let index = index as u32;
+                    let (idle, now) = (before.get_unchecked(index), after.get_unchecked(index));
+                    let units = shares::mul_div(&env, idle, shares, supply, false)?
+                        .checked_add(now - idle)
+                        .ok_or(Error::ArithmeticOverflow)?;
                     if units > 0 {
                         in_kind.push_back((held_asset, units));
                     }
@@ -327,10 +350,9 @@ impl AgentVault {
             shares,
         }
         .publish(&env);
-        if priced.is_some() {
-            let held = oracle::held(&env, &assets);
-            if let Some(values) = oracle::exit_values(&env, &asset, &held) {
-                snapshot(&env, nav_with(&env, &asset, sum(&values)?)?)?;
+        if nav.is_some() {
+            if let Some(nav) = exit_nav(&env, &asset, &assets, &mut prices)? {
+                snapshot(&env, nav)?;
             }
         }
         Ok(amount.max(0))
@@ -361,29 +383,49 @@ impl AgentVault {
         fn_name: Symbol,
         args: Vec<Val>,
     ) -> Result<Val, Error> {
-        let s = env.storage().instance();
         let agent = Self::session(env.clone()).ok_or(Error::SessionRevoked)?;
         agent.require_auth();
         if Self::paused(env.clone()) {
             return Err(Error::Paused);
         }
         let policy = leash::rules(&env)?;
-        let call = leash::inspect(&env, &policy, &target, &fn_name, &args)?;
-        let nav_before = nav_of(&env, &policy.assets)?;
-        leash::charge(&env, &policy.limits, call.value, nav_before)?;
+        let asset = Self::asset(env.clone());
+        // One price per asset for the whole call: before and after are valued alike.
+        let mut prices = Prices::strict(&env, &asset);
+        let call = leash::inspect(&env, &policy, &target, &fn_name, &args, &mut prices)?;
+        let before = valuation(&env, &policy.assets, &mut prices)?;
+        let prepared = adapters::prepare(
+            &env,
+            &policy,
+            &call.rule,
+            &target,
+            &fn_name,
+            &args,
+            &mut prices,
+        )?;
+        let committed = prepared.value.unwrap_or(call.value);
+        leash::charge(&env, &policy.limits, committed, before.nav)?;
         let held = perimeter::holdings(&env, &policy, &target)?;
-        let asset: Address = s.get(&Key::Asset).unwrap();
-        let exposed = adapters::exposures(&env, &asset)?;
-        if call.rule.approve && call.pull > 0 {
-            token::Client::new(&env, &asset).approve(
-                &env.current_contract_address(),
-                &target,
-                &call.pull,
-                &env.ledger().sequence(),
-            );
+        if call.rule.approve {
+            let me = env.current_contract_address();
+            for (pulled, amount) in call.pulls.iter() {
+                if amount > 0 {
+                    token::Client::new(&env, &pulled).approve(
+                        &me,
+                        &target,
+                        &amount,
+                        &env.ledger().sequence(),
+                    );
+                }
+            }
         }
-        let out: Val = env.invoke_contract(&target, &fn_name, args);
-        let nav_after = nav_of(&env, &policy.assets)?;
+        if !prepared.auth.is_empty() {
+            env.authorize_as_current_contract(prepared.auth);
+        }
+        let out: Val = env.invoke_contract(&target, &fn_name, args.clone());
+        adapters::settle(&env, &target, &fn_name, &args, &out)?;
+        let after = valuation(&env, &policy.assets, &mut prices)?;
+        let (nav_before, nav_after) = (before.nav, after.nav);
         let max_loss = call.rule.max_loss_bps;
         if nav_after < shares::mul_div(&env, nav_before, BPS - max_loss as i128, BPS, true)? {
             return Err(Error::NavDropped);
@@ -391,8 +433,14 @@ impl AgentVault {
         leash::record_loss(&env, &policy.limits, nav_before - nav_after, nav_before)?;
         perimeter::conserved(&env, &policy, &target, &held, nav_before, max_loss)?;
         perimeter::allowances_cleared(&env, &policy, &call.spenders)?;
-        perimeter::exposure_within_cap(&env, &policy, &asset, &exposed, nav_after)?;
-        if Self::health_factor(env.clone())? < i128::from(policy.limits.min_health_factor_bps) {
+        perimeter::exposure_within_cap(
+            &env,
+            &policy,
+            &before.exposures,
+            &after.exposures,
+            nav_after,
+        )?;
+        if after.health < i128::from(policy.limits.min_health_factor_bps) {
             return Err(Error::HealthFactorTooLow);
         }
         Executed {
@@ -407,9 +455,9 @@ impl AgentVault {
         Ok(out)
     }
 
-    /// Value held by the vault, in units of the base asset: idle balance + Blend supply/collateral
-    /// − debt + other idle assets at strict oracle prices. Fails while the oracle cannot vouch
-    /// for a held asset, which blocks deposits and the agent but never withdrawals.
+    /// Value held by the vault, in units of the base asset: idle balances plus every protocol
+    /// position net of debt, non-base assets at strict oracle prices. Fails while the oracle
+    /// cannot vouch for a held asset, which blocks deposits and the agent but never withdrawals.
     pub fn nav(env: Env) -> Result<i128, Error> {
         nav_of(&env, &leash::assets(&env))
     }
@@ -432,29 +480,75 @@ impl AgentVault {
     }
 }
 
-/// NAV counting the idle non-base `assets` at strict oracle prices.
-fn nav_of(env: &Env, assets: &Vec<Address>) -> Result<i128, Error> {
-    let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
-    nav_with(env, &asset, oracle::strict_value(env, &asset, assets)?)
+/// Strict NAV with the per-protocol exposures and health factor it was computed from.
+struct Valuation {
+    nav: i128,
+    exposures: Vec<(Address, i128)>,
+    health: i128,
 }
 
-/// Base idle balance + adapter positions + `extra` (other assets already valued in base units).
+/// The strict regime prices every position (unpriced assets count as 0, unpriced debts fail).
+fn strict_book(env: &Env, prices: &mut Prices) -> Result<adapters::Book, Error> {
+    adapters::book(env, prices)?.ok_or(Error::OracleUnavailable)
+}
+
+fn valuation(env: &Env, assets: &Vec<Address>, prices: &mut Prices) -> Result<Valuation, Error> {
+    let idle = oracle::strict_value(env, prices, assets)?;
+    let book = strict_book(env, prices)?;
+    let extra = idle
+        .checked_add(book.net)
+        .ok_or(Error::ArithmeticOverflow)?;
+    Ok(Valuation {
+        nav: nav_with(env, prices.base(), extra)?,
+        exposures: book.exposures,
+        health: book.health,
+    })
+}
+
+/// Strict NAV counting the idle non-base `assets`.
+fn nav_of(env: &Env, assets: &Vec<Address>) -> Result<i128, Error> {
+    let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
+    Ok(valuation(env, assets, &mut Prices::strict(env, &asset))?.nav)
+}
+
+/// Exit-regime NAV, or `None` when an idle asset or a position has no usable price.
+fn exit_nav(
+    env: &Env,
+    asset: &Address,
+    assets: &Vec<Address>,
+    prices: &mut Prices,
+) -> Result<Option<i128>, Error> {
+    let held = oracle::held(env, assets);
+    let Some(values) = oracle::exit_values(env, prices, &held) else {
+        return Ok(None);
+    };
+    let Some(book) = adapters::book(env, prices)? else {
+        return Ok(None);
+    };
+    let extra = values
+        .iter()
+        .try_fold(book.net, |total, value| total.checked_add(value))
+        .ok_or(Error::ArithmeticOverflow)?;
+    Ok(Some(nav_with(env, asset, extra)?))
+}
+
+/// Base idle balance + `extra` (other assets and positions already valued in base units).
 fn nav_with(env: &Env, asset: &Address, extra: i128) -> Result<i128, Error> {
     let idle = token::Client::new(env, asset).balance(&env.current_contract_address());
-    let nav = idle
-        .checked_add(adapters::nav(env, asset)?)
-        .and_then(|nav| nav.checked_add(extra))
-        .ok_or(Error::ArithmeticOverflow)?;
+    let nav = idle.checked_add(extra).ok_or(Error::ArithmeticOverflow)?;
     if nav < 0 {
         return Err(Error::Insolvent);
     }
     Ok(nav)
 }
 
-fn sum(values: &Vec<i128>) -> Result<i128, Error> {
-    values.iter().try_fold(0_i128, |total, value| {
-        total.checked_add(value).ok_or(Error::ArithmeticOverflow)
-    })
+fn balances(env: &Env, assets: &Vec<Address>) -> Vec<i128> {
+    let me = env.current_contract_address();
+    let mut out = Vec::new(env);
+    for asset in assets.iter() {
+        out.push_back(token::Client::new(env, &asset).balance(&me));
+    }
+    out
 }
 
 fn snapshot(env: &Env, nav: i128) -> Result<(), Error> {

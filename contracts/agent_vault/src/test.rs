@@ -3,8 +3,11 @@ extern crate std;
 use crate::{
     adapters::blend::Request,
     shares::{PRICE_SCALE, VIRTUAL_SHARES},
-    testutils::{Echo, Lazy, Router, RouterClient, Skimmer},
-    AgentVault, AgentVaultClient, Error, Executed, NavSnapshot,
+    testutils::{
+        blend::{BlendMock, BlendMockClient, RATE},
+        Echo, Lazy, Router, RouterClient, Skimmer,
+    },
+    AdapterKind, AgentVault, AgentVaultClient, Error, Executed, NavSnapshot,
 };
 use oracle_router::{
     testutils::{MockChainlink, MockReflector},
@@ -14,13 +17,12 @@ use policy_registry::{
     ArgRule, CallRule, Limits, PolicyChange, PolicyRegistry, PolicyRegistryClient, PolicyV2,
 };
 use soroban_sdk::{
-    contract, contractimpl, contracttype, map, symbol_short,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
     token, vec, Address, Env, IntoVal, Map, Symbol, Val, Vec,
 };
 
 pub(crate) const UNIT: i128 = 10_000_000;
-const RATE: i128 = 1_000_000_000_000;
 
 pub(crate) struct Fixture {
     pub(crate) env: Env,
@@ -135,7 +137,7 @@ impl Fixture {
         self.allow_with_loss(target, fn_name, args, approve, 5);
     }
 
-    fn allow_with_loss(
+    pub(crate) fn allow_with_loss(
         &self,
         target: &Address,
         fn_name: &str,
@@ -210,8 +212,10 @@ impl Fixture {
     /// Registers an allowlisted Blend-like pool without investing.
     pub(crate) fn blend_pool(&self) -> Address {
         let pool = self.env.register(BlendMock, (self.asset.clone(),));
-        self.client().mock_all_auths().set_blend(&pool, &3);
         self.allow_protocol(&pool);
+        self.client()
+            .mock_all_auths()
+            .set_adapter(&AdapterKind::Blend, &pool);
         self.allow(
             &pool,
             "submit_with_allowance",
@@ -257,151 +261,11 @@ impl Fixture {
     }
 
     /// Single-protocol tests invest the whole vault, above the default exposure cap.
-    fn invest(&self, amount: i128, request_type: u32) -> Address {
+    pub(crate) fn invest(&self, amount: i128, request_type: u32) -> Address {
         self.update_policy(|policy| policy.limits.max_exposure_bps = 10_000);
         let pool = self.blend_pool();
         self.submit(&pool, amount, request_type).unwrap();
         pool
-    }
-}
-
-#[contract]
-struct BlendMock;
-
-#[contracttype]
-#[derive(Clone)]
-enum MockKey {
-    Asset,
-    Supply(Address),
-    Collateral(Address),
-    Debt(Address),
-    Rate,
-    Sink,
-}
-
-#[contractimpl]
-impl BlendMock {
-    pub fn __constructor(env: Env, asset: Address) {
-        env.storage().instance().set(&MockKey::Asset, &asset);
-        env.storage().instance().set(&MockKey::Rate, &RATE);
-    }
-
-    pub fn set_rate(env: Env, rate: i128) {
-        env.storage().instance().set(&MockKey::Rate, &rate);
-    }
-
-    /// Simulates a compromised pool: inflows go to `sink` while positions are still credited.
-    pub fn set_sink(env: Env, sink: Address) {
-        env.storage().instance().set(&MockKey::Sink, &sink);
-    }
-
-    pub fn get_positions(env: Env, address: Address) -> Map<Symbol, Val> {
-        let s = env.storage().instance();
-        map![
-            &env,
-            (
-                symbol_short!("supply"),
-                map![
-                    &env,
-                    (
-                        3u32,
-                        s.get::<_, i128>(&MockKey::Supply(address.clone()))
-                            .unwrap_or(0)
-                    )
-                ]
-                .into_val(&env)
-            ),
-            (
-                Symbol::new(&env, "collateral"),
-                map![
-                    &env,
-                    (
-                        3u32,
-                        s.get::<_, i128>(&MockKey::Collateral(address.clone()))
-                            .unwrap_or(0)
-                    )
-                ]
-                .into_val(&env)
-            ),
-            (
-                Symbol::new(&env, "liabilities"),
-                map![
-                    &env,
-                    (3u32, s.get::<_, i128>(&MockKey::Debt(address)).unwrap_or(0))
-                ]
-                .into_val(&env)
-            ),
-        ]
-    }
-
-    pub fn get_reserve(env: Env, _asset: Address) -> Map<Symbol, Val> {
-        let rate: i128 = env.storage().instance().get(&MockKey::Rate).unwrap();
-        let data: Map<Symbol, i128> = map![
-            &env,
-            (symbol_short!("b_rate"), rate),
-            (symbol_short!("d_rate"), RATE),
-        ];
-        let config = map![
-            &env,
-            (symbol_short!("c_factor"), 9_000_000u32),
-            (symbol_short!("l_factor"), 9_000_000u32),
-        ];
-        map![
-            &env,
-            (symbol_short!("data"), data.into_val(&env)),
-            (symbol_short!("config"), config.into_val(&env)),
-        ]
-    }
-
-    pub fn submit_with_allowance(
-        env: Env,
-        from: Address,
-        spender: Address,
-        to: Address,
-        requests: Vec<Request>,
-    ) {
-        spender.require_auth();
-        if from != spender {
-            from.require_auth();
-        }
-        let s = env.storage().instance();
-        let asset: Address = s.get(&MockKey::Asset).unwrap();
-        let rate: i128 = s.get(&MockKey::Rate).unwrap();
-        let me = env.current_contract_address();
-        let token = token::Client::new(&env, &asset);
-        let mut net = 0;
-        for request in requests {
-            assert_eq!(request.address, asset);
-            let key = match request.request_type {
-                0 | 1 => MockKey::Supply(from.clone()),
-                2 | 3 => MockKey::Collateral(from.clone()),
-                4 | 5 => MockKey::Debt(from.clone()),
-                _ => panic!("unsupported request"),
-            };
-            let previous: i128 = s.get(&key).unwrap_or(0);
-            let (new, delta) = match request.request_type {
-                0 | 2 => (previous + request.amount * RATE / rate, -request.amount),
-                1 | 3 => {
-                    let burnt = (request.amount * RATE + rate - 1) / rate;
-                    assert!(burnt <= previous);
-                    (previous - burnt, request.amount)
-                }
-                4 => (previous + request.amount, request.amount),
-                5 => {
-                    let repaid = request.amount.min(previous);
-                    (previous - repaid, -repaid)
-                }
-                _ => unreachable!(),
-            };
-            s.set(&key, &new);
-            net += delta;
-        }
-        if net < 0 {
-            let dest: Address = s.get(&MockKey::Sink).unwrap_or(me.clone());
-            token.transfer_from(&me, &spender, &dest, &-net);
-        } else if net > 0 {
-            token.transfer(&me, &to, &net);
-        }
     }
 }
 
@@ -1184,7 +1048,7 @@ fn amount_rules_reject_negative_malformed_and_foreign_asset_requests() {
         Some(Ok(Error::InvalidAmount))
     );
     let pool = f.invest(UNIT, 0);
-    // An allowed asset is still refused by the single-asset Blend valuation.
+    // An allowed asset the oracle cannot price is refused: its position would be invisible.
     let other = f
         .env
         .register_stellar_asset_contract_v2(f.owner.clone())
@@ -1212,7 +1076,7 @@ fn amount_rules_reject_negative_malformed_and_foreign_asset_requests() {
                     .into_val(&f.env),
             )
             .err(),
-        Some(Ok(Error::InvalidAmount))
+        Some(Ok(Error::OracleUnavailable))
     );
 }
 
@@ -1260,7 +1124,10 @@ fn risk_configuration_requires_owner_and_rejects_unsafe_values() {
     assert!(f.client().try_set_paused(&true).is_err());
     assert!(f.client().try_revoke_session().is_err());
     assert!(f.client().try_rotate_session(&f.bob).is_err());
-    assert!(f.client().try_set_blend(&f.bob, &3).is_err());
+    assert!(f
+        .client()
+        .try_set_adapter(&AdapterKind::Blend, &f.bob)
+        .is_err());
     let policy = f.policy();
     assert!(f
         .registry_client()

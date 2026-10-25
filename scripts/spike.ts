@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import {
   Address, Operation, SorobanDataBuilder, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 import { fundUsdc } from "./fund-usdc.js";
 import {
-  UNIT, address, balance, build, call, callRule, defaultLimits, deployment, fail, horizon, i128, policy, read,
-  request, send, server, signer, simulate, submit, symbol, testnet, u32, u64, vec, type Positions,
+  UNIT, adapterKind, address, balance, build, call, callRule, defaultLimits, deployContract, deployment, fail, horizon,
+  i128, policy, read, request, send, server, signer, simulate, submit, symbol, testnet, u32, u64, vec, type Positions,
 } from "./lib/stellar.js";
 
 /** Demo timelock for loosening a policy; production registries use 24 h. */
@@ -16,27 +15,14 @@ const POLICY_TIMELOCK = 600n;
 async function main(): Promise<void> {
   const admin = signer("LEASH_ADMIN_SECRET");
   const agent = signer("LEASH_AGENT_SECRET");
-  const deploy = async (contract: string, constructorArgs: xdr.ScVal[]) => {
-    const wasm = await readFile(`contracts/target/wasm32v1-none/release/${contract}.wasm`);
-    const uploaded = await send(admin, Operation.uploadContractWasm({ wasm }), true, signer("E2E_USER_SECRET"));
-    assert(uploaded.returnValue, "Upload must return a WASM hash");
-    console.log(`WASM_UPLOADED ${contract} ${uploaded.txHash}`);
-    const deployed = await send(admin, Operation.createCustomContract({
-      address: new Address(admin.publicKey()),
-      wasmHash: Buffer.from(scValToNative(uploaded.returnValue) as Uint8Array),
-      constructorArgs,
-    }));
-    assert(deployed.returnValue, "Deployment must return a contract address");
-    return { id: scValToNative(deployed.returnValue) as string, txHash: deployed.txHash };
-  };
   const attacker = process.env.LEASH_ATTACKER_PUBLIC;
   if (!attacker) throw new Error("Missing LEASH_ATTACKER_PUBLIC");
   await fundUsdc();
   const oracle = await deployment("oracleRouter");
   execFileSync("stellar", ["contract", "build", "--manifest-path", "contracts/Cargo.toml"], { stdio: "inherit" });
-  const registry = await deploy("policy_registry", [u64(POLICY_TIMELOCK)]);
+  const registry = await deployContract(admin, "policy_registry", [u64(POLICY_TIMELOCK)]);
   console.log(`REGISTRY ${registry.id} ${registry.txHash} timelock=${POLICY_TIMELOCK}s`);
-  const deployed = await deploy("agent_vault", [
+  const deployed = await deployContract(admin, "agent_vault", [
     address(admin.publicKey()), address(agent.publicKey()), address(testnet.usdc),
     address(signer("LEASH_KEEPER_SECRET").publicKey()), address(oracle), address(registry.id),
   ]);
@@ -52,7 +38,7 @@ async function main(): Promise<void> {
   ], [testnet.pool], limits);
   const registered = await send(admin, call(registry.id, "register", [address(vault), rules()]));
   console.log(`POLICY_REGISTERED ${registered.txHash}`);
-  await send(admin, call(vault, "set_blend", [address(testnet.pool), u32(3)]));
+  await send(admin, call(vault, "set_adapter", [adapterKind("Blend"), address(testnet.pool)]));
   const amount = 100n * UNIT;
   const deposited = await send(admin, call(vault, "deposit", [address(admin.publicKey()), i128(amount)]));
   assert(deposited.returnValue, "Deposit must return shares");

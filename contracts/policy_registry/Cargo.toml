@@ -1,0 +1,21 @@
+[package]
+name = "policy-registry"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[features]
+default = ["contract"]
+# Vaults depend on the policy types only; without this feature the registry's
+# entry points are not compiled, so they are never exported from a vault's Wasm.
+contract = []
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

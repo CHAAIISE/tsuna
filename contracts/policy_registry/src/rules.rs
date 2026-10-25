@@ -1,8 +1,8 @@
-use soroban_sdk::{Address, Vec};
+use soroban_sdk::{Address, Map, Symbol, Vec};
 
 use crate::{
-    ArgRule, CallRule, Error, Limits, PolicyV2, BPS, MAX_ASSETS, MAX_CALLS, MAX_GUARDS,
-    MAX_PROTOCOLS,
+    ArgRule, CallRule, Error, Limits, PolicyV2, Quota, Role, BPS, DEFAULT_ROLE, MAX_ASSETS,
+    MAX_CALLS, MAX_GUARDS, MAX_PROTOCOLS, MAX_ROLES, MAX_ROLE_CALLS,
 };
 
 pub(crate) fn validate(policy: &PolicyV2, base: &Address) -> Result<(), Error> {
@@ -20,6 +20,7 @@ pub(crate) fn validate(policy: &PolicyV2, base: &Address) -> Result<(), Error> {
     });
     if !limits_valid
         || !caps_valid
+        || !roles_valid(policy)
         || policy.assets.get(0).as_ref() != Some(base)
         || policy.assets.len() > MAX_ASSETS
         || policy.protocols.len() > MAX_PROTOCOLS
@@ -46,12 +47,7 @@ pub(crate) fn validate(policy: &PolicyV2, base: &Address) -> Result<(), Error> {
 pub(crate) fn loosens(current: &PolicyV2, next: &PolicyV2) -> bool {
     added(&current.protocols, &next.protocols)
         || added(&current.assets, &next.assets)
-        || next.calls.iter().any(|(call, rule)| {
-            current
-                .calls
-                .get(call)
-                .is_none_or(|old| rule_loosens(&old, &rule))
-        })
+        || calls_loosen(&current.calls, &next.calls)
         || next.guards.iter().any(|(protocol, guards)| {
             current
                 .guards
@@ -60,6 +56,67 @@ pub(crate) fn loosens(current: &PolicyV2, next: &PolicyV2) -> bool {
         })
         || limits_loosen(&current.limits, &next.limits)
         || exposure_loosens(current, next)
+        || roles_loosen(current, next)
+}
+
+/// `default` is the vault's own session key, rules and limits; it cannot be redefined as a role.
+fn roles_valid(policy: &PolicyV2) -> bool {
+    let Some(roles) = policy.roles.as_ref() else {
+        return true;
+    };
+    let default = Symbol::new(roles.env(), DEFAULT_ROLE);
+    roles.len() <= MAX_ROLES
+        && roles.iter().all(|(name, role)| {
+            let quota = &role.quota;
+            name != default
+                && role.calls.len() <= MAX_ROLE_CALLS
+                && role
+                    .calls
+                    .values()
+                    .iter()
+                    .all(|rule| rule.max_loss_bps <= BPS)
+                && quota.tx_cap_bps <= BPS
+                && quota.daily_cap_bps != 0
+                && quota.calls_per_hour != 0
+                && quota.daily_loss_bps <= BPS
+        })
+}
+
+fn calls_loosen(
+    current: &Map<(Address, Symbol), CallRule>,
+    next: &Map<(Address, Symbol), CallRule>,
+) -> bool {
+    next.iter().any(|(call, rule)| {
+        current
+            .get(call)
+            .is_none_or(|old| rule_loosens(&old, &rule))
+    })
+}
+
+/// Adding a role or widening one loosens; removing or narrowing one tightens.
+fn roles_loosen(current: &PolicyV2, next: &PolicyV2) -> bool {
+    next.roles.as_ref().is_some_and(|roles| {
+        roles.iter().any(|(name, role)| {
+            current
+                .role(&name)
+                .is_none_or(|old| role_loosens(&old, &role))
+        })
+    })
+}
+
+fn role_loosens(current: &Role, next: &Role) -> bool {
+    next.member != current.member
+        // RiskOff acts while paused and Normal may raise risk: either switch grants something.
+        || next.mode != current.mode
+        || calls_loosen(&current.calls, &next.calls)
+        || quota_loosens(&current.quota, &next.quota)
+}
+
+fn quota_loosens(current: &Quota, next: &Quota) -> bool {
+    next.tx_cap_bps > current.tx_cap_bps
+        || next.daily_cap_bps > current.daily_cap_bps
+        || next.calls_per_hour > current.calls_per_hour
+        || next.daily_loss_bps > current.daily_loss_bps
 }
 
 fn added(current: &Vec<Address>, next: &Vec<Address>) -> bool {

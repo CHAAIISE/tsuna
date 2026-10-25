@@ -95,6 +95,16 @@ The leash stops the agent from moving value out of the vault; it does not make a
 
 The owner can pause the vault (`set_paused`), `revoke_session`, or `rotate_session` to a new key. `check_drawdown()` is permissionless: anyone can pause a vault whose price per share has fallen below its 24-hour peak by more than the configured drawdown. Peaks are kept in a segment tree indexed by observation, so a check touches a logarithmic number of storage entries and skips expired history. None of these switches blocks withdrawals.
 
+## Agent roles
+
+A vault can give several session keys their own leash, as Zodiac's Roles Modifier does on EVM, except that Leash also checks what each call did. The policy's `roles` map names each role to a `Role { member, mode, calls, quota }`: the member's key, `Normal` or `RiskOff`, an allowlist with the same `CallRule`s as `calls`, and a `Quota { tx_cap_bps, daily_cap_bps, calls_per_hour, daily_loss_bps }` counted apart from every other role (`role_usage(role)`, `role_daily_loss(role)`). Protocols, guards, assets, exposure caps and the health-factor floor stay vault-wide. Role `default` is `execute` itself: the session key with the policy's own `calls` and `limits`.
+
+`execute_as(member, role, target, fn, args)` requires `member`'s signature, then fails with `RoleNotFound` (34) for a role the policy in force does not define and `NotRoleMember` (35) when `member` does not hold it (for `default`, the current session key). The call then runs under the role's rules with the pre- and post-conditions above, and emits `RoleExecuted(role, target, fn, nav_before, nav_after)` (`default` emits `Executed`).
+
+A `Normal` role is blocked while the vault is paused, like `default`. A `RiskOff` role may act while paused, but each call must leave the vault no riskier, compared at the same oracle prices before and after the call: the health factor does not fall, no protocol position grows, idle non-base value grows at most by what positions released (no move out of the base asset), and an asset not held before appears only when a position released it. Together with the NAV, perimeter and allowance checks, any violation fails with `RiskIncreased` (36). A RiskOff role can repay Blend debt or withdraw from a protocol during a crash; it cannot borrow, add collateral, withdraw collateral while in debt, or swap into another asset.
+
+Roles change through the registry: `propose_role(vault, name, role)` adds or widens a role behind the timelock (new member, mode change either way, new or wider call, higher quota: `RoleProposed`, then `RoleApplied` on `apply_policy`) and narrows one immediately (`RoleNarrowed`); `revoke_role(vault, name)` is immediate (`RoleRevoked`, `RoleNotFound` (7) if absent) and cancels any pending proposal. A vault has at most 4 roles of at most 8 calls each, and no role may be named `default`.
+
 ## Protocol adapters
 
 The owner attaches an adapter to a protocol with `set_adapter(kind, protocol)`; `adapters()` lists them. The protocol must already be in the policy's `protocols` (`ProtocolNotAllowed` (29)), so adding one goes through the registry's timelock. At most `MAX_POSITIONS` (4) adapters hold positions, because every NAV reads them and an `execute` reads them twice (`TooManyPositions` (31)); Soroswap holds none and does not count. A protocol cannot change kind, and `remove_adapter` is refused while it still holds value or debt (`AdapterInUse` (30)). An allowlisted protocol without an adapter is worth nothing in the NAV, so moving funds into it fails `NavDropped`.
@@ -115,7 +125,7 @@ XOXNO's testnet deployment is documented at <https://xoxno.com/docs/stellar-lend
 
 ## Policy registry
 
-`policy_registry` stores each vault's policy: `calls`, `protocols`, `guards` (custody contracts per protocol), `assets` (base asset first, then assets the agent may route through, all counted in NAV and paid out on withdrawal), `limits`, and since v2 `exposure_caps` (per-protocol overrides of `max_exposure_bps`). The vault is deployed with the registry's address as its sixth constructor argument and reads its policy from it on every `execute`, `check_drawdown`, `nav` and withdrawal; it keeps no rules of its own.
+`policy_registry` stores each vault's policy: `calls`, `protocols`, `guards` (custody contracts per protocol), `assets` (base asset first, then assets the agent may route through, all counted in NAV and paid out on withdrawal), `limits`, and since v2 `exposure_caps` (per-protocol overrides of `max_exposure_bps`) and `roles` ([agent roles](#agent-roles)). The vault is deployed with the registry's address as its sixth constructor argument and reads its policy from it on every `execute`, `check_drawdown`, `nav` and withdrawal; it keeps no rules of its own.
 
 The vault's owner installs the first policy with `register(vault, policy)`, once and before any deposit (`VaultHasDeposits` (4) otherwise): the registry reads the vault's `owner()`, `asset()` and `total_shares()`, requires the owner's signature, and binds that owner as the vault's creator. Every later change goes through `propose_policy(vault, policy)`, signed by the creator, and is classified field by field against the policy in force:
 
@@ -124,7 +134,7 @@ The vault's owner installs the first policy with `register(vault, policy)`, once
 
 The timelock is fixed at deployment: 24 h in production, 10 minutes for the testnet demo. Invalid policies (caps above 100%, a zero rate, a health factor below 1, a different base asset, more than 16 calls, 8 assets or 8 protocols, 4 guards per protocol) fail with `InvalidPolicy` (3).
 
-Policies are versioned through Soroban's tolerant struct decoding (CAP-86, soroban-sdk 28): `PolicyV2` adds `exposure_caps` as an `Option` to `PolicyV1`, and a field missing from a stored map reads as `None`, so entries written by v1 code are read by v2 code without migration.
+Policies are versioned through Soroban's tolerant struct decoding (CAP-86, soroban-sdk 28): `PolicyV2` adds `exposure_caps` and `roles` as `Option`s to `PolicyV1`, and a field missing from a stored map reads as `None`, so entries written by earlier code are read without migration.
 
 Removing an asset the vault still holds also removes it from NAV and withdrawals until it is allowed again; creators should unwind a position before dropping its asset.
 

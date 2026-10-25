@@ -6,6 +6,7 @@ mod fees;
 mod leash;
 mod oracle;
 mod perimeter;
+mod roles;
 mod shares;
 #[cfg(test)]
 mod test;
@@ -15,6 +16,8 @@ mod test_adapters;
 mod test_oracle;
 #[cfg(test)]
 mod test_policy;
+#[cfg(test)]
+mod test_roles;
 #[cfg(test)]
 mod testutils;
 
@@ -26,6 +29,7 @@ pub use adapters::{Adapter, AdapterKind, MAX_POSITIONS};
 pub use errors::Error;
 pub use leash::{LossBucket, Usage};
 use oracle::Prices;
+use policy_registry::RoleMode;
 
 const BPS: i128 = 10_000;
 
@@ -49,10 +53,26 @@ enum Key {
     Losses,
     Oracle,
     Registry,
+    /// Budget counters of a named role; the default role keeps `Usage` and `Losses`.
+    RoleUsage(Symbol),
+    RoleLosses(Symbol),
 }
 
 #[contractevent]
 pub struct Executed {
+    #[topic]
+    pub target: Address,
+    #[topic]
+    pub fn_name: Symbol,
+    pub nav_before: i128,
+    pub nav_after: i128,
+}
+
+/// An execution by a named role; the default role publishes [`Executed`].
+#[contractevent]
+pub struct RoleExecuted {
+    #[topic]
+    pub role: Symbol,
     #[topic]
     pub target: Address,
     #[topic]
@@ -155,12 +175,21 @@ impl AgentVault {
     }
 
     pub fn usage(env: Env) -> Usage {
-        leash::usage(&env)
+        leash::usage(&env, None)
     }
 
     /// NAV lost to executions over the rolling 24 h window, in base-asset units.
     pub fn daily_loss(env: Env) -> Result<i128, Error> {
-        leash::daily_loss(&env)
+        leash::daily_loss(&env, None)
+    }
+
+    /// Budget counters of `role`; `default` reads the same counters as [`Self::usage`].
+    pub fn role_usage(env: Env, role: Symbol) -> Usage {
+        leash::usage(&env, roles::counters(&env, &role).as_ref())
+    }
+
+    pub fn role_daily_loss(env: Env, role: Symbol) -> Result<i128, Error> {
+        leash::daily_loss(&env, roles::counters(&env, &role).as_ref())
     }
 
     pub fn revoke_session(env: Env) {
@@ -385,10 +414,42 @@ impl AgentVault {
     ) -> Result<Val, Error> {
         let agent = Self::session(env.clone()).ok_or(Error::SessionRevoked)?;
         agent.require_auth();
-        if Self::paused(env.clone()) {
-            return Err(Error::Paused);
-        }
-        let policy = leash::rules(&env)?;
+        let scope = roles::default_scope(&env)?;
+        Self::run(env, scope, target, fn_name, args)
+    }
+
+    /// `execute` on behalf of `role`, signed by its `member`, with that role's allowlist and
+    /// quotas. Role `default` is `execute` itself: the session key, the policy's own `calls`
+    /// and `limits`. A RiskOff role may act while paused, provided the call reduces risk.
+    pub fn execute_as(
+        env: Env,
+        member: Address,
+        role: Symbol,
+        target: Address,
+        fn_name: Symbol,
+        args: Vec<Val>,
+    ) -> Result<Val, Error> {
+        member.require_auth();
+        let scope = if roles::counters(&env, &role).is_none() {
+            if Self::session(env.clone()).ok_or(Error::SessionRevoked)? != member {
+                return Err(Error::NotRoleMember);
+            }
+            roles::default_scope(&env)?
+        } else {
+            roles::named(&env, &member, role)?
+        };
+        Self::run(env, scope, target, fn_name, args)
+    }
+
+    fn run(
+        env: Env,
+        scope: roles::Scope,
+        target: Address,
+        fn_name: Symbol,
+        args: Vec<Val>,
+    ) -> Result<Val, Error> {
+        let roles::Scope { name, mode, policy } = scope;
+        let role = name.as_ref();
         let asset = Self::asset(env.clone());
         // One price per asset for the whole call: before and after are valued alike.
         let mut prices = Prices::strict(&env, &asset);
@@ -404,8 +465,9 @@ impl AgentVault {
             &mut prices,
         )?;
         let committed = prepared.value.unwrap_or(call.value);
-        leash::charge(&env, &policy.limits, committed, before.nav)?;
+        leash::charge(&env, &policy.limits, committed, before.nav, role)?;
         let held = perimeter::holdings(&env, &policy, &target)?;
+        let assets_before = (mode == RoleMode::RiskOff).then(|| oracle::held(&env, &policy.assets));
         if call.rule.approve {
             let me = env.current_contract_address();
             for (pulled, amount) in call.pulls.iter() {
@@ -427,29 +489,54 @@ impl AgentVault {
         let after = valuation(&env, &policy.assets, &mut prices)?;
         let (nav_before, nav_after) = (before.nav, after.nav);
         let max_loss = call.rule.max_loss_bps;
-        if nav_after < shares::mul_div(&env, nav_before, BPS - max_loss as i128, BPS, true)? {
-            return Err(Error::NavDropped);
+        let guarded = (|| -> Result<(), Error> {
+            if nav_after < shares::mul_div(&env, nav_before, BPS - max_loss as i128, BPS, true)? {
+                return Err(Error::NavDropped);
+            }
+            leash::record_loss(
+                &env,
+                &policy.limits,
+                nav_before - nav_after,
+                nav_before,
+                role,
+            )?;
+            perimeter::conserved(&env, &policy, &target, &held, nav_before, max_loss)?;
+            perimeter::allowances_cleared(&env, &policy, &call.spenders)
+        })();
+        roles::outcome(mode, guarded)?;
+        if let Some(assets_before) = assets_before {
+            let assets_after = oracle::held(&env, &policy.assets);
+            let tolerance = shares::mul_div(&env, nav_before, max_loss.into(), BPS, false)?;
+            roles::risk_not_increased(&before, &after, &assets_before, &assets_after, tolerance)?;
+        } else {
+            perimeter::exposure_within_cap(
+                &env,
+                &policy,
+                &before.exposures,
+                &after.exposures,
+                nav_after,
+            )?;
+            if after.health < i128::from(policy.limits.min_health_factor_bps) {
+                return Err(Error::HealthFactorTooLow);
+            }
         }
-        leash::record_loss(&env, &policy.limits, nav_before - nav_after, nav_before)?;
-        perimeter::conserved(&env, &policy, &target, &held, nav_before, max_loss)?;
-        perimeter::allowances_cleared(&env, &policy, &call.spenders)?;
-        perimeter::exposure_within_cap(
-            &env,
-            &policy,
-            &before.exposures,
-            &after.exposures,
-            nav_after,
-        )?;
-        if after.health < i128::from(policy.limits.min_health_factor_bps) {
-            return Err(Error::HealthFactorTooLow);
+        match name {
+            None => Executed {
+                target,
+                fn_name,
+                nav_before,
+                nav_after,
+            }
+            .publish(&env),
+            Some(role) => RoleExecuted {
+                role,
+                target,
+                fn_name,
+                nav_before,
+                nav_after,
+            }
+            .publish(&env),
         }
-        Executed {
-            target,
-            fn_name,
-            nav_before,
-            nav_after,
-        }
-        .publish(&env);
         fees::crystallize(&env, nav_after)?;
         snapshot(&env, nav_after)?;
         Ok(out)
@@ -483,6 +570,8 @@ impl AgentVault {
 /// Strict NAV with the per-protocol exposures and health factor it was computed from.
 struct Valuation {
     nav: i128,
+    /// Idle non-base assets, in base units.
+    idle: i128,
     exposures: Vec<(Address, i128)>,
     health: i128,
 }
@@ -500,6 +589,7 @@ fn valuation(env: &Env, assets: &Vec<Address>, prices: &mut Prices) -> Result<Va
         .ok_or(Error::ArithmeticOverflow)?;
     Ok(Valuation {
         nav: nav_with(env, prices.base(), extra)?,
+        idle,
         exposures: book.exposures,
         health: book.health,
     })

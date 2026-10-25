@@ -42,4 +42,10 @@ pub enum Error {
     SlippageTooLoose = 32,
     /// The vault holds too little of a debt asset to repay any of the leaver's share.
     RepaymentUnavailable = 33,
+    /// `execute_as` names a role the policy in force does not define.
+    RoleNotFound = 34,
+    /// The signer of `execute_as` is not the member of the role it names.
+    NotRoleMember = 35,
+    /// A RiskOff call left the vault riskier or poorer than it found it.
+    RiskIncreased = 36,
 }

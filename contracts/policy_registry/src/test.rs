@@ -8,7 +8,8 @@ use soroban_sdk::{
 
 use crate::{
     contract::Key, ArgRule, CallRule, Error, Limits, PolicyApplied, PolicyChange, PolicyProposed,
-    PolicyRegistry, PolicyRegistryClient, PolicyTightened, PolicyV1, PolicyV2,
+    PolicyRegistry, PolicyRegistryClient, PolicyTightened, PolicyV1, PolicyV2, Quota, Role,
+    RoleApplied, RoleMode, RoleNarrowed, RoleProposed, RoleRevoked,
 };
 
 const TIMELOCK: u64 = 600;
@@ -109,6 +110,7 @@ impl Setup {
             assets: vec![env, self.asset.clone()],
             limits: Limits::default(),
             exposure_caps: None,
+            roles: None,
         }
     }
 
@@ -391,4 +393,258 @@ fn register_binds_vault_owner_before_deposits() {
             .try_propose_policy(&s.vault, &rebased),
         Err(Ok(Error::InvalidPolicy))
     );
+}
+
+impl Setup {
+    fn name(&self, name: &str) -> Symbol {
+        Symbol::new(&self.env, name)
+    }
+
+    fn role(&self, member: &Address, mode: RoleMode) -> Role {
+        let env = &self.env;
+        Role {
+            member: member.clone(),
+            mode,
+            calls: map![
+                env,
+                (
+                    self.submit(),
+                    CallRule {
+                        args: vec![env, ArgRule::Vault, ArgRule::Any, ArgRule::BlendRequests],
+                        max_loss_bps: 5,
+                        approve: false,
+                    }
+                )
+            ],
+            quota: Quota {
+                tx_cap_bps: 2_000,
+                daily_cap_bps: 5_000,
+                calls_per_hour: 10,
+                daily_loss_bps: 20,
+            },
+        }
+    }
+
+    fn propose_role(&self, name: &str, role: &Role) -> PolicyChange {
+        self.client()
+            .mock_all_auths()
+            .propose_role(&self.vault, &self.name(name), role)
+    }
+
+    /// Adds `role` through the timelock and returns the time it was applied at.
+    fn with_role(&self, name: &str, role: &Role) -> u64 {
+        let PolicyChange::Proposed(eta) = self.propose_role(name, role) else {
+            panic!("adding a role must wait for the timelock");
+        };
+        self.warp(eta);
+        self.apply().unwrap();
+        eta
+    }
+}
+
+#[test]
+fn adding_role_requires_timelock() {
+    let s = Setup::new();
+    let keeper = Address::generate(&s.env);
+    let riskoff = s.role(&keeper, RoleMode::RiskOff);
+    let name = s.name("riskoff");
+    assert_eq!(
+        s.propose_role("riskoff", &riskoff),
+        PolicyChange::Proposed(START + TIMELOCK)
+    );
+    s.last_event_is(RoleProposed {
+        vault: s.vault.clone(),
+        role: name.clone(),
+        eta: START + TIMELOCK,
+    });
+    assert_eq!(s.current().role(&name), None);
+    assert_eq!(s.apply(), Err(Error::TimelockActive));
+    s.warp(START + TIMELOCK - 1);
+    assert_eq!(s.apply(), Err(Error::TimelockActive));
+    assert_eq!(s.current().role(&name), None);
+    s.warp(START + TIMELOCK);
+    s.apply().unwrap();
+    s.last_event_is(RoleApplied {
+        vault: s.vault.clone(),
+        role: name.clone(),
+    });
+    assert_eq!(s.current().role(&name), Some(riskoff.clone()));
+
+    // Widening a role in any way waits too.
+    let other = Address::generate(&s.env);
+    let mut variants = std::vec::Vec::new();
+    let mut r = riskoff.clone();
+    r.member = other.clone();
+    variants.push(r);
+    // RiskOff to Normal: no longer acts in pause, but may now raise risk.
+    let mut r = riskoff.clone();
+    r.mode = RoleMode::Normal;
+    variants.push(r);
+    let mut r = riskoff.clone();
+    r.calls.set(
+        (other.clone(), symbol_short!("swap")),
+        CallRule {
+            args: vec![&s.env],
+            max_loss_bps: 0,
+            approve: false,
+        },
+    );
+    variants.push(r);
+    let mut r = riskoff.clone();
+    let mut rule = r.calls.get(s.submit()).unwrap();
+    rule.max_loss_bps = 6;
+    r.calls.set(s.submit(), rule);
+    variants.push(r);
+    for widen in [
+        |q: &mut Quota| q.tx_cap_bps += 1,
+        |q: &mut Quota| q.daily_cap_bps += 1,
+        |q: &mut Quota| q.calls_per_hour += 1,
+        |q: &mut Quota| q.daily_loss_bps += 1,
+    ] {
+        let mut r = riskoff.clone();
+        widen(&mut r.quota);
+        variants.push(r);
+    }
+    for (index, variant) in variants.iter().enumerate() {
+        let now = START + TIMELOCK + 1 + index as u64;
+        s.warp(now);
+        assert_eq!(
+            s.propose_role("riskoff", variant),
+            PolicyChange::Proposed(now + TIMELOCK),
+            "variant {index}"
+        );
+        assert_eq!(s.current().role(&name), Some(riskoff.clone()));
+    }
+
+    // Normal to RiskOff: the role could act while the vault is paused.
+    let trader = s.role(&keeper, RoleMode::Normal);
+    s.with_role("trader", &trader);
+    let mut promoted = trader.clone();
+    promoted.mode = RoleMode::RiskOff;
+    assert!(matches!(
+        s.propose_role("trader", &promoted),
+        PolicyChange::Proposed(_)
+    ));
+
+    // A whole-policy proposal that adds a role is classified the same way.
+    let mut policy = s.current();
+    let mut roles = policy.roles.clone().unwrap();
+    roles.set(s.name("extra"), s.role(&other, RoleMode::Normal));
+    policy.roles = Some(roles);
+    assert!(matches!(s.propose(&policy), PolicyChange::Proposed(_)));
+    assert_eq!(s.current().role(&s.name("extra")), None);
+}
+
+#[test]
+fn narrowing_role_is_immediate() {
+    let s = Setup::new();
+    let keeper = Address::generate(&s.env);
+    let riskoff = s.role(&keeper, RoleMode::RiskOff);
+    s.with_role("riskoff", &riskoff);
+    let mut narrowed = riskoff.clone();
+    narrowed.quota.tx_cap_bps = 1_000;
+    narrowed.quota.calls_per_hour = 1;
+    let mut rule = narrowed.calls.get(s.submit()).unwrap();
+    rule.max_loss_bps = 1;
+    rule.args.set(1, ArgRule::Vault);
+    narrowed.calls.set(s.submit(), rule);
+    assert_eq!(
+        s.propose_role("riskoff", &narrowed),
+        PolicyChange::Tightened
+    );
+    s.last_event_is(RoleNarrowed {
+        vault: s.vault.clone(),
+        role: s.name("riskoff"),
+    });
+    assert_eq!(s.current().role(&s.name("riskoff")), Some(narrowed.clone()));
+    narrowed.calls = Map::new(&s.env);
+    assert_eq!(
+        s.propose_role("riskoff", &narrowed),
+        PolicyChange::Tightened
+    );
+    assert_eq!(s.current().role(&s.name("riskoff")), Some(narrowed));
+}
+
+#[test]
+fn revoking_role_is_immediate() {
+    let s = Setup::new();
+    let keeper = Address::generate(&s.env);
+    let riskoff = s.role(&keeper, RoleMode::RiskOff);
+    let trader = s.role(&keeper, RoleMode::Normal);
+    s.with_role("riskoff", &riskoff);
+    s.with_role("trader", &trader);
+    let name = s.name("riskoff");
+    // A pending widening of the same role must not bring it back once applied.
+    let mut widened = riskoff.clone();
+    widened.quota.calls_per_hour += 1;
+    assert!(matches!(
+        s.propose_role("riskoff", &widened),
+        PolicyChange::Proposed(_)
+    ));
+
+    // Only the creator can revoke.
+    assert!(s.client().try_revoke_role(&s.vault, &name).is_err());
+    s.client().mock_all_auths().revoke_role(&s.vault, &name);
+    s.last_event_is(RoleRevoked {
+        vault: s.vault.clone(),
+        role: name.clone(),
+    });
+    assert_eq!(s.current().role(&name), None);
+    assert_eq!(s.current().role(&s.name("trader")), Some(trader));
+    assert_eq!(s.client().pending_policy(&s.vault), None);
+    assert_eq!(s.apply(), Err(Error::NoPendingPolicy));
+    assert_eq!(
+        s.client().mock_all_auths().try_revoke_role(&s.vault, &name),
+        Err(Ok(Error::RoleNotFound))
+    );
+
+    let fresh = Setup::new();
+    assert_eq!(
+        fresh
+            .client()
+            .mock_all_auths()
+            .try_revoke_role(&fresh.vault, &name),
+        Err(Ok(Error::RoleNotFound))
+    );
+}
+
+#[test]
+fn invalid_roles_are_refused() {
+    let s = Setup::new();
+    let keeper = Address::generate(&s.env);
+    let role = s.role(&keeper, RoleMode::RiskOff);
+    let rejected = |name: &str, role: &Role| {
+        s.client()
+            .mock_all_auths()
+            .try_propose_role(&s.vault, &s.name(name), role)
+    };
+    // `default` is the vault's own session key and rules.
+    assert_eq!(rejected("default", &role), Err(Ok(Error::InvalidPolicy)));
+    let mut idle = role.clone();
+    idle.quota.calls_per_hour = 0;
+    assert_eq!(rejected("riskoff", &idle), Err(Ok(Error::InvalidPolicy)));
+    let mut uncapped = role.clone();
+    uncapped.quota.tx_cap_bps = 10_001;
+    assert_eq!(
+        rejected("riskoff", &uncapped),
+        Err(Ok(Error::InvalidPolicy))
+    );
+    let mut lossy = role.clone();
+    let mut rule = lossy.calls.get(s.submit()).unwrap();
+    rule.max_loss_bps = 10_001;
+    lossy.calls.set(s.submit(), rule.clone());
+    assert_eq!(rejected("riskoff", &lossy), Err(Ok(Error::InvalidPolicy)));
+    let mut busy = role.clone();
+    for _ in 0..crate::MAX_ROLE_CALLS {
+        busy.calls.set(
+            (Address::generate(&s.env), symbol_short!("call")),
+            rule.clone(),
+        );
+    }
+    assert_eq!(rejected("riskoff", &busy), Err(Ok(Error::InvalidPolicy)));
+
+    for index in 0..crate::MAX_ROLES {
+        s.with_role(&std::format!("role{index}"), &role);
+    }
+    assert_eq!(rejected("onemore", &role), Err(Ok(Error::InvalidPolicy)));
 }

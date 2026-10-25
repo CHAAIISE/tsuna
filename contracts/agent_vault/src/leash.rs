@@ -151,12 +151,27 @@ pub(crate) fn inspect(
     })
 }
 
-pub(crate) fn charge(env: &Env, limits: &Limits, amount: i128, nav: i128) -> Result<(), Error> {
+/// Counters of a named role, or of the default role for `None`.
+fn usage_key(role: Option<&Symbol>) -> Key {
+    role.map_or(Key::Usage, |role| Key::RoleUsage(role.clone()))
+}
+
+fn losses_key(role: Option<&Symbol>) -> Key {
+    role.map_or(Key::Losses, |role| Key::RoleLosses(role.clone()))
+}
+
+pub(crate) fn charge(
+    env: &Env,
+    limits: &Limits,
+    amount: i128,
+    nav: i128,
+    role: Option<&Symbol>,
+) -> Result<(), Error> {
     if amount > shares::mul_div(env, nav, limits.tx_cap_bps.into(), BPS, false)? {
         return Err(Error::TxCapExceeded);
     }
     let now = env.ledger().timestamp();
-    let mut usage = usage(env);
+    let mut usage = usage(env, role);
     if usage.day != now / 86_400 {
         usage.day = now / 86_400;
         usage.spent = 0;
@@ -174,27 +189,30 @@ pub(crate) fn charge(env: &Env, limits: &Limits, amount: i128, nav: i128) -> Res
     }
     usage.calls += 1;
     // Written before the external call; a rejected post-condition rolls this back too.
-    env.storage().instance().set(&Key::Usage, &usage);
+    env.storage().instance().set(&usage_key(role), &usage);
     Ok(())
 }
 
-pub(crate) fn usage(env: &Env) -> Usage {
-    env.storage().instance().get(&Key::Usage).unwrap_or(Usage {
-        day: env.ledger().timestamp() / 86_400,
-        spent: 0,
-        hour: env.ledger().timestamp() / 3_600,
-        calls: 0,
-    })
+pub(crate) fn usage(env: &Env, role: Option<&Symbol>) -> Usage {
+    env.storage()
+        .instance()
+        .get(&usage_key(role))
+        .unwrap_or(Usage {
+            day: env.ledger().timestamp() / 86_400,
+            spent: 0,
+            hour: env.ledger().timestamp() / 3_600,
+            calls: 0,
+        })
 }
 
 /// Losses still inside the rolling 24 h window, in hourly buckets (at most 24).
-fn window(env: &Env) -> Vec<LossBucket> {
+fn window(env: &Env, role: Option<&Symbol>) -> Vec<LossBucket> {
     let hour = env.ledger().timestamp() / 3_600;
     let mut kept = Vec::new(env);
     let buckets: Vec<LossBucket> = env
         .storage()
         .instance()
-        .get(&Key::Losses)
+        .get(&losses_key(role))
         .unwrap_or(Vec::new(env));
     for bucket in buckets {
         if bucket.hour + 24 > hour {
@@ -204,8 +222,8 @@ fn window(env: &Env) -> Vec<LossBucket> {
     kept
 }
 
-pub(crate) fn daily_loss(env: &Env) -> Result<i128, Error> {
-    window(env)
+pub(crate) fn daily_loss(env: &Env, role: Option<&Symbol>) -> Result<i128, Error> {
+    window(env, role)
         .iter()
         .try_fold(0_i128, |total, bucket| add(total, bucket.loss))
 }
@@ -216,12 +234,13 @@ pub(crate) fn record_loss(
     limits: &Limits,
     loss: i128,
     nav_before: i128,
+    role: Option<&Symbol>,
 ) -> Result<(), Error> {
     if loss <= 0 {
         return Ok(());
     }
     let hour = env.ledger().timestamp() / 3_600;
-    let mut buckets = window(env);
+    let mut buckets = window(env, role);
     let mut total = loss;
     for bucket in buckets.iter() {
         total = add(total, bucket.loss)?;
@@ -237,7 +256,7 @@ pub(crate) fn record_loss(
         }
         _ => buckets.push_back(LossBucket { hour, loss }),
     }
-    env.storage().instance().set(&Key::Losses, &buckets);
+    env.storage().instance().set(&losses_key(role), &buckets);
     Ok(())
 }
 

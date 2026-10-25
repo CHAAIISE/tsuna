@@ -1,9 +1,9 @@
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, symbol_short, Address, Env,
-    IntoVal, Symbol, TryFromVal, Val, Vec,
+    IntoVal, Map, Symbol, TryFromVal, Val, Vec,
 };
 
-use crate::{rules, PolicyV2};
+use crate::{rules, PolicyV2, Role};
 
 const TTL_THRESHOLD: u32 = 17_280;
 const TTL_EXTEND_TO: u32 = 120_960;
@@ -19,6 +19,7 @@ pub enum Error {
     VaultHasDeposits = 4,
     NoPendingPolicy = 5,
     TimelockActive = 6,
+    RoleNotFound = 7,
 }
 
 #[contracttype]
@@ -70,6 +71,41 @@ pub struct PolicyProposed {
 pub struct PolicyApplied {
     #[topic]
     pub vault: Address,
+}
+
+/// A role was added or widened; it becomes usable after `apply_policy` at `eta`.
+#[contractevent]
+pub struct RoleProposed {
+    #[topic]
+    pub vault: Address,
+    #[topic]
+    pub role: Symbol,
+    pub eta: u64,
+}
+
+#[contractevent]
+pub struct RoleNarrowed {
+    #[topic]
+    pub vault: Address,
+    #[topic]
+    pub role: Symbol,
+}
+
+#[contractevent]
+pub struct RoleRevoked {
+    #[topic]
+    pub vault: Address,
+    #[topic]
+    pub role: Symbol,
+}
+
+/// A role added or changed by the applied policy.
+#[contractevent]
+pub struct RoleApplied {
+    #[topic]
+    pub vault: Address,
+    #[topic]
+    pub role: Symbol,
 }
 
 /// Rules of each vault, changed by the vault's creator. Tightening is immediate;
@@ -125,23 +161,47 @@ impl PolicyRegistry {
         policy: PolicyV2,
     ) -> Result<PolicyChange, Error> {
         Self::creator_of(&env, &vault)?.require_auth();
-        let current: PolicyV2 =
-            load(&env, &Key::Policy(vault.clone())).ok_or(Error::NotRegistered)?;
-        rules::validate(&policy, &current.assets.get_unchecked(0))?;
-        let pending = Key::Pending(vault.clone());
-        if rules::loosens(&current, &policy) {
-            let eta = env
-                .ledger()
-                .timestamp()
-                .saturating_add(Self::policy_timelock(env.clone()));
-            store(&env, &pending, &PendingPolicy { policy, eta });
-            PolicyProposed { vault, eta }.publish(&env);
-            return Ok(PolicyChange::Proposed(eta));
+        change(&env, vault, policy)
+    }
+
+    /// Sets role `name` on top of the policy in force, classified like `propose_policy`:
+    /// adding or widening a role waits for the timelock, narrowing it applies now.
+    pub fn propose_role(
+        env: Env,
+        vault: Address,
+        name: Symbol,
+        role: Role,
+    ) -> Result<PolicyChange, Error> {
+        Self::creator_of(&env, &vault)?.require_auth();
+        let mut policy = current(&env, &vault)?;
+        let mut roles = policy.roles.clone().unwrap_or(Map::new(&env));
+        roles.set(name.clone(), role);
+        policy.roles = Some(roles);
+        let outcome = change(&env, vault.clone(), policy)?;
+        match outcome {
+            PolicyChange::Proposed(eta) => RoleProposed {
+                vault,
+                role: name,
+                eta,
+            }
+            .publish(&env),
+            PolicyChange::Tightened => RoleNarrowed { vault, role: name }.publish(&env),
         }
-        env.storage().persistent().remove(&pending);
-        store(&env, &Key::Policy(vault.clone()), &policy);
-        PolicyTightened { vault }.publish(&env);
-        Ok(PolicyChange::Tightened)
+        Ok(outcome)
+    }
+
+    /// Immediate, like any tightening, so a leaked member key is cut off in one transaction.
+    pub fn revoke_role(env: Env, vault: Address, name: Symbol) -> Result<(), Error> {
+        Self::creator_of(&env, &vault)?.require_auth();
+        let mut policy = current(&env, &vault)?;
+        let mut roles = policy.roles.clone().ok_or(Error::RoleNotFound)?;
+        if roles.remove(name.clone()).is_none() {
+            return Err(Error::RoleNotFound);
+        }
+        policy.roles = Some(roles);
+        change(&env, vault.clone(), policy)?;
+        RoleRevoked { vault, role: name }.publish(&env);
+        Ok(())
     }
 
     pub fn apply_policy(env: Env, vault: Address) -> Result<(), Error> {
@@ -151,15 +211,52 @@ impl PolicyRegistry {
         if env.ledger().timestamp() < pending.eta {
             return Err(Error::TimelockActive);
         }
+        let previous = current(&env, &vault)?;
         env.storage().persistent().remove(&key);
         store(&env, &Key::Policy(vault.clone()), &pending.policy);
-        PolicyApplied { vault }.publish(&env);
+        PolicyApplied {
+            vault: vault.clone(),
+        }
+        .publish(&env);
+        for (name, role) in pending.policy.roles.unwrap_or(Map::new(&env)) {
+            if previous.role(&name).as_ref() != Some(&role) {
+                RoleApplied {
+                    vault: vault.clone(),
+                    role: name,
+                }
+                .publish(&env);
+            }
+        }
         Ok(())
     }
 
     fn creator_of(env: &Env, vault: &Address) -> Result<Address, Error> {
         load(env, &Key::Creator(vault.clone())).ok_or(Error::NotRegistered)
     }
+}
+
+fn current(env: &Env, vault: &Address) -> Result<PolicyV2, Error> {
+    load(env, &Key::Policy(vault.clone())).ok_or(Error::NotRegistered)
+}
+
+/// Applies `policy` now when it only tightens, otherwise queues it behind the timelock.
+fn change(env: &Env, vault: Address, policy: PolicyV2) -> Result<PolicyChange, Error> {
+    let current = current(env, &vault)?;
+    rules::validate(&policy, &current.assets.get_unchecked(0))?;
+    let pending = Key::Pending(vault.clone());
+    if rules::loosens(&current, &policy) {
+        let eta = env
+            .ledger()
+            .timestamp()
+            .saturating_add(PolicyRegistry::policy_timelock(env.clone()));
+        store(env, &pending, &PendingPolicy { policy, eta });
+        PolicyProposed { vault, eta }.publish(env);
+        return Ok(PolicyChange::Proposed(eta));
+    }
+    env.storage().persistent().remove(&pending);
+    store(env, &Key::Policy(vault.clone()), &policy);
+    PolicyTightened { vault }.publish(env);
+    Ok(PolicyChange::Tightened)
 }
 
 fn view<T: TryFromVal<Env, Val>>(env: &Env, vault: &Address, name: Symbol) -> T {

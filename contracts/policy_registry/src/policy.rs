@@ -6,6 +6,10 @@ pub const MAX_PROTOCOLS: u32 = 8;
 pub const MAX_GUARDS: u32 = 4;
 /// Every execution loads the whole policy, so its size is bounded.
 pub const MAX_CALLS: u32 = 16;
+pub const MAX_ROLES: u32 = 4;
+pub const MAX_ROLE_CALLS: u32 = 8;
+/// Name of the role run by `execute` with the vault's own session key, `calls` and `limits`.
+pub const DEFAULT_ROLE: &str = "default";
 
 /// Constraint on one positional argument of an allowlisted call.
 #[contracttype]
@@ -89,6 +93,38 @@ pub struct PolicyV2 {
     pub limits: Limits,
     /// Per-protocol overrides of `limits.max_exposure_bps`.
     pub exposure_caps: Option<Map<Address, u32>>,
+    /// Named roles besides `default`, each with its own member, allowlist and quotas.
+    pub roles: Option<Map<Symbol, Role>>,
+}
+
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RoleMode {
+    /// Same post-conditions as the default role; blocked while the vault is paused.
+    Normal,
+    /// May act while paused, but each call must leave the vault no riskier than before.
+    RiskOff,
+}
+
+/// A role's own budgets, counted apart from every other role's.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Quota {
+    pub tx_cap_bps: u32,
+    pub daily_cap_bps: u32,
+    pub calls_per_hour: u32,
+    pub daily_loss_bps: u32,
+}
+
+/// Protocols, guards, assets, exposure caps and the health-factor floor stay vault-wide.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Role {
+    /// Session key allowed to act in this role.
+    pub member: Address,
+    pub mode: RoleMode,
+    pub calls: Map<(Address, Symbol), CallRule>,
+    pub quota: Quota,
 }
 
 impl PolicyV2 {
@@ -110,5 +146,11 @@ impl PolicyV2 {
             .as_ref()
             .and_then(|caps| caps.get(protocol.clone()))
             .unwrap_or(self.limits.max_exposure_bps)
+    }
+
+    pub fn role(&self, name: &Symbol) -> Option<Role> {
+        self.roles
+            .as_ref()
+            .and_then(|roles| roles.get(name.clone()))
     }
 }

@@ -102,6 +102,7 @@ impl Fixture {
             assets: vec![&f.env, f.asset.clone()],
             limits: Limits::default(),
             exposure_caps: None,
+            roles: None,
         };
         f.registry_client()
             .mock_all_auths()

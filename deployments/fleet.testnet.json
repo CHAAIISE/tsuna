@@ -1,0 +1,56 @@
+{
+  "network": "testnet",
+  "tag": "vault-v1",
+  "builds": [
+    {
+      "hash": "ecc59f525220bef8a6d816e022ae562bc7e05b378a2605763b695efe47847596",
+      "title": "Initial vault build",
+      "description": "agent_vault as deployed with the demo fleet."
+    },
+    {
+      "hash": "958f66d361916f5e42164787c20aa7b61c3397f28df67450faf6e1c985877157",
+      "title": "Rehearsal build 2",
+      "description": "Same agent_vault source with the contract meta entry leash_build=2: no behaviour change, used to rehearse an upgrade on the test fleet.",
+      "uploadTx": "2ada0157f2dfc923c0e20b5d01c254544e8854b99b40290fbe931c207c1015d8"
+    }
+  ],
+  "fleets": {
+    "demo": {
+      "label": "Demo fleet",
+      "adminSecrets": [
+        "LEASH_ADMIN_SECRET",
+        "LEASH_KEEPER_SECRET"
+      ]
+    },
+    "test": {
+      "label": "Test fleet",
+      "factory": "CAWPWRQVRDWXSYV3Q3ERRVGZR3JQZKS5YSON3QWPT7SV37A7S4AENVMX",
+      "timelockSecs": 120,
+      "adminSecrets": [
+        "LEASH_FLEETTEST_ADMIN_A_SECRET",
+        "LEASH_FLEETTEST_ADMIN_B_SECRET"
+      ],
+      "creator": "GDPULB67CZGL6FAELASLBJVARN2FAYWR544HI2AP7JGK4QZSAYK5GKTD",
+      "vaults": [
+        {
+          "address": "CCX6CP55RWARXVLXPPY7CLTXPFNENOVYUDDNEAQN62GKIKX7QWDP4ERK",
+          "name": "Test vault A",
+          "policyShape": "v1",
+          "deployTx": "01659d2c322d12911145a3e1fc666ff435063d63c58f407452845f0e4455ef8d",
+          "registerTx": "cb4a27af5d57bd8d7700dce4df0ea84bdbabd01f4143ded440efe930cefb883c"
+        },
+        {
+          "address": "CBSCPKRQ2FYQD6AQCUQA6ADH3ZASLVA6K4IKRDMZAIWGCLT467HXWUM7",
+          "name": "Test vault B",
+          "policyShape": "v2",
+          "deployTx": "92f1e626c8e67fe9f53244d619f90114a7188170312d81fc330bc7b048d50067",
+          "registerTx": "d9c1bec602faa9dea9491cf1f73efea0c7213bdb0850b2edb6304791c7d5a916"
+        }
+      ],
+      "transactions": {
+        "factoryDeploy": "6e518cd8e15e6f81a18b4854be84596f181ab6577ce29ef4de9e8c5d6ec52a5b",
+        "setRef": "c273fae0625c57a0bfb652d02a524e3ac7bb4738870aed1e9923f92773a11086"
+      }
+    }
+  }
+}

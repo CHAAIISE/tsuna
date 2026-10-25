@@ -1,0 +1,17 @@
+/* The crimson wall shakes once when a refusal appears (DESIGN § Mouvement). */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+.wall {
+  animation: shake 200ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall {
+    animation: none;
+  }
+}

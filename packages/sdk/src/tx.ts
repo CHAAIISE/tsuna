@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   Address, Keypair, Operation, SorobanDataBuilder, TransactionBuilder, authorizeEntry, authorizeInvocation, rpc, xdr,
 } from "@stellar/stellar-sdk";
@@ -26,6 +27,16 @@ const BASE_FEE = "10000";
 const TIMEOUT_SECS = 120;
 /** Ledgers a signed authorization entry stays valid (~8 minutes). */
 const AUTH_VALIDITY_LEDGERS = 100;
+/** Resends of an envelope the RPC answered `TRY_AGAIN_LATER`, with a growing pause. */
+const SEND_RETRIES = 4;
+const SEND_RETRY_MS = 2_000;
+/**
+ * Margin over a successful simulation's budget. Only the resources actually used plus the
+ * non-refundable part of the declared ones are charged; the rest of the fee is refunded.
+ */
+const INSTRUCTIONS_LEEWAY = 1.1;
+const BYTES_LEEWAY = 2_048;
+const FEE_LEEWAY = 500_000n;
 /** Extra instructions and fee for a refused call submitted with a reconstructed budget. */
 const REFUSED_INSTRUCTIONS_MARGIN = 5_000_000;
 const REFUSED_FEE_MARGIN = 2_000_000n;
@@ -77,7 +88,8 @@ export class Chain {
   /**
    * Simulates, signs and submits `operation` with `source` as transaction source. Authorization
    * entries naming another address are signed by the matching `signers` and simulated again,
-   * so the resource budget covers their signature checks.
+   * so the resource budget covers their signature checks. The simulated budget gets a margin:
+   * vault state such as hourly loss buckets can grow between simulation and inclusion.
    */
   async invoke(source: Keypair, operation: xdr.Operation, signers: Keypair[] = [], fallback: ErrorSource = "other"): Promise<TxResult> {
     let simulated = await this.simulate(source.publicKey(), operation, fallback);
@@ -87,7 +99,17 @@ export class Chain {
       const func = hostFunction(operation);
       simulated = await this.simulate(source.publicKey(), Operation.invokeHostFunction({ func, auth }), fallback);
     }
-    const tx = rpc.assembleTransaction(simulated.tx, simulated.simulation).build();
+    const data = simulated.simulation.transactionData.build();
+    const { instructions, diskReadBytes, writeBytes } = data.resources;
+    const padded = new SorobanDataBuilder(data)
+      .setResources(
+        Math.min(Math.ceil(instructions * INSTRUCTIONS_LEEWAY), MAX_INSTRUCTIONS),
+        diskReadBytes + BYTES_LEEWAY,
+        writeBytes + BYTES_LEEWAY,
+      )
+      .setResourceFee(data.resourceFee + FEE_LEEWAY)
+      .build();
+    const tx = rpc.assembleTransaction(simulated.tx, simulated.simulation).setSorobanData(padded).build();
     return this.submit(source, tx, fallback);
   }
 
@@ -110,10 +132,17 @@ export class Chain {
     }));
   }
 
-  /** Signs `tx` with `source`, submits it and waits for its final status. */
+  /**
+   * Signs `tx` with `source`, submits it and waits for its final status. A `TRY_AGAIN_LATER`
+   * answer (the RPC queue is busy for this account) resends the same envelope a few times.
+   */
   async submit(source: Keypair, tx: Transaction, fallback: ErrorSource = "other"): Promise<TxResult> {
     tx.sign(source);
-    const sent = await this.server.sendTransaction(tx);
+    let sent = await this.server.sendTransaction(tx);
+    for (let retry = 1; sent.status === "TRY_AGAIN_LATER" && retry <= SEND_RETRIES; retry++) {
+      await sleep(retry * SEND_RETRY_MS);
+      sent = await this.server.sendTransaction(tx);
+    }
     if (sent.status !== "PENDING" && sent.status !== "DUPLICATE") {
       const raw = errorFromEvents(sent.diagnosticEvents ?? []);
       if (raw) throw new LeashRefusal(this.toLeashError(raw, fallback), `Submission ${sent.status}`);

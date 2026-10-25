@@ -68,8 +68,9 @@ export function rank(rows: LeaderboardRow[]): LeaderboardRow[] {
 }
 
 const NAV_SNAPSHOT = xdr.ScVal.scvSymbol("nav_snapshot").toXDR("base64");
-/** `getEvents` accepts at most 5 contract ids per filter. */
+/** `getEvents` accepts at most 5 filters per request and 5 contract ids per filter. */
 const IDS_PER_FILTER = 5;
+const FILTERS_PER_REQUEST = 5;
 const PAGE = 1_000;
 
 function snapshotOf(event: rpc.Api.EventResponse): Snapshot {
@@ -80,22 +81,28 @@ function snapshotOf(event: rpc.Api.EventResponse): Snapshot {
   };
 }
 
+/** Ledger a `getEvents` cursor points at (the cursor starts with a TOID: ledger in the high 32 bits). */
+const cursorLedger = (cursor: string) => Number(BigInt(cursor.split("-")[0] ?? "0") >> 32n);
+
 /**
- * Every `NavSnapshot` of `vaults` the RPC still retains (about 7 days on testnet), oldest first,
- * following the pagination cursor to the end.
+ * Every `NavSnapshot` of `vaults` the RPC still retains (about 7 days on testnet), oldest first.
+ * The RPC scans a bounded ledger range per request, so a short page does not mean the end: the
+ * cursor is followed until it reaches the latest ledger.
  */
 export async function fetchSnapshots(server: rpc.Server, vaults: string[]): Promise<{ snapshots: Snapshot[]; oldestLedger: number }> {
   const { oldestLedger } = await server.getHealth();
   const snapshots: Snapshot[] = [];
+  const filters: rpc.Api.EventFilter[] = [];
   for (let i = 0; i < vaults.length; i += IDS_PER_FILTER) {
-    const filters: rpc.Api.EventFilter[] = [{
-      type: "contract", contractIds: vaults.slice(i, i + IDS_PER_FILTER), topics: [[NAV_SNAPSHOT, "**"]],
-    }];
-    let page = await server.getEvents({ startLedger: oldestLedger, filters, limit: PAGE });
+    filters.push({ type: "contract", contractIds: vaults.slice(i, i + IDS_PER_FILTER), topics: [[NAV_SNAPSHOT, "**"]] });
+  }
+  for (let i = 0; i < filters.length; i += FILTERS_PER_REQUEST) {
+    const batch = filters.slice(i, i + FILTERS_PER_REQUEST);
+    let page = await server.getEvents({ startLedger: oldestLedger, filters: batch, limit: PAGE });
     for (;;) {
       snapshots.push(...page.events.map(snapshotOf));
-      if (page.events.length < PAGE) break;
-      page = await server.getEvents({ cursor: page.cursor, filters, limit: PAGE });
+      if (page.events.length < PAGE && cursorLedger(page.cursor) >= page.latestLedger) break;
+      page = await server.getEvents({ cursor: page.cursor, filters: batch, limit: PAGE });
     }
   }
   snapshots.sort((a, b) => a.ledger - b.ledger || a.ts - b.ts);

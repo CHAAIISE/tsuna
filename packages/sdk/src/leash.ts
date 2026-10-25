@@ -127,7 +127,7 @@ export class Leash {
       vault.session(),
       vault.totalShares(),
       vault.paused(),
-      vault.policy().catch(() => null),
+      vault.findPolicy(),
       vault.adapters(),
     ]);
     const creator = await this.read<string | null>(required(this.deployments, "policyRegistry"), "creator", [new Address(address).toScVal()]);

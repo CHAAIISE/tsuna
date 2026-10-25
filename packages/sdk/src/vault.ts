@@ -122,11 +122,17 @@ export class VaultClient {
     return this.chain.read(this.readSource, new Contract(registry).call(fn, address(this.address)), "registry");
   }
 
-  /** Policy in force in the registry. */
-  async policy(): Promise<Policy> {
+  /** Policy in force in the registry, `null` before the owner registers one. */
+  async findPolicy(): Promise<Policy | null> {
     const value = await this.registryCall("policy");
-    if (value.type === "scvVoid") throw new Error(`Vault ${this.address} has no registered policy`);
-    return decodePolicy(value);
+    return value.type === "scvVoid" ? null : decodePolicy(value);
+  }
+
+  /** Policy in force in the registry; fails for a vault without policy. */
+  async policy(): Promise<Policy> {
+    const policy = await this.findPolicy();
+    if (!policy) throw new Error(`Vault ${this.address} has no registered policy`);
+    return policy;
   }
 
   /** Loosening waiting for its public timelock, if any. */

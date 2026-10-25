@@ -1,4 +1,4 @@
-import { env } from "node:process";
+import { env, stdout } from "node:process";
 import { describe, expect, test } from "vitest";
 import { actions } from "./actions.js";
 import { TESTNET } from "./network.js";
@@ -16,7 +16,7 @@ describe("testnet write smoke", () => {
 
   test("deposit, allowed Blend supply, on-chain refusal of a transfer, withdrawal", async () => {
     const deposited = await vault.deposit(owner, 2n * UNIT);
-    expect(deposited.status).toBe("SUCCESS");
+    expect(deposited).toMatchObject({ status: "SUCCESS" });
     const shares = await vault.sharesOf(owner.publicKey());
     expect(shares).toBeGreaterThan(0n);
 
@@ -25,7 +25,7 @@ describe("testnet write smoke", () => {
     const simulated = await vault.simulateExecute(agent, supply);
     expect(simulated.ok).toBe(true);
     const supplied = await vault.execute(agent, supply);
-    expect(supplied.status).toBe("SUCCESS");
+    expect(supplied).toMatchObject({ status: "SUCCESS" });
     const positions = await vault.positions();
     const blend = positions.find(p => p.protocol === TESTNET.blendPool && p.kind === "supply");
     expect(blend?.amount ?? 0n).toBeGreaterThan(0n);
@@ -34,7 +34,7 @@ describe("testnet write smoke", () => {
     const [withdrawBlend] = actions.blendWithdraw(address, TESTNET.usdc, UNIT / 10n);
     if (!withdrawBlend) throw new Error("blendWithdraw built no call");
     const sponsored = await vault.execute(agent, withdrawBlend, { feePayer: owner });
-    expect(sponsored.status).toBe("SUCCESS");
+    expect(sponsored).toMatchObject({ status: "SUCCESS" });
 
     const [transfer] = actions.usdcTransfer(address, attacker, UNIT);
     if (!transfer) throw new Error("usdcTransfer built no call");
@@ -47,15 +47,16 @@ describe("testnet write smoke", () => {
     // Withdraw everything the owner holds now, performance-fee shares included.
     const held = await vault.sharesOf(owner.publicKey());
     const redeemed = await vault.withdraw(owner, held);
-    expect(redeemed.status).toBe("SUCCESS");
+    expect(redeemed).toMatchObject({ status: "SUCCESS" });
     expect(await vault.sharesOf(owner.publicKey())).toBeLessThan(held);
 
-    console.log([
+    // Proof of the run: explorer-checkable hashes (vitest hides console output of passing tests).
+    stdout.write(`${[
       `DEPOSIT ${deposited.hash}`,
       `SUPPLY ${supplied.hash} SUCCESS`,
       `SPONSORED_WITHDRAW ${sponsored.hash} SUCCESS`,
       `REFUSED ${refused.hash} FAILED ${refused.error?.name}`,
       `WITHDRAW ${redeemed.hash}`,
-    ].join("\n"));
+    ].join("\n")}\n`);
   });
 });

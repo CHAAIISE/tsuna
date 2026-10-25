@@ -147,3 +147,24 @@ USDC moves from Ethereum Sepolia to a vault on Stellar testnet in five steps: `d
 The script prepares everything it needs and is safe to rerun: the bridge recipient (`LEASH_BRIDGE_USER_SECRET`, created and funded with Friendbot when absent), its Circle and Blend USDC trustlines opened with the SAC `trust` function, a test vault deployed from the uploaded `agent_vault` WASM (or `LEASH_BRIDGE_VAULT`), and the Circle-USDC / Blend-USDC Soroswap pair kept at 1:1 with 1,000 of each token. The ops account (`LEASH_CCTP_OPS_SECRET`) pays for `mint_and_forward`, seeds the pair with Circle USDC bought on the Stellar DEX and Blend USDC borrowed against XLM, and keeps Blend USDC to swap the pair back to 1:1 after bridged swaps move it. The swap must return at least 99.5 % of its input; nothing is burned when the pool cannot meet that floor. Addresses are recorded in `deployments/cctp.testnet.json`.
 
 `/bridge` runs the same pipeline from the server-side Sepolia test wallet (`POST /api/bridge`, one run at a time; `GET /api/bridge` returns the steps and transaction hashes). Jobs are kept in a JSON file in the OS temporary directory, 20 at most; on serverless hosts they last as long as the instance.
+## Agent payments
+
+Agents pay for market signals from a signal budget: an OpenZeppelin smart account (`contracts/signal_budget`, `stellar-accounts` 0.8). The admin rule belongs to the operations account; the session rule lets the agent key sign transfers of Blend testnet USDC only, metered by the OZ `spending_limit` policy at 5 USDC per 17,280 ledgers (about a day).
+
+```sh
+pnpm tsx scripts/deploy-signal-budget.ts
+pnpm tsx scripts/pay-signal.ts
+```
+
+`deploy-signal-budget.ts` uploads the verifier, policy and account WASMs when the network does not already store them, reuses the contracts recorded in `deployments/pay.testnet.json`, and keeps the budget at 20 USDC by borrowing on Blend against XLM collateral from `LEASH_PAY_OPS_SECRET` (Friendbot accounts are merged in when XLM runs low).
+
+The web app sells two signals, 2 USDC per call by default (`SIGNAL_PRICE_USDC`):
+
+- `GET /api/signals/rates` (x402, `@x402/next`): USDC and XLM reserves of the Blend pool with `b_rate`, `d_rate`, utilization and supply/borrow APR from Blend v2's rate model. Settlement happens only after a successful response.
+- `GET /api/signals/risk` (MPP charge, `@stellar/mpp` method on `mppx`, secret `MPP_SECRET`): XLM price, 1-hour and retained-window change, annualized 5-minute and hourly volatility, and USDC peg deviation from the Reflector testnet oracle.
+
+Each payload states its method. Both protocols use a signed Soroban authorization entry for the SEP-41 transfer; the server rebuilds the transaction, simulates it in enforce mode (which runs the account's `__check_auth` and the policy), checks that the only balance change is the payment, and submits it with `LEASH_FACILITATOR_SECRET` as source and fee payer.
+
+The x402 facilitator runs in-process. The public testnet facilitator named in the Stellar docs (x402.org) refuses these payments: its verifier caps settlement fees at 50,000 stroops (a smart-account transfer simulates at about 465,000) and expects SAC transfer events only, while the policy emits its own. The stock `@stellar/mpp` server only accepts `G…` payers, so the MPP charge keeps its method schema with a verifier that accepts contract accounts.
+
+`buySignal(kind, options)` in `@leash/agent` runs the 402 flow, signs with the session key, and returns `{ data, paymentTxHash }` or a typed refusal such as `SpendingLimitExceeded` (3221). With a `refusalSubmitter`, the refused payment is submitted anyway so the refusal is a `FAILED` transaction on-chain; its resources come from the same transfer reduced to one stroop. `pay-signal.ts` starts the web app on port 3217, buys one x402 and one MPP signal, verifies both hashes are `SUCCESS`, confirms that a third payment fails on-chain with the policy error, and stops the server. A budget that already spent in the current window is replaced by a fresh one.

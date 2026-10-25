@@ -100,19 +100,19 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
   return (
     <div className="space-y-6">
       <Card>
-        <div className="grid divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <div className="space-y-1 p-6">
-            <p className="text-caption text-muted-foreground">Vault executable · <span className="font-mono">{state.tag}</span></p>
+        <div className="grid grid-cols-2 sm:grid-cols-3">
+          <div className="col-span-2 space-y-1 border-b p-4 sm:col-span-1 sm:border-b-0 sm:p-6">
+            <p className="text-caption text-muted-foreground">Vault executable · {state.tag}</p>
             <p className="text-subheading font-medium" data-testid="current-build">{current ? buildName(current) : "Not published"}</p>
             {current?.description && <p className="text-caption text-muted-foreground">{current.description}</p>}
             {current && <HashChip hash={current.hash} />}
           </div>
-          <div className="space-y-1 p-6">
+          <div className="space-y-1 p-4 sm:border-l sm:p-6">
             <p className="text-caption text-muted-foreground">Vaults on this build</p>
             <p className="text-subheading font-medium tabular-nums" data-testid="fleet-uniform">{onCurrent} of {vaults.length}</p>
             <p className="text-caption text-muted-foreground">Each vault points at the factory&apos;s reference, not at its own copy.</p>
           </div>
-          <div className="space-y-1 p-6">
+          <div className="space-y-1 border-l p-4 sm:p-6">
             <p className="text-caption text-muted-foreground">Upgrade rule</p>
             <p className="text-subheading font-medium">2 of 2 admins · {Math.round(state.timelockSecs / 60)} min timelock</p>
             <p className="text-caption text-muted-foreground">Every patch is public before it can land.</p>
@@ -270,7 +270,7 @@ function VaultRow({ vault, factory, current }: { vault: FleetVault; factory: str
   const onCurrent = vault.wasmHash !== null && vault.wasmHash === current;
   const policy = vault.policy;
   return (
-    <div role="row" data-testid="fleet-vault" data-address={vault.address} className="grid grid-cols-2 gap-x-4 gap-y-3 border-b px-6 py-4 last:border-b-0 lg:min-h-table-row lg:grid-cols-[1.4fr_1fr_1.3fr_1fr_1fr] lg:items-center">
+    <div role="row" data-testid="fleet-vault" data-address={vault.address} className="grid grid-cols-2 gap-x-4 gap-y-3 border-b px-4 py-4 last:border-b-0 sm:px-6 lg:min-h-table-row lg:grid-cols-[1.4fr_1fr_1.3fr_1fr_1fr] lg:items-center">
       <div role="cell" className="col-span-2 min-w-0 lg:col-span-1">
         <p className="truncate font-medium">{vault.name}</p>
         <details className="mt-1 text-caption">
@@ -281,7 +281,7 @@ function VaultRow({ vault, factory, current }: { vault: FleetVault; factory: str
       <div role="cell">
         <span className="block text-caption text-muted-foreground lg:hidden">Executable</span>
         {vault.executableRef
-          ? <span>{vault.executableRef.owner === factory ? "Factory ref" : "External ref"} <span className="font-mono text-caption text-muted-foreground">{vault.executableRef.tag}</span></span>
+          ? <span>{vault.executableRef.owner === factory ? "Factory ref" : "External ref"} <span className="text-caption text-muted-foreground">{vault.executableRef.tag}</span></span>
           : <span className="text-muted-foreground">Own Wasm</span>}
       </div>
       <div role="cell" className="flex flex-wrap items-center gap-2" data-testid="vault-wasm" data-hash={vault.wasmHash ?? ""}>

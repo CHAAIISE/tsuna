@@ -67,8 +67,8 @@ function RoleCard({ role, nav }: { role: RoleView; nav: string | null }) {
     <Card data-testid={`role-${role.name}`}>
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2">{riskOff ? <ShieldCheck aria-hidden="true" className="size-4 text-primary" /> : <LockKeyhole aria-hidden="true" className="size-4 text-primary" />}{role.name === "default" ? "Yield agent (default role)" : `${role.name === "riskoff" ? "Risk-off agent" : role.name} (${role.name} role)`}</CardTitle>
-          <span className="rounded-full bg-chip px-2.5 py-1 text-caption text-muted-foreground">{riskOff ? "RiskOff mode: acts while paused, may only reduce risk" : "Normal mode"}</span>
+          <CardTitle className="flex min-w-0 items-start gap-2">{riskOff ? <ShieldCheck aria-hidden="true" className="mt-1 size-4 shrink-0 text-primary" /> : <LockKeyhole aria-hidden="true" className="mt-1 size-4 shrink-0 text-primary" />}{role.name === "default" ? "Yield agent (default role)" : `${role.name === "riskoff" ? "Risk-off agent" : role.name} (${role.name} role)`}</CardTitle>
+          <span className="max-w-full rounded-lg bg-chip px-2.5 py-1 text-caption text-muted-foreground">{riskOff ? "RiskOff mode: acts while paused, may only reduce risk" : "Normal mode"}</span>
         </div>
         <CardDescription>
           Signed by <a href={explorerAccount(role.member)} target="_blank" rel="noreferrer" className="hover:text-primary" title={role.member}>{shortAddress(role.member)}</a>.
@@ -78,21 +78,22 @@ function RoleCard({ role, nav }: { role: RoleView; nav: string | null }) {
       <div className="space-y-5 px-6 pb-6">
         <RoleBudget role={role} nav={nav} />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <caption className="pb-2 text-left text-caption text-muted-foreground">{role.calls.length} allowlisted {role.calls.length === 1 ? "call" : "calls"} — anything else is refused with CallNotAllowed</caption>
-            <thead className="border-b text-caption text-muted-foreground">
+          <table className="block w-full text-left text-sm sm:table">
+            <caption className="block pb-2 text-left text-caption text-muted-foreground sm:table-caption">{role.calls.length} allowlisted {role.calls.length === 1 ? "call" : "calls"} — anything else is refused with CallNotAllowed</caption>
+            <thead className="hidden border-b text-caption text-muted-foreground sm:table-header-group">
               <tr><th scope="col" className="py-2 pr-3 font-normal">Contract · function</th><th scope="col" className="px-3 py-2 font-normal">Arguments</th><th scope="col" className="px-3 py-2 font-normal">Max loss</th><th scope="col" className="py-2 pl-3 font-normal">Preset</th></tr>
             </thead>
-            <tbody>
+            <tbody className="block sm:table-row-group">
               {role.calls.map(call => (
-                <tr key={`${call.target}-${call.fn}`} className="border-b align-top last:border-0">
-                  <td className="py-2 pr-3"><span className="font-medium">{call.targetName}</span> · <span className="font-mono text-caption">{call.fn}</span></td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                <tr key={`${call.target}-${call.fn}`} className="grid grid-cols-2 gap-3 border-b py-4 align-top last:border-0 sm:table-row sm:py-0">
+                  <td className="col-span-2 block break-words sm:table-cell sm:py-2 sm:pr-3"><span className="font-medium">{call.targetName}</span> · <span className="text-caption break-all">{call.fn}</span></td>
+                  <td className="col-span-2 block text-muted-foreground sm:table-cell sm:px-3 sm:py-2">
+                    <p className="mb-1 text-caption font-medium text-foreground sm:hidden">Arguments</p>
                     <ol className="list-decimal space-y-0.5 pl-4 text-caption">{call.args.map((arg, i) => <li key={i}>{ARG_LABEL[arg] ?? arg}</li>)}</ol>
                     {call.approve && <p className="mt-1 text-caption">Vault issues an exact approve, cleared after the call</p>}
                   </td>
-                  <td className="px-3 py-2 tabular-nums">{formatLimitBps(call.maxLossBps)}</td>
-                  <td className="py-2 pl-3 text-muted-foreground">{call.preset ?? "Custom"}</td>
+                  <td className="block tabular-nums sm:table-cell sm:px-3 sm:py-2"><span className="mb-1 block text-caption text-muted-foreground sm:hidden">Max loss</span>{formatLimitBps(call.maxLossBps)}</td>
+                  <td className="block text-muted-foreground sm:table-cell sm:py-2 sm:pl-3"><span className="mb-1 block text-caption sm:hidden">Preset</span>{call.preset ?? "Custom"}</td>
                 </tr>
               ))}
             </tbody>

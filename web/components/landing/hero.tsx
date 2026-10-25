@@ -73,7 +73,7 @@ function Hero() {
           </a>
           <h1
             id="hero-title"
-            className="mt-7 text-[2.75rem] leading-[1.05] font-light tracking-[-0.02em] text-heading sm:text-hero lg:text-[4.75rem] lg:leading-[1.02]"
+            className="mt-8 text-page font-light tracking-tight text-heading sm:text-hero"
           >
             AI agents can be tricked.{" "}
             <span className="text-muted-foreground">Your vault can&apos;t.</span>

@@ -10,7 +10,7 @@ function ExposureBar({ exposure }: { exposure: ExposureView | undefined }) {
   const share = Math.max(0, Math.min(100, exposure.bps / 100));
   const cap = Math.min(100, exposure.capBps / 100);
   return (
-    <span className="flex items-center gap-2" title={`${formatLimitBps(exposure.bps)} of NAV; the vault refuses any call raising it above ${formatLimitBps(exposure.capBps)}`}>
+    <span className="flex flex-wrap items-center gap-2" title={`${formatLimitBps(exposure.bps)} of NAV; the vault refuses any call raising it above ${formatLimitBps(exposure.capBps)}`}>
       <span className="relative h-1.5 w-24 rounded-full bg-secondary">
         <span className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: `${share}%` }} />
         <span aria-hidden="true" className="absolute -inset-y-1 w-px bg-foreground/50" style={{ left: `${cap}%` }} />
@@ -54,7 +54,7 @@ export function Positions({ positions, exposure }: { positions: PositionView[]; 
           <li key={`${position.protocol}-${position.kind}-${position.asset}`} className="space-y-1 px-4 py-3 text-sm">
             <p className="flex justify-between gap-2"><span className="font-medium">{position.protocolName}</span><span className="tabular-nums">{formatUsdc(position.value)} USDC</span></p>
             <p className="flex justify-between gap-2 text-caption text-muted-foreground"><span>{KIND_LABEL[position.kind]} · {formatUnits(position.amount, position.assetDecimals, 4)} {position.assetSymbol}</span></p>
-            {position.protocol !== "idle" && <ExposureBar exposure={exposure.find(entry => entry.protocol === position.protocol)} />}
+            {position.protocol !== "idle" && <div className="space-y-1 pt-1"><p className="text-caption text-muted-foreground">Exposure / cap</p><ExposureBar exposure={exposure.find(entry => entry.protocol === position.protocol)} /></div>}
           </li>
         ))}
       </ul>

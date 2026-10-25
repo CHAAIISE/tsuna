@@ -28,9 +28,9 @@ const label = <T extends string | number>(options: Option<T>[], value: T) => opt
 function Steps({ current }: { current: number }) {
   return (
     <nav aria-label="Publishing steps" data-testid="create-steps" className="rounded-xl border bg-card px-4 py-4 sm:px-6">
-      <ol className="grid grid-cols-3 gap-4">
+      <ol className="grid grid-cols-3 gap-2 sm:gap-4">
         {STEPS.map((name, index) => (
-          <li key={name} aria-current={index === current ? "step" : undefined} className="flex items-center gap-3 text-caption">
+          <li key={name} aria-current={index === current ? "step" : undefined} className="flex items-center gap-2 text-caption sm:gap-3">
             <span aria-hidden="true" className={cn("flex size-6 shrink-0 items-center justify-center rounded-full border font-medium", index === current ? "border-primary bg-primary text-primary-foreground" : index < current ? "border-primary/20 bg-primary/10 text-primary" : "border-border text-muted-foreground")}>
               {index < current ? <Check className="size-3" /> : index + 1}
             </span>
@@ -162,14 +162,14 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
             <fieldset className="grid gap-3 lg:grid-cols-3">
               <legend className="sr-only">Strategy</legend>
               {STRATEGIES.map(item => (
-                <label key={item.id} data-testid={`strategy-${item.id}`} className={cn("flex cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors hover:bg-secondary has-focus-visible:ring-3 has-focus-visible:ring-ring/50", item.id === choice.strategy && "border-primary bg-primary/5")}>
+                <label key={item.id} data-testid={`strategy-${item.id}`} className={cn("flex cursor-pointer flex-col gap-2 rounded-lg border p-4 transition-colors hover:bg-secondary has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:gap-3", item.id === choice.strategy && "border-primary bg-primary/5")}>
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-medium">{item.label}</span>
                     <input type="radio" name="strategy" checked={item.id === choice.strategy} onChange={() => pickStrategy(item.id)} className="accent-primary" />
                   </span>
                   <span className="text-sm text-muted-foreground">{item.summary}</span>
                   <span className="mt-auto flex flex-wrap gap-1.5">
-                    {item.venues.map(venue => <Badge key={venue.id} variant="secondary">{venue.adapter}</Badge>)}
+                    {item.venues.map(venue => <Badge key={venue.id} variant="secondary" className="px-2 py-1 text-caption">{venue.adapter}</Badge>)}
                   </span>
                 </label>
               ))}
@@ -187,7 +187,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
             <CardTitle>Leash rules</CardTitle>
             <CardDescription>Composed from the SDK&apos;s protocol presets. The chain refuses any call outside them, whatever the agent is told.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-8">
+          <CardContent className="space-y-6 sm:space-y-8">
             <fieldset className="space-y-3">
               <legend className="font-medium">Protocols the agent may use</legend>
               <p className="text-sm text-muted-foreground">Keep at least one protocol enabled. Required protocols cannot be removed.</p>
@@ -206,7 +206,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
                 );
               })}
             </fieldset>
-            <div className="grid gap-8 lg:grid-cols-3">
+            <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
               <Choices name="daily-loss" legend="Loss budget per day" hint="Above this loss over 24 h, every further call is refused." options={DAILY_LOSS_OPTIONS} value={choice.dailyLossBps} onChange={dailyLossBps => update({ dailyLossBps })} />
               <Choices name="drawdown" legend="Pause on drawdown" hint="Anyone can pause the vault once its share price falls this far from its 24 h peak." options={DRAWDOWN_OPTIONS} value={choice.drawdownBps} onChange={drawdownBps => update({ drawdownBps })} />
               <Choices name="exposure" legend="Exposure" hint="How much of the vault one protocol may hold." options={EXPOSURE_OPTIONS} value={choice.exposure} onChange={exposure => update({ exposure })} />

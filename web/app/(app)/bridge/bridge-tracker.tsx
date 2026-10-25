@@ -93,10 +93,10 @@ function BridgeTracker() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <ol data-testid="bridge-tracker" data-job-status={job?.status ?? "none"} className="grid gap-3 lg:grid-cols-5">
+        <ol data-testid="bridge-tracker" data-job-status={job?.status ?? "none"} className="grid divide-y lg:grid-cols-5 lg:gap-3 lg:divide-y-0">
           {(job?.steps ?? (Object.keys(stepLabels) as StepId[]).map(id => ({ id, status: "pending" as const, txs: [] }))).map((step, index) => (
-            <li key={step.id} data-testid={`bridge-step-${step.id}`} data-status={step.status} aria-current={step.status === "running" ? "step" : undefined} className="space-y-2 rounded-lg border bg-background p-4 text-caption">
-              <div className="flex items-center gap-3">
+            <li key={step.id} data-testid={`bridge-step-${step.id}`} data-status={step.status} aria-current={step.status === "running" ? "step" : undefined} className="space-y-1 py-3 text-caption lg:space-y-2 lg:rounded-lg lg:border lg:bg-background lg:p-4">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span aria-hidden="true" className={cn("flex size-6 shrink-0 items-center justify-center rounded-full border font-medium",
                   step.status === "done" && "border-primary/20 bg-primary/10 text-primary",
                   step.status === "running" && "border-primary bg-primary text-primary-foreground",
@@ -104,11 +104,9 @@ function BridgeTracker() {
                   {step.status === "done" ? <Check className="size-3" /> : step.status === "running" ? <LoaderCircle className="size-3 animate-spin" /> : index + 1}
                 </span>
                 <span className="text-sm font-medium">{stepLabels[step.id]}</span>
+                <span data-testid={`bridge-step-${step.id}-status`} className={cn("ml-auto lg:ml-0 lg:w-full", step.status === "failed" ? "text-foreground" : "text-muted-foreground")}>{statusLabels[step.status]}</span>
               </div>
-              <p className={step.status === "failed" ? "text-foreground" : "text-muted-foreground"}>
-                <span data-testid={`bridge-step-${step.id}-status`}>{statusLabels[step.status]}</span>
-                {"detail" in step && step.detail ? <span className="block break-words">{step.detail}</span> : null}
-              </p>
+              {"detail" in step && step.detail ? <p className="pl-9 break-words text-muted-foreground lg:pl-0">{step.detail}</p> : null}
             </li>
           ))}
         </ol>

@@ -23,7 +23,7 @@ function Stage({ label, state }: { label: string; state: "done" | "failed" | "sk
     skipped: "border-dashed border-border text-muted-foreground",
   }[state];
   const Icon = state === "skipped" ? Minus : state === "failed" || state === "blocked" ? LockKeyhole : Check;
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-caption ${tone}`}><Icon aria-hidden="true" className="size-3" />{label}</span>;
+  return <span className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-full border px-1.5 py-1 text-center text-caption leading-tight sm:px-2 sm:py-0.5 ${tone}`}><Icon aria-hidden="true" className="hidden size-3 shrink-0 sm:block" />{label}</span>;
 }
 
 const ROLE_LABEL: Record<string, string> = { default: "Yield agent", riskoff: "Risk-off agent" };
@@ -41,7 +41,7 @@ function ActionItem({ item }: { item: TimelineAction }) {
       data-source={item.source}
       data-hash={item.hash ?? undefined}
       className={cn(
-        "animate-in fade-in slide-in-from-bottom-1 space-y-3 rounded-lg px-4 py-3 duration-200",
+        "animate-in fade-in slide-in-from-bottom-1 space-y-3 rounded-lg px-3 py-3 duration-200 sm:px-4",
         blocked ? cn("border-l-[3px] border-destructive bg-destructive-soft", item.outcome === "blocked" && styles.wall) : "border bg-card",
       )}
     >
@@ -50,11 +50,11 @@ function ActionItem({ item }: { item: TimelineAction }) {
           <p className="text-caption text-muted-foreground">{roleLabel(item.role)} · {item.source === "run" ? "run from this app" : "seen on-chain"} · {formatWhen(item.at)}</p>
           <p className="font-medium break-words">{item.label}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-1" aria-label="Stages">
+        <div className="grid w-full grid-cols-3 items-center gap-1 sm:flex sm:w-auto sm:flex-wrap" aria-label="Stages">
           <Stage label="Proposed" state={item.proposed ? "done" : "skipped"} />
-          <ArrowRight aria-hidden="true" className="size-3 text-muted-foreground" />
+          <ArrowRight aria-hidden="true" className="hidden size-3 text-muted-foreground sm:block" />
           <Stage label="Simulated" state={simulated} />
-          <ArrowRight aria-hidden="true" className="size-3 text-muted-foreground" />
+          <ArrowRight aria-hidden="true" className="hidden size-3 text-muted-foreground sm:block" />
           <Stage
             label={outcomeLabel}
             state={item.outcome === "authorized" ? "authorized" : item.outcome === "blocked" ? "blocked" : "skipped"}
@@ -63,7 +63,7 @@ function ActionItem({ item }: { item: TimelineAction }) {
       </div>
       {blocked && (
         <div className="space-y-1">
-          <p className="flex items-center gap-2 font-medium text-destructive" data-testid="refusal-name"><LockKeyhole aria-hidden="true" className="size-4" />{error ? error.name : "Refused on-chain"}</p>
+          <p className="flex items-start gap-2 font-medium break-words text-destructive" data-testid="refusal-name"><LockKeyhole aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 break-words">{error ? error.name : "Refused on-chain"}</span></p>
           <p className="text-sm">{error ? `The chain refused: ${error.message}` : "The vault refused this call. Its error detail is no longer retained by the RPC."}</p>
         </div>
       )}
@@ -78,7 +78,7 @@ function ActionItem({ item }: { item: TimelineAction }) {
             <summary className={cn("w-fit", blocked ? "text-destructive" : "text-muted-foreground")}>Details</summary>
             <dl className="mt-2 grid gap-1 sm:grid-cols-[8rem_1fr]">
               {item.hash && <><dt className="text-muted-foreground">Transaction</dt><dd className="font-mono break-all">{item.hash}</dd></>}
-              {error && <><dt className="text-muted-foreground">Error</dt><dd className="font-mono">{error.name} ({error.contract} #{error.code})</dd></>}
+              {error && <><dt className="text-muted-foreground">Error</dt><dd className="font-mono break-all">{error.name} ({error.contract} #{error.code})</dd></>}
               <dt className="text-muted-foreground">Role</dt><dd className="font-mono">{item.role}</dd>
               {item.navBefore && <><dt className="text-muted-foreground">NAV before</dt><dd className="font-mono">{item.navBefore}</dd></>}
             </dl>

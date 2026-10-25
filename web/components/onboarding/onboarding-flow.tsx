@@ -137,14 +137,14 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
   details.push({ label: "Test USDC (Blend)", value: passkeyDeployment.usdc, kind: "contract" });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <OnboardingSteps currentStep={step} />
-      <div className="grid items-start gap-8 lg:grid-cols-3">
+      <div className="grid items-start gap-6 sm:gap-8 lg:grid-cols-3">
         <Card className="lg:col-span-2" aria-live="polite">
           {!ready && mode === "passkey" && (
             <>
               <CardHeader>
-                <p className="font-overline text-caption tracking-overline text-muted-foreground">Step 1</p>
+                <p className="text-caption text-muted-foreground">Step 1</p>
                 <CardTitle>Create your passkey</CardTitle>
                 <CardDescription>Your device keeps the key. Use your fingerprint, face or PIN to approve actions.</CardDescription>
               </CardHeader>
@@ -153,7 +153,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
                 <p className="flex gap-3"><ArrowRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No gas. Leash pays the testnet network fees.</p>
                 {!supported && <p className="text-muted-foreground">This browser cannot create passkeys. Use a wallet extension instead.</p>}
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex-col items-stretch sm:flex-row sm:items-center">
                 <Button data-primary data-testid="create-passkey" onClick={createAccount} pending={pending === "create"} disabled={!supported}>
                   {pending === "create" ? WAITING : "Create passkey"}
                 </Button>
@@ -165,7 +165,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
           {!ready && mode === "wallet" && (
             <>
               <CardHeader>
-                <p className="font-overline text-caption tracking-overline text-muted-foreground">Step 1</p>
+                <p className="text-caption text-muted-foreground">Step 1</p>
                 <CardTitle>{wallet ? "Add the USDC trustline" : "Connect a wallet"}</CardTitle>
                 <CardDescription>
                   {wallet
@@ -174,7 +174,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
                 </CardDescription>
               </CardHeader>
               {wallet && <CardContent className="text-sm">Connected as <span className="font-medium">{shortAddress(wallet)}</span></CardContent>}
-              <CardFooter>
+              <CardFooter className="flex-col items-stretch sm:flex-row sm:items-center">
                 {wallet ? (
                   <Button data-primary onClick={trust} pending={pending === "trustline"} disabled={balance === undefined}>
                     {pending === "trustline" ? WAITING : "Add USDC trustline"}
@@ -192,7 +192,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
           {ready && (
             <>
               <CardHeader>
-                <p className="font-overline text-caption tracking-overline text-muted-foreground">{funded ? "Up next" : "Step 2"}</p>
+                <p className="text-caption text-muted-foreground">{funded ? "Up next" : "Step 2"}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="success" data-testid="account-ready">{mode === "passkey" ? "Account ready" : "Wallet ready"}</Badge>
                   <span className="text-caption text-muted-foreground">{shortAddress(holder)}</span>
@@ -204,7 +204,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
                 <p className="text-caption text-muted-foreground">Balance, read on Stellar</p>
                 <p className="text-section font-medium tabular-nums" data-testid="usdc-balance">{typeof balance === "bigint" ? formatUsdc(balance) : "—"} <span className="text-base font-normal text-muted-foreground">USDC</span></p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex-col items-stretch sm:flex-row sm:items-center">
                 {funded ? (
                   <Button asChild data-primary><Link href="/agents">Pick an agent <ArrowRight aria-hidden="true" /></Link></Button>
                 ) : (
@@ -233,7 +233,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
               <a href={`${EXPLORER_URL}/tx/${notice.hash}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline">View on Stellar Expert <ExternalLink aria-hidden="true" className="size-3" /></a>
             </div>
           )}
-          <Card>
+          <Card className="bg-muted shadow-none">
             <CardHeader className="space-y-3">
               <div className="flex items-center justify-between gap-2"><CardTitle className="text-base">How it works</CardTitle><Badge variant="secondary">Testnet only</Badge></div>
               <CardDescription>Test tokens have no value. Blend testnet USDC is borrowed against faucet XLM and sent from a Leash faucet account.</CardDescription>

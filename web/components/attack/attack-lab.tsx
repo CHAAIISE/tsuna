@@ -56,18 +56,18 @@ export function AttackLab({ id }: { id: string }) {
           const run = catalog.data?.runs.find(entry => entry.attack === attack.id);
           const result = run?.result;
           return <Card key={attack.id} data-testid={`attack-${attack.id}`}>
-            <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-6">
               <div className="min-w-0 space-y-2">
                 <p className="text-caption text-muted-foreground">0{index + 1} · Agent {attack.vault === "prudent" ? "Prudent" : "Leverage"}</p>
                 <h2 className="text-subheading font-medium">{attack.title}</h2>
                 <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">{attack.description}</p>
               </div>
-              <Button variant={attack.id === primaryAttack ? "default" : "outline"} data-primary={attack.id === primaryAttack ? true : undefined} pending={run?.status === "running" || (launch.isPending && launch.variables === attack.id)} disabled={running} onClick={() => launch.mutate(attack.id)}>{run?.status === "running" || (launch.isPending && launch.variables === attack.id) ? "Waiting for Stellar…" : result ? "Replay attack" : "Launch attack"}</Button>
+              <Button className="shrink-0" variant={attack.id === primaryAttack ? "default" : "outline"} data-primary={attack.id === primaryAttack ? true : undefined} pending={run?.status === "running" || (launch.isPending && launch.variables === attack.id)} disabled={running} onClick={() => launch.mutate(attack.id)}>{run?.status === "running" || (launch.isPending && launch.variables === attack.id) ? "Waiting for Stellar…" : result ? "Replay attack" : "Launch attack"}</Button>
             </div>
             {run?.status === "failed" && <p role="alert" className="px-6 pb-6 text-sm text-muted-foreground">{run.error}</p>}
-            {result && <div className="px-6 pb-6" aria-live="polite">
+            {result && <div className="px-4 pb-4 sm:px-6 sm:pb-6" aria-live="polite">
               <div data-testid="attack-wall" data-blocked={result.blocked} data-hash={result.hash} className={result.blocked ? `${wall.wall} space-y-3 rounded-lg border-l-4 border-destructive bg-destructive-soft p-4` : "space-y-3 rounded-lg border p-4"}>
-                <p className={`flex items-center gap-2 font-medium ${result.blocked ? "text-destructive" : "text-foreground"}`}><ShieldX aria-hidden="true" className="size-4 shrink-0" />{result.blocked ? `Blocked on-chain · ${result.error}` : `Unexpected outcome · ${result.error ?? result.onChain}`}</p>
+                <p className={`flex items-start gap-2 font-medium break-words ${result.blocked ? "text-destructive" : "text-foreground"}`}><ShieldX aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 break-words">{result.blocked ? `Blocked on-chain · ${result.error}` : `Unexpected outcome · ${result.error ?? result.onChain}`}</span></p>
                 <p className="text-sm">{result.blocked ? explanations[result.error ?? ""] : "The transaction did not produce the expected refusal. Inspect the receipt before replaying."}</p>
                 <p className="text-caption text-muted-foreground">{result.id === "injection" ? result.note : "Crafted transaction signed with the agent's session key. No model involved."}</p>
                 <a data-testid="attack-tx" href={result.explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">View transaction<ArrowUpRight aria-hidden="true" className="size-3" /></a>

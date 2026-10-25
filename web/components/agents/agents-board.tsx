@@ -6,6 +6,7 @@ import { ArrowDown, ArrowRight, CircleAlert, Plus, Search } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-layout";
 import { useAgents } from "@/lib/hooks/use-agents";
 import { usePasskeyAccount } from "@/lib/hooks/use-passkey-account";
 import { useHoldings } from "@/lib/hooks/use-vault";
@@ -214,6 +215,16 @@ export function AgentsBoard() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Agents"
+        description="Every number here comes from on-chain events."
+        aside={
+          <div className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-full border border-input bg-card px-4 py-2 text-caption shadow-card">
+            <span className="text-muted-foreground">Total in vaults</span>
+            <span className="font-medium tabular-nums" data-testid="total-in-vaults">{data ? `${formatUsdc(data.totalNav)} USDC` : "Reading vaults…"}</span>
+          </div>
+        }
+      />
       {account && <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Compare the assets and limits, then open a vault to deposit.</p>
         {holdingsQuery.data && BigInt(holdingsQuery.data.usdcBalance ?? "0") === 0n ? (
@@ -228,25 +239,20 @@ export function AgentsBoard() {
           <Button data-primary pending={isFetching} onClick={() => void refetch()}>Read agents again</Button>
         )}
       </div>}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Card className="col-span-2 p-5 sm:col-span-1">
-          <p className="text-caption text-muted-foreground">Total value locked</p>
-          <p className="mt-1 text-section font-medium tabular-nums" data-testid="total-in-vaults">{data ? `${formatUsdc(data.totalNav)} USDC` : <span className="inline-block h-7 w-40 animate-pulse rounded bg-secondary align-middle" />}</p>
-          <p className="mt-1 text-caption text-muted-foreground">Sum of the listed vaults&apos; NAV at oracle prices</p>
-        </Card>
-        <Card className="p-5">
-          <p className="text-caption text-muted-foreground">Agents</p>
-          <p className="mt-1 text-section font-medium tabular-nums" data-testid="agents-count">{data ? data.rows.length : "—"}</p>
-          <p className="mt-1 text-caption text-muted-foreground">
+      <dl className="grid grid-cols-2 gap-4 text-caption sm:flex sm:gap-8">
+        <div className="space-y-1">
+          <dt className="text-muted-foreground">Agents</dt>
+          <dd className="text-subheading font-medium tabular-nums" data-testid="agents-count">{data ? data.rows.length : "—"}</dd>
+          <dd className="text-muted-foreground">
             {data ? `${data.rows.length - published} demo, ${published} published with Create${paused > 0 ? ` · ${paused} paused` : ""}` : "Reading the vault factory…"}
-          </p>
-        </Card>
-        <Card className="p-5">
-          <p className="text-caption text-muted-foreground">Rules enforced on-chain</p>
-          <p className="mt-1 text-section font-medium tabular-nums">{data ? totalRules : "—"}</p>
-          <p className="mt-1 text-caption text-muted-foreground">{oldest ? `History since inception (${formatAge(oldest)})` : "Allowlisted calls and limits"}</p>
-        </Card>
-      </div>
+          </dd>
+        </div>
+        <div className="space-y-1 border-l pl-4 sm:pl-8">
+          <dt className="text-muted-foreground">Rules enforced on-chain</dt>
+          <dd className="text-subheading font-medium tabular-nums">{data ? totalRules : "—"}</dd>
+          <dd className="text-muted-foreground">{oldest ? `History since inception (${formatAge(oldest)})` : "Allowlisted calls and limits"}</dd>
+        </div>
+      </dl>
 
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b px-4 py-4 sm:px-6 lg:flex-row lg:items-center">

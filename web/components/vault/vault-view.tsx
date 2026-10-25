@@ -125,7 +125,7 @@ export function VaultView({ id }: { id: string }) {
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-6">
-          <div role="tablist" aria-label="Vault sections" className="flex w-fit max-w-full flex-wrap gap-1 rounded-xl bg-secondary p-1 text-sm sm:rounded-full">
+          <div role="tablist" aria-label="Vault sections" className="grid w-full grid-cols-4 gap-1 rounded-full bg-secondary p-1 text-caption sm:flex sm:w-fit sm:text-sm">
             {TABS.map(entry => (
               <button
                 key={entry.id}
@@ -135,12 +135,12 @@ export function VaultView({ id }: { id: string }) {
                 aria-selected={tab === entry.id}
                 aria-controls={`panel-${entry.id}`}
                 onClick={() => setTab(entry.id)}
-                className={cn("rounded-full border border-transparent px-4 py-1.5 transition-colors", tab === entry.id ? "border-input bg-card shadow-card" : "text-muted-foreground hover:text-foreground")}
+                className={cn("rounded-full border border-transparent px-2 py-2 whitespace-nowrap transition-colors sm:px-4 sm:py-1.5", tab === entry.id ? "border-input bg-card shadow-card" : "text-muted-foreground hover:text-foreground")}
               >
                 {entry.label}
               </button>
             ))}
-            <Link href={`/agents/${encodeURIComponent(id)}/attack`} className="shrink-0 rounded-full border border-transparent px-4 py-1.5 text-muted-foreground hover:text-foreground">Attack lab</Link>
+            <Link href={`/agents/${encodeURIComponent(id)}/attack`} className="rounded-full border border-transparent px-2 py-2 text-center whitespace-nowrap text-muted-foreground hover:text-foreground sm:px-4 sm:py-1.5">Attack lab</Link>
           </div>
 
           {tab === "overview" && (
@@ -153,11 +153,13 @@ export function VaultView({ id }: { id: string }) {
               <Card>
                 <CardHeader>
                   <CardTitle>Agent journal</CardTitle>
-                  <CardDescription>The agent proposes, the vault simulates and decides. Refusals are real failed transactions.</CardDescription>
+                  <CardDescription>The agent proposes, the vault simulates and decides. Refusals are real failed transactions. {agentItems.length > 0 && `Showing ${Math.min(agentItems.length, OVERVIEW_ITEMS)} recent entries; scroll the journal to read each one.`}</CardDescription>
                 </CardHeader>
                 <div className="px-6 pb-6">
-                  {activity.isPending && !running ? <p className="text-sm text-muted-foreground">Reading the journal…</p> : (
-                    <Timeline items={agentItems.slice(0, OVERVIEW_ITEMS)} empty="The agent hasn't acted yet — run it." />
+                  {activity.error && !activity.data && !running ? <p role="alert" className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">{activity.error.message}</p> : activity.isPending && !running ? <p role="status" className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">Reading the journal…</p> : (
+                    <div role="region" aria-label="Recent agent journal" tabIndex={agentItems.length ? 0 : undefined} className="max-h-screen overflow-y-auto rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+                      <Timeline items={agentItems.slice(0, OVERVIEW_ITEMS)} empty="The agent hasn't acted yet — run it." />
+                    </div>
                   )}
                   {agentItems.length > OVERVIEW_ITEMS && <Button variant="link" className="mt-3 px-0" onClick={() => setTab("activity")}>See all activity</Button>}
                 </div>

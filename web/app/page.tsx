@@ -5,6 +5,7 @@ import { HowItWorks } from "@/components/landing/how-it-works";
 import { Closing, LandingFooter, Limits } from "@/components/landing/limits";
 import { Problem } from "@/components/landing/problem";
 import { Proof } from "@/components/landing/proof";
+import { ProductPreview } from "@/components/landing/product-preview";
 
 export default function Home() {
   return (
@@ -12,6 +13,7 @@ export default function Home() {
       <LandingHeader />
       <main>
         <Hero />
+        <ProductPreview />
         <Problem />
         <HowItWorks />
         <Proof />

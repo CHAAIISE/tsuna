@@ -37,7 +37,7 @@ export function PortfolioView() {
   if (!ready) return <div role="status" aria-label="Loading" className="h-40 animate-pulse rounded-xl bg-secondary" />;
   if (!account) {
     return (
-      <Card className="flex flex-col items-start gap-4 p-8">
+      <Card className="flex flex-col items-start gap-4 p-4 sm:p-6">
         <p className="text-subheading font-medium">Sign in to see your deposits</p>
         <p className="max-w-xl text-sm text-muted-foreground">Your passkey account lives on this device. Leash reads its vault shares and USDC balance straight from Stellar testnet.</p>
         <Button asChild data-primary><Link href="/onboarding"><Fingerprint aria-hidden="true" />Sign in with passkey</Link></Button>

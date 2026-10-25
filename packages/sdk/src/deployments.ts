@@ -65,7 +65,8 @@ export function parseDeployments(value: unknown): Deployments {
 }
 
 export function loadDeployments(path: string = defaultDeploymentsPath()): Deployments {
-  return parseDeployments(JSON.parse(readFileSync(path, "utf8")));
+  // The path is only known at runtime: keep bundlers from tracing the whole repository for it.
+  return parseDeployments(JSON.parse(readFileSync(/*turbopackIgnore: true*/ path, "utf8")));
 }
 
 /** `deployments[key]`, or an error naming the missing entry. */

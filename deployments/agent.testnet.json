@@ -1,0 +1,53 @@
+{
+  "network": "testnet",
+  "vaults": [
+    {
+      "id": "agent-prudent",
+      "name": "Agent Prudent (runtime test)",
+      "slug": "agent-prudent",
+      "strategy": "USDC yield on Blend and a DeFindex vault lending on Blend, run by the agent runtime with its own session key.",
+      "strategyId": "prudent",
+      "address": "CDUHSK4XZSYLSZOL3VMX4N5HYTSYATDSQR42DTUZ4767GLN7UKDCK7N5",
+      "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
+      "registry": "CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN",
+      "oracle": "CCQW2UW5BDDKQYJXGXFGLDQOSBHTVWRNNRJTYYE52RKI7MS7GXGAYN4G",
+      "owner": "GAZNZHH557AR4CL3XKNVSG542UT7DQGETHS64BRYMXHY3LRLPYCM53MV",
+      "agent": "GCIVCMY5U64B225RVDLC4B6OJK47UFLNIQNZUQ7JMRYCYSGIUOX5ZI5V",
+      "assets": [
+        "CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU"
+      ],
+      "adapters": [
+        {
+          "kind": "Blend",
+          "protocol": "CCEBVDYM32YNYCVNRXQKDFFPISJJCV557CDZEIRBEE4NCV4KHPQ44HGF"
+        },
+        {
+          "kind": "DeFindex",
+          "protocol": "CDTXTXCYXNHVRSQUWOP4UW6DGW23Y4ZYT2WMFC4BKHOEOR3CUB3JXKVQ"
+        }
+      ],
+      "roles": {
+        "default": {
+          "member": "GCIVCMY5U64B225RVDLC4B6OJK47UFLNIQNZUQ7JMRYCYSGIUOX5ZI5V",
+          "env": "LEASH_AGENTRUN_AGENT_SECRET"
+        },
+        "riskoff": {
+          "member": "GDYWE52NU2RBSW6X6FYE6LZJ3QBZUQY3J4CBZDA5RFCUCZ5ST3U3PIVY",
+          "env": "LEASH_AGENTRUN_RISKOFF_SECRET"
+        }
+      },
+      "feePayer": {
+        "address": "GBC3U2JJ677OKCASFTOAKFPGGBYLBNNJJPEOOXGXN3WRLDGNO2SZP7OF",
+        "env": "LEASH_AGENTRUN_FEE_SECRET"
+      },
+      "deployTx": "1bf467d1e910d9fef171feee914beeed87888c8a846b508c107a289fd3403bf8",
+      "adapterTxs": [
+        "0b947568c2daad2490f7068bead93af5b289d66f3655fcbcd396ef1101c6707e",
+        "c62514f59d60ddef2a6784feb0daf58a722e62bc6a0eaf8b7fd3e48bddc39e32"
+      ],
+      "policyTx": "df2f84b4dada2716aaee233e7cb20617027c57618c7a98a16959b0980b87a585",
+      "depositTx": "ac4f19bf11345b5a6239e3239fdeb738aeb1cc2b9d957c4b9000a404a2643b5b",
+      "deposit": "1000000000"
+    }
+  ]
+}

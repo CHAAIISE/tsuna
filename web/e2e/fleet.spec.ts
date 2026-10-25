@@ -19,7 +19,7 @@ test("the demo fleet shows every factory vault on the factory's executable", asy
   expect(state.vaults.length).toBeGreaterThanOrEqual(3);
 
   await page.goto("/fleet");
-  await expect(page.getByRole("heading", { name: "Fleet" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fleet", exact: true })).toBeVisible();
   const rows = page.getByTestId("fleet-vault");
   await expect(rows).toHaveCount(state.vaults.length);
   for (const name of ["Prudent", "Leverage", "Liquidity"]) {

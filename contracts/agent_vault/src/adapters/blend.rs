@@ -20,6 +20,8 @@ struct Position {
     debt: i128,
     b_rate: i128,
     d_rate: i128,
+    c_factor: u32,
+    l_factor: u32,
 }
 
 fn load(env: &Env, asset: &Address, position: &BlendPosition) -> Result<Position, Error> {
@@ -34,6 +36,7 @@ fn load(env: &Env, asset: &Address, position: &BlendPosition) -> Result<Position
         (asset,).into_val(env),
     );
     let data: Map<Symbol, Val> = field(env, &reserve, symbol_short!("data"))?;
+    let config: Map<Symbol, Val> = field(env, &reserve, symbol_short!("config"))?;
     let b_rate = field(env, &data, symbol_short!("b_rate"))?;
     let d_rate = field(env, &data, symbol_short!("d_rate"))?;
     if b_rate <= 0 || d_rate <= 0 {
@@ -60,6 +63,8 @@ fn load(env: &Env, asset: &Address, position: &BlendPosition) -> Result<Position
         )?,
         b_rate,
         d_rate,
+        c_factor: field(env, &config, symbol_short!("c_factor"))?,
+        l_factor: field(env, &config, symbol_short!("l_factor"))?,
     })
 }
 
@@ -73,6 +78,26 @@ pub(crate) fn nav(env: &Env, asset: &Address, position: &BlendPosition) -> Resul
         .checked_add(collateral)
         .and_then(|assets| assets.checked_sub(debt))
         .ok_or(Error::ArithmeticOverflow)
+}
+
+pub(crate) fn health_factor(
+    env: &Env,
+    asset: &Address,
+    position: &BlendPosition,
+) -> Result<i128, Error> {
+    let p = load(env, asset, position)?;
+    if p.debt == 0 {
+        return Ok(i128::MAX);
+    }
+    if p.c_factor > 10_000_000 || p.l_factor == 0 || p.l_factor > 10_000_000 {
+        return Err(Error::BadAdapterData);
+    }
+    // The base asset is both collateral and liability, so its oracle price cancels.
+    let collateral = mul_div(env, p.collateral, p.b_rate, SCALAR, false)?;
+    let debt = mul_div(env, p.debt, p.d_rate, SCALAR, true)?;
+    let collateral = mul_div(env, collateral, p.c_factor.into(), 10_000_000, false)?;
+    let debt = mul_div(env, debt, 10_000_000, p.l_factor.into(), true)?;
+    mul_div(env, collateral, 10_000, debt, false)
 }
 
 pub(crate) fn unwind(

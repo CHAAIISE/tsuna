@@ -60,3 +60,19 @@ cd contracts
 cargo test -p agent-vault
 stellar contract build
 ```
+
+## Session limits
+
+`execute(target, fn, args)` is the only path for the session key. In order, it checks that the session is not revoked, the vault is not paused, `(target, fn)` is allowlisted with one rule per argument, and each argument satisfies its rule. `Amount` arguments and same-asset `BlendRequests` (summed, never netted) are charged against the limits set by the owner with `set_limits`:
+
+| Limit | Default | Error |
+| --- | --- | --- |
+| Per-call amount, in bps of NAV before the call | 10,000 | `TxCapExceeded` (14) |
+| Amount per UTC day, in bps of NAV at each call | 100,000 | `DailyCapExceeded` (15) |
+| Calls per clock hour, including zero-amount calls | 60 | `RateLimited` (16) |
+| Blend health factor after the call, in bps | 13,000 | `HealthFactorTooLow` (17) |
+| Price-per-share drop from the rolling 24-hour peak | 2,000 | pause via `check_drawdown` |
+
+After the call, NAV must not fall more than `max_loss_bps` (constructor) or the whole transaction reverts with `NavDropped` (5), including any protocol state, allowance and usage counters it wrote. Other refusals: `CallNotAllowed` (1), `DestinationNotVault` (2), `SpenderNotProtocol` (3), `ArgCountMismatch` (4), `Paused` (6), `SessionRevoked` (18). Successful calls emit `Executed(target, fn, nav_before, nav_after)`.
+
+The owner can pause the vault (`set_paused`), `revoke_session`, or `rotate_session` to a new key. `check_drawdown()` is permissionless: anyone can pause a vault whose price per share has fallen below its 24-hour peak by more than the configured drawdown. Peaks are kept in a segment tree indexed by observation, so a check touches a logarithmic number of storage entries and skips expired history. None of these switches blocks withdrawals.

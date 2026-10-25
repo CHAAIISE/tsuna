@@ -15,6 +15,17 @@ pub(crate) fn nav(env: &Env, asset: &Address) -> Result<i128, Error> {
     }
 }
 
+pub(crate) fn health_factor(env: &Env, asset: &Address) -> Result<i128, Error> {
+    match env
+        .storage()
+        .instance()
+        .get::<_, BlendPosition>(&Key::Blend)
+    {
+        Some(position) => blend::health_factor(env, asset, &position),
+        None => Ok(i128::MAX),
+    }
+}
+
 pub(crate) fn unwind(env: &Env, asset: &Address, shares: i128, supply: i128) -> Result<(), Error> {
     if let Some(position) = env
         .storage()

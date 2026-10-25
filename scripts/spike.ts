@@ -33,8 +33,8 @@ async function main(): Promise<void> {
   const vault = scValToNative(deployed.returnValue) as string;
   console.log(`VAULT ${vault} ${deployed.txHash}`);
   await send(admin, call(vault, "allow_protocol", [address(testnet.pool)]));
-  await send(admin, call(vault, "allow_call", [address(testnet.usdc), symbol("approve"), vec(["Vault", "Protocol", "Any", "Any"].map(rule => vec([symbol(rule)])))]));
-  await send(admin, call(vault, "allow_call", [address(testnet.pool), symbol("submit_with_allowance"), vec(["Vault", "Vault", "Vault", "Any"].map(rule => vec([symbol(rule)])))]));
+  await send(admin, call(vault, "allow_call", [address(testnet.usdc), symbol("approve"), vec(["Vault", "Protocol", "Amount", "Any"].map(rule => vec([symbol(rule)])))]));
+  await send(admin, call(vault, "allow_call", [address(testnet.pool), symbol("submit_with_allowance"), vec(["Vault", "Vault", "Vault", "BlendRequests"].map(rule => vec([symbol(rule)])))]));
   await send(admin, call(vault, "set_blend", [address(testnet.pool), u32(3)]));
   const amount = 100n * UNIT;
   const deposited = await send(admin, call(vault, "deposit", [address(admin.publicKey()), i128(amount)]));
@@ -67,7 +67,8 @@ async function main(): Promise<void> {
     assert(rejected.error.includes(`Error(Contract, #${attack.code})`), `Unexpected preflight error: ${rejected.error}`);
     // A failing preflight has no resource estimate. Reuse a valid call's budget,
     // then include the exact allowlist key read by the rejected invocation.
-    const { simulation } = await simulate(agent, call(vault, "execute", approveArgs));
+    const budgetArgs = [address(testnet.usdc), symbol("approve"), vec([address(vault), address(testnet.pool), i128(0n), u32(expiry)])];
+    const { simulation } = await simulate(agent, call(vault, "execute", budgetArgs));
     const data = new SorobanDataBuilder(simulation.transactionData.build());
     const ruleKey = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
       contract: new Address(vault).toScAddress(),

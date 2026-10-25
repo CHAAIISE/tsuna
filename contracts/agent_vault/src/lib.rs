@@ -1,35 +1,21 @@
 #![no_std]
 mod adapters;
+mod drawdown;
+mod errors;
 mod fees;
+mod leash;
 mod shares;
 #[cfg(test)]
 mod test;
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, token, Address, Env,
-    Symbol, TryFromVal, Val, Vec,
+    contract, contractevent, contractimpl, contracttype, token, Address, Env, Symbol, Val, Vec,
 };
 
-const BPS: i128 = 10_000;
+pub use errors::Error;
+pub use leash::{Limits, Usage};
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum Error {
-    CallNotAllowed = 1,
-    DestinationNotVault = 2,
-    SpenderNotProtocol = 3,
-    ArgCountMismatch = 4,
-    NavDropped = 5,
-    Paused = 6,
-    BadAdapterData = 7,
-    InvalidAmount = 8,
-    InsufficientShares = 9,
-    ZeroShares = 10,
-    ArithmeticOverflow = 11,
-    Insolvent = 12,
-    InvalidConfig = 13,
-}
+const BPS: i128 = 10_000;
 
 /// Constraint on one positional argument of an allowlisted call.
 #[contracttype]
@@ -40,6 +26,10 @@ pub enum ArgRule {
     Vault,
     /// Must be an allowlisted protocol (e.g. the spender of an `approve`).
     Protocol,
+    /// Non-negative base-asset amount, included in transaction and daily budgets.
+    Amount,
+    /// Sum of same-base-asset Blend request amounts; never net deposits against withdrawals.
+    BlendRequests,
 }
 
 #[contracttype]
@@ -63,6 +53,11 @@ enum Key {
     TotalShares,
     Shares(Address),
     HighWaterMark,
+    Limits,
+    Usage,
+    Revoked,
+    Observations,
+    Peak(u32, u32),
 }
 
 #[contractevent]
@@ -121,6 +116,8 @@ impl AgentVault {
         s.set(&Key::MaxLossBps, &max_loss_bps);
         s.set(&Key::Paused, &false);
         s.set(&Key::ProtocolRecipient, &protocol_recipient);
+        s.set(&Key::Limits, &Limits::default());
+        s.set(&Key::Revoked, &false);
         s.set(&Key::TotalShares, &0_i128);
         s.set(
             &Key::HighWaterMark,
@@ -160,6 +157,59 @@ impl AgentVault {
     pub fn set_paused(env: Env, paused: bool) {
         Self::owner(&env).require_auth();
         env.storage().instance().set(&Key::Paused, &paused);
+    }
+
+    pub fn set_limits(env: Env, limits: Limits) -> Result<(), Error> {
+        Self::owner(&env).require_auth();
+        leash::validate(&limits)?;
+        env.storage().instance().set(&Key::Limits, &limits);
+        Ok(())
+    }
+
+    pub fn limits(env: Env) -> Limits {
+        leash::limits(&env)
+    }
+
+    pub fn usage(env: Env) -> Usage {
+        leash::usage(&env)
+    }
+
+    pub fn revoke_session(env: Env) {
+        Self::owner(&env).require_auth();
+        env.storage().instance().set(&Key::Revoked, &true);
+    }
+
+    pub fn rotate_session(env: Env, agent: Address) {
+        Self::owner(&env).require_auth();
+        env.storage().instance().set(&Key::Agent, &agent);
+        env.storage().instance().set(&Key::Revoked, &false);
+    }
+
+    pub fn session(env: Env) -> Option<Address> {
+        if env.storage().instance().get(&Key::Revoked).unwrap_or(false) {
+            None
+        } else {
+            env.storage().instance().get(&Key::Agent)
+        }
+    }
+
+    pub fn paused(env: Env) -> bool {
+        env.storage().instance().get(&Key::Paused).unwrap_or(false)
+    }
+
+    pub fn health_factor(env: Env) -> Result<i128, Error> {
+        let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
+        adapters::health_factor(&env, &asset)
+    }
+
+    pub fn check_drawdown(env: Env) -> Result<bool, Error> {
+        let nav = Self::nav(env.clone())?;
+        let price = shares::price(&env, nav)?;
+        if drawdown::breached(&env, price)? {
+            env.storage().instance().set(&Key::Paused, &true);
+        }
+        snapshot(&env, nav)?;
+        Ok(Self::paused(env))
     }
 
     pub fn deposit(env: Env, user: Address, amount: i128) -> Result<i128, Error> {
@@ -264,47 +314,23 @@ impl AgentVault {
         args: Vec<Val>,
     ) -> Result<Val, Error> {
         let s = env.storage().instance();
-        s.get::<_, Address>(&Key::Agent).unwrap().require_auth();
-        if s.get(&Key::Paused).unwrap_or(false) {
+        let agent = Self::session(env.clone()).ok_or(Error::SessionRevoked)?;
+        agent.require_auth();
+        if Self::paused(env.clone()) {
             return Err(Error::Paused);
         }
-
-        let rules: Vec<ArgRule> = env
-            .storage()
-            .persistent()
-            .get(&Key::Rule(target.clone(), fn_name.clone()))
-            .ok_or(Error::CallNotAllowed)?;
-        if rules.len() != args.len() {
-            return Err(Error::ArgCountMismatch);
-        }
-        let me = env.current_contract_address();
-        for (rule, arg) in rules.iter().zip(args.iter()) {
-            match rule {
-                ArgRule::Any => {}
-                ArgRule::Vault => {
-                    let a = Address::try_from_val(&env, &arg)
-                        .map_err(|_| Error::DestinationNotVault)?;
-                    if a != me {
-                        return Err(Error::DestinationNotVault);
-                    }
-                }
-                ArgRule::Protocol => {
-                    let a =
-                        Address::try_from_val(&env, &arg).map_err(|_| Error::SpenderNotProtocol)?;
-                    if !Self::is_protocol(&env, &a) {
-                        return Err(Error::SpenderNotProtocol);
-                    }
-                }
-            }
-        }
-
+        let amount = leash::amount(&env, &target, &fn_name, &args)?;
         let nav_before = Self::nav(env.clone())?;
+        leash::charge(&env, amount, nav_before)?;
         let out: Val = env.invoke_contract(&target, &fn_name, args);
         let nav_after = Self::nav(env.clone())?;
-
         let max_loss: u32 = s.get(&Key::MaxLossBps).unwrap();
         if nav_after < shares::mul_div(&env, nav_before, BPS - max_loss as i128, BPS, true)? {
             return Err(Error::NavDropped);
+        }
+        if Self::health_factor(env.clone())? < i128::from(leash::limits(&env).min_health_factor_bps)
+        {
+            return Err(Error::HealthFactorTooLow);
         }
         Executed {
             target,
@@ -344,9 +370,11 @@ impl AgentVault {
 }
 
 fn snapshot(env: &Env, nav: i128) -> Result<(), Error> {
+    let pps = shares::price(env, nav)?;
+    drawdown::record(env, pps)?;
     NavSnapshot {
         nav,
-        pps: shares::price(env, nav)?,
+        pps,
         ts: env.ledger().timestamp(),
     }
     .publish(env);

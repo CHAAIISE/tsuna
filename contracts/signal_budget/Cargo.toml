@@ -1,0 +1,19 @@
+[package]
+name = "signal-budget"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-accounts = "0.8.0"
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+ed25519-dalek = "2.1.1"
+signal-budget-ed25519-verifier = { path = "ed25519_verifier" }
+signal-budget-spending-limit-policy = { path = "spending_limit_policy" }

@@ -1,0 +1,13 @@
+[package]
+name = "signal-budget-spending-limit-policy"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-accounts = "0.8.0"

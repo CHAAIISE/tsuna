@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["agent_vault"]
+members = ["agent_vault", "signal_budget", "signal_budget/ed25519_verifier", "signal_budget/spending_limit_policy"]
 
 [workspace.dependencies]
 soroban-sdk = "28.0.0"

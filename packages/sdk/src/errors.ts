@@ -177,16 +177,56 @@ export function parseHostError(text: string): RawContractError | null {
  * carrying a contract code, which is the contract where the failure started.
  */
 export function errorFromEvents(events: xdr.DiagnosticEvent[]): RawContractError | null {
-  for (const diagnostic of events) {
-    const event = diagnostic.event;
+  for (const error of errorEvents(events)) {
+    if (error.value.type !== "sceContract") continue;
+    return { ...(error.contractId ? { contractId: error.contractId } : {}), code: Number(error.value.contractCode) };
+  }
+  return null;
+}
+
+function* errorEvents(events: xdr.DiagnosticEvent[]): Generator<{ contractId?: string; value: xdr.ScError }> {
+  for (const { event } of events) {
     const topics = event.body.v0.topics;
     if (topics[0]?.type !== "scvSymbol" || String(topics[0].value) !== "error") continue;
     const error = topics.find(topic => topic.type === "scvError");
-    if (!error || error.type !== "scvError" || error.value.type !== "sceContract") continue;
+    if (!error || error.type !== "scvError") continue;
     const contractId = event.contractId
       ? Address.fromScAddress(xdr.ScAddress.scAddressTypeContract(event.contractId)).toString()
       : undefined;
-    return { ...(contractId ? { contractId } : {}), code: Number(error.value.contractCode) };
+    yield { ...(contractId ? { contractId } : {}), value: error.value };
+  }
+}
+
+const HOST_MESSAGES: Record<string, string> = {
+  Auth: "An authorization was missing or its signature did not verify.",
+  Budget: "The transaction ran out of its CPU or memory budget.",
+  Storage: "The transaction touched ledger state outside its footprint, or missing state.",
+};
+
+/** Host (non-contract) failure, e.g. `Error(Auth, InvalidAction)`, named `AuthFailed`-style. */
+export function hostError(kind: string, code: string): LeashError {
+  return {
+    contract: "other",
+    code: 0,
+    name: kind === "Auth" ? "AuthFailed" : `Host${kind}Error`,
+    message: HOST_MESSAGES[kind] ?? `The Soroban host failed with ${kind}/${code}.`,
+  };
+}
+
+/** First host failure in diagnostic events, when no contract error explains the failure. */
+export function hostErrorFromEvents(events: xdr.DiagnosticEvent[]): LeashError | null {
+  for (const { value } of errorEvents(events)) {
+    if (value.type === "sceContract") continue;
+    const kind = value.type.slice(3);
+    return hostError(kind, "code" in value ? String(value.code.name) : "unknown");
   }
   return null;
+}
+
+const HOST_TEXT = /Error\((\w+), (\w+)\)/;
+
+/** Host failure named in a simulation error text, e.g. `Error(Auth, InvalidAction)`. */
+export function parseHostFailure(text: string): LeashError | null {
+  const match = HOST_TEXT.exec(text);
+  return match && match[1] !== "Contract" ? hostError(match[1] as string, match[2] as string) : null;
 }

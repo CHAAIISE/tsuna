@@ -2,7 +2,10 @@ import {
   Address, Keypair, Operation, SorobanDataBuilder, TransactionBuilder, authorizeEntry, authorizeInvocation, rpc, xdr,
 } from "@stellar/stellar-sdk";
 import type { Transaction } from "@stellar/stellar-sdk";
-import { LeashRefusal, describeError, errorFromEvents, parseHostError, type ErrorSource, type LeashError, type RawContractError } from "./errors.js";
+import {
+  LeashRefusal, describeError, errorFromEvents, hostErrorFromEvents, parseHostError, parseHostFailure,
+  type ErrorSource, type LeashError, type RawContractError,
+} from "./errors.js";
 
 export interface TxResult {
   hash: string;
@@ -56,7 +59,8 @@ export class Chain {
     const simulation = await this.server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(simulation)) {
       const raw = parseHostError(simulation.error);
-      if (raw) throw new LeashRefusal(this.toLeashError(raw, fallback), simulation.error);
+      const error = raw ? this.toLeashError(raw, fallback) : parseHostFailure(simulation.error);
+      if (error) throw new LeashRefusal(error, simulation.error);
       throw new Error(`Simulation failed: ${simulation.error}`);
     }
     if (rpc.Api.isSimulationRestore(simulation)) throw new Error("Ledger entries of this call need restoration");
@@ -78,7 +82,7 @@ export class Chain {
   async invoke(source: Keypair, operation: xdr.Operation, signers: Keypair[] = [], fallback: ErrorSource = "other"): Promise<TxResult> {
     let simulated = await this.simulate(source.publicKey(), operation, fallback);
     const entries = simulated.simulation.result?.auth ?? [];
-    if (entries.some(entry => entry.credentials.type === "sorobanCredentialsAddress")) {
+    if (entries.some(entry => entry.credentials.type !== "sorobanCredentialsSourceAccount")) {
       const auth = await this.signEntries(entries, signers);
       const func = hostFunction(operation);
       simulated = await this.simulate(source.publicKey(), Operation.invokeHostFunction({ func, auth }), fallback);
@@ -87,11 +91,19 @@ export class Chain {
     return this.submit(source, tx, fallback);
   }
 
+  /**
+   * Signs every address-credential entry (legacy or CAP-71 `addressV2`, which recent RPCs
+   * return) with the signer it names.
+   */
   async signEntries(entries: xdr.SorobanAuthorizationEntry[], signers: Keypair[]): Promise<xdr.SorobanAuthorizationEntry[]> {
     const validUntil = (await this.server.getLatestLedger()).sequence + AUTH_VALIDITY_LEDGERS;
     return Promise.all(entries.map(async entry => {
-      if (entry.credentials.type !== "sorobanCredentialsAddress") return entry;
-      const named = Address.fromScAddress(entry.credentials.value.address).toString();
+      const { credentials } = entry;
+      if (credentials.type === "sorobanCredentialsSourceAccount") return entry;
+      if (credentials.type === "sorobanCredentialsAddressWithDelegates") {
+        throw new Error("Delegated authorization entries are not supported");
+      }
+      const named = Address.fromScAddress(credentials.value.address).toString();
       const signer = signers.find(key => key.publicKey() === named);
       if (!signer) throw new Error(`No signer provided for the authorization of ${named}`);
       return authorizeEntry(entry, signer, validUntil, this.networkPassphrase);
@@ -117,11 +129,10 @@ export class Chain {
       };
     }
     if (result.status === rpc.Api.GetTransactionStatus.FAILED) {
-      const raw = errorFromEvents(result.diagnosticEventsXdr ?? []);
-      return {
-        hash: sent.hash, status: "FAILED", ledger: result.ledger,
-        ...(raw ? { error: this.toLeashError(raw, fallback) } : {}),
-      };
+      const events = result.diagnosticEventsXdr ?? [];
+      const raw = errorFromEvents(events);
+      const error = raw ? this.toLeashError(raw, fallback) : hostErrorFromEvents(events);
+      return { hash: sent.hash, status: "FAILED", ledger: result.ledger, ...(error ? { error } : {}) };
     }
     throw new Error(`Transaction ${sent.hash} not found after submission`);
   }
@@ -179,13 +190,16 @@ export class Chain {
       auth = await authorizeInvocation({
         signer: member, validUntilLedgerSeq, invocation, publicKey: member.publicKey(), networkPassphrase: this.networkPassphrase,
       });
-      if (auth.credentials.type !== "sorobanCredentialsAddress") throw new Error("Expected address credentials");
+      const { credentials } = auth;
+      if (credentials.type !== "sorobanCredentialsAddress" && credentials.type !== "sorobanCredentialsAddressV2") {
+        throw new Error("Expected address credentials");
+      }
       // The host reads the member's account to check the signature and consumes the nonce.
       const account = xdr.LedgerKey.account(new xdr.LedgerKeyAccount({ accountId: member.xdrAccountId() }));
       readOnly.set(keyId(account), account);
       const nonce = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
         contract: new Address(member.publicKey()).toScAddress(),
-        key: xdr.ScVal.scvLedgerKeyNonce(new xdr.ScNonceKey({ nonce: auth.credentials.value.nonce })),
+        key: xdr.ScVal.scvLedgerKeyNonce(new xdr.ScNonceKey({ nonce: credentials.value.nonce })),
         durability: xdr.ContractDataDurability.temporary,
       }));
       readWrite.set(keyId(nonce), nonce);

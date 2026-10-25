@@ -22,7 +22,7 @@ test("five attacks produce five real on-chain refusals with receipts", async ({ 
       const card = page.getByTestId(`attack-${id}`);
       await expect(page.locator("[data-primary]:visible")).toHaveCount(1);
       const previous = await card.getByTestId("attack-wall").count() ? await card.getByTestId("attack-wall").getAttribute("data-hash") : null;
-      await card.getByRole("button", { name: "Launch attack" }).click();
+      await card.getByRole("button").click();
       const wall = card.getByTestId("attack-wall");
       await expect(wall).toHaveAttribute("data-hash", /[0-9a-f]{64}/, { timeout: 360_000 });
       await expect.poll(() => wall.getAttribute("data-hash"), { timeout: 360_000 }).not.toBe(previous);

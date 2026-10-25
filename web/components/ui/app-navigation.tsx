@@ -34,7 +34,7 @@ function AppNavigation() {
             <span className="sm:hidden">Testnet</span>
             <span className="hidden sm:inline">Stellar testnet</span>
           </Badge>
-          <AccountAction primary={pathname === SIGN_IN_SCREEN} />
+          {pathname !== "/onboarding" && <AccountAction primary={pathname === SIGN_IN_SCREEN} />}
         </div>
         <nav aria-label="Main navigation" className="flex w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1 lg:ml-8 lg:w-auto lg:bg-transparent">
           {links.map(({ href, label }) => {

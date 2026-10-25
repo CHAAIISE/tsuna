@@ -117,6 +117,8 @@ export function DepositPanel({ vault, owner, holding, balance }: {
       <div className="mt-5">
         {!owner ? (
           <Button asChild data-primary className="w-full"><Link href="/onboarding"><Fingerprint aria-hidden="true" />Sign in with passkey</Link></Button>
+        ) : mode === "deposit" && (balance === null || balance === "0") ? (
+          <Button asChild data-primary className="w-full"><Link href="/onboarding">Get test USDC</Link></Button>
         ) : (
           <Button
             className="w-full"
@@ -124,7 +126,7 @@ export function DepositPanel({ vault, owner, holding, balance }: {
             pending={action.isPending}
             disabled={amount === null || amount <= 0n || tooMuch || blockedByPause || !vault.sponsored || !vault.pps}
             data-testid={`${mode}-submit`}
-            {...(mode === "deposit" ? { "data-primary": true } : {})}
+            data-primary
           >
             {action.isPending ? "Waiting for Stellar…" : mode === "deposit" ? "Deposit" : "Withdraw"}
           </Button>
@@ -137,6 +139,7 @@ export function DepositPanel({ vault, owner, holding, balance }: {
         )}
         {!vault.sponsored && <p className="text-muted-foreground">The Leash relayer only sponsors calls to listed vaults; this one is not listed.</p>}
         {owner && mode === "deposit" && (balance === null || balance === "0") && <p className="text-muted-foreground">This account has no USDC yet. <Link href="/onboarding" className="text-primary hover:underline">Get test USDC</Link></p>}
+        {owner && mode === "withdraw" && shares === 0n && <p className="text-muted-foreground">You have no shares in this vault yet. Make a deposit first, then you can withdraw here.</p>}
         {refusal && (
           <div role="alert" className="space-y-1 rounded-lg border-l-[3px] border-destructive bg-destructive-soft px-3 py-2">
             <p className="flex items-center gap-2 font-medium text-destructive"><LockKeyhole aria-hidden="true" className="size-4" />{refusal.name}</p>

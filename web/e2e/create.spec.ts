@@ -8,14 +8,14 @@ test("publishing an agent deploys a factory vault with its rules", async ({ page
 
   // Strategy
   await page.getByTestId("strategy-yield").click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.locator("[data-primary]:visible").click();
 
   // Leash rules: presets only, with the risk-off agent
   await expect(page.getByRole("heading", { name: "Leash rules" })).toBeVisible();
   await page.getByText("0.25 %").click();
   await page.getByText("60 % per position protocol").click();
   await page.getByTestId("risk-off-option").click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.locator("[data-primary]:visible").click();
 
   // Review
   await expect(page.getByText("Yes: may only unwind, even while paused")).toBeVisible();

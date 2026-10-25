@@ -52,6 +52,7 @@ function SkeletonPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map(i => <div key={i} className="h-28 animate-pulse rounded-xl bg-secondary" />)}</div>
       <div className="h-64 animate-pulse rounded-xl bg-secondary" />
       <p className="text-caption text-muted-foreground">Reading the vault from Stellar testnet…</p>
+      <Button data-primary pending>Reading vault…</Button>
     </div>
   );
 }
@@ -94,7 +95,7 @@ export function VaultView({ id }: { id: string }) {
       <div role="alert" className="space-y-3 py-10">
         <p className="font-medium">This vault could not be read</p>
         <p className="text-sm text-muted-foreground">{vault.error?.message ?? "Unknown vault."}</p>
-        <div className="flex gap-3"><Button variant="outline" onClick={() => void vault.refetch()}>Try again</Button><Button asChild variant="ghost"><Link href="/agents">Back to agents</Link></Button></div>
+        <div className="flex gap-3"><Button data-primary onClick={() => void vault.refetch()}>Try again</Button><Button asChild variant="ghost"><Link href="/agents">Back to agents</Link></Button></div>
       </div>
     );
   }

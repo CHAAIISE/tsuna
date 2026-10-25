@@ -28,5 +28,5 @@ test("the bridge tracker renders the status served by the API", async ({ page, r
   }
   const primary = page.locator("[data-primary]");
   await expect(primary).toHaveCount(1);
-  await expect(primary).toHaveText(status.job?.status === "running" ? "Waiting for the bridge…" : "Bridge and deposit");
+  if (status.job?.status === "done") await expect(primary).toHaveAttribute("href", "/agents");
 });

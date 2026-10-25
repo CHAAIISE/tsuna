@@ -136,7 +136,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
                   <span className="flex items-center justify-between gap-3">
                     <LeashBadge rules={row.rules} />
                     {signedIn && (
-                      <Button asChild size="sm" data-primary className="relative z-10 hidden group-hover:inline-flex">
+                      <Button asChild size="sm" variant="outline" className="relative z-10 hidden group-hover:inline-flex group-focus-within:inline-flex">
                         <Link href={`/agents/${row.id}#deposit`}>Deposit</Link>
                       </Button>
                     )}
@@ -214,6 +214,20 @@ export function AgentsBoard() {
 
   return (
     <div className="space-y-6">
+      {account && <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">Compare the assets and limits, then open a vault to deposit.</p>
+        {holdingsQuery.data && BigInt(holdingsQuery.data.usdcBalance ?? "0") === 0n ? (
+          <Button asChild data-primary><Link href="/onboarding">Get test USDC <ArrowRight aria-hidden="true" /></Link></Button>
+        ) : rows[0] ? (
+          <Button asChild data-primary><Link href={`/agents/${rows[0].id}#deposit`}>Open {rows[0].name} <ArrowRight aria-hidden="true" /></Link></Button>
+        ) : data && data.rows.length === 0 ? (
+          <Button asChild data-primary><Link href="/create">Publish an agent</Link></Button>
+        ) : data ? (
+          <Button data-primary onClick={() => { setStrategy("all"); setAssets("all"); setQuery(""); }}>Clear filters</Button>
+        ) : (
+          <Button data-primary pending={isFetching} onClick={() => void refetch()}>Read agents again</Button>
+        )}
+      </div>}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Card className="col-span-2 p-5 sm:col-span-1">
           <p className="text-caption text-muted-foreground">Total value locked</p>

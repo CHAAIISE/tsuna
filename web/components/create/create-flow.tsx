@@ -23,7 +23,6 @@ interface Published {
   adapterTxs: string[];
 }
 
-const short = (value: string) => `${value.slice(0, 4)}…${value.slice(-4)}`;
 const label = <T extends string | number>(options: Option<T>[], value: T) => options.find(option => option.value === value)?.label ?? String(value);
 
 function Steps({ current }: { current: number }) {
@@ -123,7 +122,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
           <Badge variant="success" className="w-fit">Published on Stellar testnet</Badge>
           <CardTitle>Your {strategy.label.toLowerCase()} agent has a vault</CardTitle>
           <CardDescription>
-            Vault <span className="font-mono" data-testid="created-vault">{short(published.vault)}</span> runs the factory&apos;s shared code and its rules are in force.
+            Your vault runs the factory&apos;s shared code and its rules are in force.
             It takes deposits now; its agent acts within the rules you chose.
           </CardDescription>
         </CardHeader>
@@ -135,7 +134,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
                 ...txs.map(tx => ({ label: tx.label, value: tx.hash, kind: "tx" }))].map(row => (
                 <div key={row.value} className="space-y-1">
                   <dt className="text-muted-foreground">{row.label}</dt>
-                  <dd><a href={`${EXPLORER}/${row.kind}/${row.value}`} target="_blank" rel="noreferrer" className="break-all font-mono text-foreground underline-offset-4 hover:text-primary hover:underline">{row.value}</a></dd>
+                  <dd><a data-testid={row.value === published.vault ? "created-vault" : undefined} href={`${EXPLORER}/${row.kind}/${row.value}`} target="_blank" rel="noreferrer" className="break-all font-mono text-foreground underline-offset-4 hover:text-primary hover:underline">{row.value}</a></dd>
                 </div>
               ))}
             </dl>
@@ -177,7 +176,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
             </fieldset>
           </CardContent>
           <CardFooter>
-            <Button data-primary onClick={() => setStep(1)}>Next</Button>
+            <Button data-primary onClick={() => setStep(1)}>Next: Leash rules</Button>
           </CardFooter>
         </Card>
       )}
@@ -191,6 +190,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
           <CardContent className="space-y-8">
             <fieldset className="space-y-3">
               <legend className="font-medium">Protocols the agent may use</legend>
+              <p className="text-sm text-muted-foreground">Keep at least one protocol enabled. Required protocols cannot be removed.</p>
               {strategy.venues.map(venue => {
                 const enabled = venues.includes(venue);
                 return (
@@ -222,7 +222,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
             )}
           </CardContent>
           <CardFooter>
-            <Button data-primary onClick={() => setStep(2)}>Next</Button>
+            <Button data-primary onClick={() => setStep(2)}>Next: Review</Button>
             <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
           </CardFooter>
         </Card>
@@ -248,15 +248,23 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
               <ReviewRow term="Withdrawals" detail="Always open to depositors, even while paused" />
             </dl>
             {error && <p role="alert" className="mt-4 text-sm text-muted-foreground">{error}</p>}
-            {!creator && <p className="mt-4 text-sm text-muted-foreground">Publishing is not configured on this server.</p>}
+            {!creator && <p id="publish-unavailable" className="mt-4 text-sm text-muted-foreground">Publishing is unavailable because this server has no demo creator configured. You can still edit your rules or browse existing agents.</p>}
           </CardContent>
           <CardFooter>
-            <Button data-primary pending={publishing} disabled={!creator} onClick={() => void publish()}>
+            <Button data-primary pending={publishing} disabled={!creator} aria-describedby={!creator ? "publish-unavailable" : undefined} onClick={() => void publish()}>
               {publishing ? "Waiting for Stellar…" : "Publish"}
             </Button>
             <Button variant="outline" disabled={publishing} onClick={() => setStep(1)}>Back</Button>
-            {creator && <span className="text-caption text-muted-foreground">Signed by the testnet demo creator {short(creator)}; fees paid by Leash.</span>}
+            {creator && <span className="text-caption text-muted-foreground">Signed by the testnet demo creator; fees paid by Leash.</span>}
           </CardFooter>
+          {creator && (
+            <CardContent>
+              <details className="text-caption">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Creator details</summary>
+                <a href={`${EXPLORER}/account/${creator}`} target="_blank" rel="noreferrer" className="mt-3 block break-all font-mono hover:text-primary hover:underline">{creator}</a>
+              </details>
+            </CardContent>
+          )}
         </Card>
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Check, LoaderCircle } from "lucide-react";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
@@ -112,7 +113,7 @@ function BridgeTracker() {
           ))}
         </ol>
 
-        {!state && !error && <p className="text-sm text-muted-foreground">Loading bridge status…</p>}
+        {!state && !error && <p id="bridge-availability" role="status" className="text-sm text-muted-foreground">Loading bridge status before deposits can start…</p>}
         {state && !job && <p className="text-sm text-muted-foreground">No bridge has run on this server yet.</p>}
         {job?.status === "done" && job.result && (
           <div role="status" className="flex flex-wrap items-center gap-3 text-sm">
@@ -121,10 +122,11 @@ function BridgeTracker() {
           </div>
         )}
         {job?.status === "failed" && (
-          <p role="alert" className="text-sm">The bridge stopped: {job.error}. Funds already minted stay with the Stellar recipient; start a new bridge when ready.</p>
+          <p role="alert" className="text-sm">The bridge stopped: {job.error}. Any funds already minted remain with the Stellar recipient. Check the transaction details before starting another bridge.</p>
         )}
-        {error && <p role="alert" className="text-sm">{error}</p>}
-        {state && !state.bridge.ready && <p className="text-sm text-muted-foreground">The bridge wallet is not configured on this server.</p>}
+        {error && <p id={!state ? "bridge-availability" : undefined} role="alert" className="text-sm">{error}{!state && " Reload this page to check availability again."}</p>}
+        {state && !state.bridge.ready && <p id="bridge-availability" className="text-sm text-muted-foreground">New bridges are unavailable because the server&apos;s demo bridge wallet is not configured. You can still inspect the last run and explore agents.</p>}
+        {running && <p role="status" className="text-sm text-muted-foreground">The bridge is running. This page updates automatically as each step completes; no further action is needed.</p>}
 
         <details className="text-caption">
           <summary className="cursor-pointer text-muted-foreground">Details</summary>
@@ -144,8 +146,9 @@ function BridgeTracker() {
         </details>
       </CardContent>
       <CardFooter>
-        <Button data-primary onClick={start} pending={starting || running} disabled={!state?.bridge.ready}>
-          {running ? "Waiting for the bridge…" : "Bridge and deposit"}
+        {job?.status === "done" && <Button data-primary asChild><Link href="/agents">Explore agents</Link></Button>}
+        <Button data-primary={job?.status === "done" ? undefined : true} variant={job?.status === "done" ? "outline" : "default"} onClick={start} pending={starting || running} disabled={!state?.bridge.ready} aria-describedby={!state?.bridge.ready ? "bridge-availability" : undefined}>
+          {running ? "Waiting for the bridge…" : job?.status === "done" ? "Bridge again" : "Bridge and deposit"}
         </Button>
         {job && <span className="text-caption text-muted-foreground">Last run started {new Date(job.createdAt).toLocaleString("en-US")}</span>}
       </CardFooter>

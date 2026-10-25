@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ArrowRight, CircleAlert, ExternalLink, Fingerprint, Wallet } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { OnboardingSteps } from "@/components/ui/onboarding-steps";
+import { queryKeys } from "@/lib/hooks/keys";
+import type { HoldingsResponse } from "@/lib/stellar/types";
 import {
   createPasskeyAccount, forgetPasskeyAccount, parsePasskeyAccount, passkeyAccountSnapshot,
   readUsdcBalance, requestTestUsdc, subscribePasskeyAccount,
@@ -32,6 +35,7 @@ const errorMessage = (error: unknown) => {
 };
 
 export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
+  const client = useQueryClient();
   const storedAccount = useSyncExternalStore(subscribePasskeyAccount, passkeyAccountSnapshot, () => null);
   const account = parsePasskeyAccount(storedAccount);
   const supported = useSyncExternalStore(() => () => undefined, passkeysSupported, () => true);
@@ -52,8 +56,10 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
   const amountLabel = faucetAmount.toLocaleString("en-US");
 
   const refreshBalance = useCallback(async (address: string) => {
-    setBalance(await readUsdcBalance(address));
-  }, []);
+    const value = await readUsdcBalance(address);
+    setBalance(value);
+    client.setQueryData<HoldingsResponse>(queryKeys.holdings(address), current => current ? { ...current, usdcBalance: value?.toString() ?? null } : undefined);
+  }, [client]);
 
   useEffect(() => {
     if (!holder) return;
@@ -140,11 +146,11 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
               <CardHeader>
                 <p className="font-overline text-caption tracking-overline text-muted-foreground">Step 1</p>
                 <CardTitle>Create your passkey</CardTitle>
-                <CardDescription>Your device keeps the key and asks for your fingerprint, face or PIN. Leash deploys a Stellar smart account that only this passkey can sign for.</CardDescription>
+                <CardDescription>Your device keeps the key. Use your fingerprint, face or PIN to approve actions.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <p className="flex gap-3"><Fingerprint aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No seed phrase to write down. The account checks a P-256 passkey signature on-chain.</p>
-                <p className="flex gap-3"><ArrowRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No gas. A Leash relayer pays the network fees on testnet.</p>
+                <p className="flex gap-3"><Fingerprint aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No seed phrase. Only your passkey can approve deposits and withdrawals.</p>
+                <p className="flex gap-3"><ArrowRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No gas. Leash pays the testnet network fees.</p>
                 {!supported && <p className="text-muted-foreground">This browser cannot create passkeys. Use a wallet extension instead.</p>}
               </CardContent>
               <CardFooter>

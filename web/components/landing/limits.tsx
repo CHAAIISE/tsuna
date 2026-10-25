@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
+import { OnboardingSteps } from "@/components/ui/onboarding-steps";
 import { Overline } from "./section";
 
 function Limits() {
@@ -35,13 +36,15 @@ function Closing() {
       <h2 id="closing-title" className="max-w-3xl text-3xl font-light tracking-tight text-heading sm:text-[2.5rem] sm:leading-[1.15]">
         Try to break it. <span className="text-muted-foreground">Create a passkey, get test USDC, and watch the chain say no.</span>
       </h2>
+      <div className="mt-8">
+        <OnboardingSteps currentStep={0} />
+      </div>
       <div className="mt-10 flex flex-wrap gap-3">
-        {/* Same action as the hero's primary button: filled, but the hero keeps the single data-primary marker. */}
-        <Button asChild size="lg">
+        <Button asChild size="lg" variant="outline" className="border-input">
           <Link href="/agents">Explore agents</Link>
         </Button>
         <Button asChild size="lg" variant="outline" className="border-input">
-          <Link href="/onboarding">Get test USDC</Link>
+          <Link href="/onboarding">Create your passkey</Link>
         </Button>
       </div>
     </section>

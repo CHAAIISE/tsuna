@@ -12,7 +12,6 @@ const EXPLORER = "https://stellar.expert/explorer/testnet";
 /** Ledger timestamps trail the wall clock by a few seconds. */
 const LEDGER_LAG_SECS = 6;
 
-const short = (value: string) => `${value.slice(0, 8)}…${value.slice(-4)}`;
 
 function duration(secs: number): string {
   const s = Math.max(0, Math.ceil(secs));
@@ -25,8 +24,13 @@ function buildName(build: BuildInfo): string {
   return build.meta.leash_build ? `Build ${build.meta.leash_build}` : "Undescribed build";
 }
 
-function HashChip({ hash, className }: { hash: string; className?: string }) {
-  return <span title={hash} className={cn("inline-flex rounded-sm bg-chip px-2 py-0.5 font-mono text-caption text-muted-foreground", className)}>{short(hash)}</span>;
+function HashChip({ hash }: { hash: string }) {
+  return (
+    <details className="min-w-0 text-caption">
+      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Code details</summary>
+      <p className="mt-2 break-all font-mono text-muted-foreground">{hash}</p>
+    </details>
+  );
 }
 
 interface ActionResult {
@@ -137,7 +141,6 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
                   <span className="min-w-0 space-y-1">
                     <span className="block font-medium">{buildName(build)}</span>
                     {build.description && <span className="block text-sm text-muted-foreground">{build.description}</span>}
-                    <HashChip hash={build.hash} />
                   </span>
                 </label>
               ))}
@@ -146,15 +149,21 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
             <p className="rounded-lg bg-secondary p-4 text-sm text-muted-foreground">No other vault build is uploaded yet. Every vault already runs the latest one.</p>
           )}
           {refusal && <RefusalWall refusal={refusal} />}
+          <p id="fleet-next-action" className="text-sm text-muted-foreground">
+            {pending
+              ? ready ? "The timelock has ended. Apply this patch to update every vault." : "Apply becomes available when the timelock ends. No action is needed while you wait."
+              : selected ? "This is a real testnet upgrade proposal, signed by the demo admins. Review your selected build before proposing."
+                : "Propose patch is unavailable until another vault build is uploaded."}
+          </p>
           {result && !refusal && <ResultLine result={result} />}
         </CardContent>
         <CardFooter>
           {pending ? (
-            <Button data-primary pending={busy === "apply"} disabled={!ready} onClick={() => void act("apply")}>
+            <Button data-primary pending={busy === "apply"} disabled={!ready} aria-describedby="fleet-next-action" onClick={() => void act("apply")}>
               {busy === "apply" ? "Waiting for Stellar…" : "Apply to all vaults"}
             </Button>
           ) : (
-            <Button data-primary pending={busy === "propose"} disabled={!selected} onClick={() => void act("propose")}>
+            <Button data-primary pending={busy === "propose"} disabled={!selected} aria-describedby="fleet-next-action" onClick={() => void act("propose")}>
               {busy === "propose" ? "Waiting for Stellar…" : "Propose patch"}
             </Button>
           )}
@@ -203,6 +212,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
               <Detail label="Factory" value={state.factory} kind="contract" />
               <Detail label="Admin A" value={state.admins[0]} kind="account" />
               <Detail label="Admin B" value={state.admins[1]} kind="account" />
+              {state.candidates.map(build => <div key={build.hash} className="space-y-1"><dt className="text-muted-foreground">{buildName(build)} · code hash</dt><dd className="break-all font-mono">{build.hash}</dd></div>)}
               {vaults.filter(vault => vault.registeredAsV1).map(vault => (
                 <Detail key={vault.address} label={`${vault.name}: registered from a v1 policy (no exposure_caps, no roles keys)`} value={vault.registeredAsV1 ?? ""} kind="tx" />
               ))}
@@ -248,7 +258,7 @@ function RefusalWall({ refusal }: { refusal: Refusal }) {
 
 function ResultLine({ result }: { result: ActionResult }) {
   return (
-    <p className="flex flex-wrap items-center gap-2 text-sm" data-testid={`${result.kind}-result`}>
+    <p role="status" className="flex flex-wrap items-center gap-2 text-sm" data-testid={`${result.kind}-result`}>
       <Check aria-hidden="true" className="size-4 text-success" />
       {result.kind === "propose" ? "Patch proposed. The timelock is running." : "Patch applied to every vault in one transaction."}
       <a href={`${EXPLORER}/tx/${result.hash}`} target="_blank" rel="noreferrer" data-testid={`${result.kind}-tx`} data-hash={result.hash} className="text-primary underline-offset-4 hover:underline">View transaction</a>
@@ -263,7 +273,10 @@ function VaultRow({ vault, factory, current }: { vault: FleetVault; factory: str
     <div role="row" data-testid="fleet-vault" data-address={vault.address} className="grid grid-cols-2 gap-x-4 gap-y-3 border-b px-6 py-4 last:border-b-0 lg:min-h-table-row lg:grid-cols-[1.4fr_1fr_1.3fr_1fr_1fr] lg:items-center">
       <div role="cell" className="col-span-2 min-w-0 lg:col-span-1">
         <p className="truncate font-medium">{vault.name}</p>
-        <p className="truncate font-mono text-caption text-muted-foreground" title={vault.address}>{short(vault.address)}</p>
+        <details className="mt-1 text-caption">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Vault details</summary>
+          <a href={`${EXPLORER}/contract/${vault.address}`} target="_blank" rel="noreferrer" className="mt-2 block break-all font-mono hover:text-primary hover:underline">{vault.address}</a>
+        </details>
       </div>
       <div role="cell">
         <span className="block text-caption text-muted-foreground lg:hidden">Executable</span>

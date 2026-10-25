@@ -15,6 +15,10 @@ pnpm dev
 
 Keep the existing environment file and symlink if they are already configured. Use only dedicated Stellar testnet burners for the variables in `.env.example`; never fund them with real assets.
 
+Open `/agents`, create a passkey, then get test USDC before choosing a vault. The getting-started checklist follows the account's actual USDC balance and vault shares. An empty wallet links back to test funding; a vault's Withdraw tab stays available while paused. The attack lab submits real transactions, so inspect the failed receipt rather than treating a successful HTTP response as proof of a block.
+
+`pnpm --dir web exec playwright test ux.spec.ts` checks one primary action, onboarding guidance and mobile overflow across the demo screens. It also creates a real passkey account on testnet to check the empty-wallet path; it does not draw from the faucet or run attacks.
+
 ```sh
 pnpm typecheck
 pnpm lint

@@ -3,11 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "prepare": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.build.json",
     "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
-    "build": "tsc"
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "specs": "node scripts/generate-specs.mjs",
+    "testnet:setup": "tsx scripts/testnet-setup.ts"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.4.0",

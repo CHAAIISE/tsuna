@@ -40,7 +40,7 @@ function LandingNav() {
     <nav aria-label="Site" className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-6 pt-6 sm:px-10 sm:pt-7">
       <a
         href={docsUrl}
-        className="pointer-events-auto rounded-sm bg-background/80 px-2 py-1 font-display text-sm tracking-[0.18em] text-muted-foreground uppercase backdrop-blur transition-colors hover:text-heading"
+        className="pointer-events-auto rounded-sm border border-primary/70 bg-background/90 px-5 py-2.5 font-display text-sm tracking-[0.14em] text-primary uppercase backdrop-blur transition-colors hover:bg-primary hover:text-primary-foreground sm:px-8 sm:py-3"
       >
         Docs
       </a>

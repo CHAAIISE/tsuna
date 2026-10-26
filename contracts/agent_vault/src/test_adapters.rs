@@ -772,6 +772,46 @@ fn strained_leveraged_exit_falls_back_to_what_idle_balances_repay() {
 }
 
 #[test]
+fn leveraged_exit_keeps_the_collateral_when_the_swap_misses_its_minimum() {
+    let lab = Lab::new();
+    let f = &lab.f;
+    let (pool, _) = lab.blend();
+    let df = lab.defindex();
+    lab.mint(&lab.xlm, &f.vault, 2_000 * UNIT);
+    lab.submit(
+        &pool,
+        vec![
+            lab.env(),
+            lab.request(&lab.xlm, 2_000 * UNIT, 2),
+            lab.request(&f.asset, 200 * UNIT, 4),
+        ],
+    )
+    .unwrap();
+    lab.df_deposit(&df, 1_150 * UNIT).unwrap();
+    // The pair pays 10 % under the oracle: below the exit's 3 % minimum.
+    let pair = lab.env().register(PairMock, (UNIT * 18 / 100,));
+    lab.mint(&f.asset, &pair, 10_000 * UNIT);
+    let router = lab.env().register(SoroswapRouterMock, (pair.clone(),));
+    lab.adapter(AdapterKind::Soroswap, &router);
+    f.update_policy(|policy| {
+        policy
+            .guards
+            .set(router.clone(), vec![lab.env(), pair.clone()])
+    });
+    let nav = lab.nav();
+    let shares = f.client().balance(&f.alice);
+    let supply = f.client().total_shares() + crate::shares::VIRTUAL_SHARES;
+    // The failed swap is rolled back and the exit falls back to what 50 idle USDC repays.
+    f.withdraw(&f.alice, shares);
+    let redeemed = (50 * UNIT - 6) * supply / (200 * UNIT);
+    assert_eq!(f.client().balance(&f.alice), shares - redeemed);
+    assert_eq!(lab.balance(&lab.xlm, &pair), 0);
+    // Nothing was sold below the oracle: those who stay keep their share of NAV.
+    let left = supply - redeemed;
+    assert!((lab.nav() - nav * left / supply).abs() <= UNIT / 100);
+}
+
+#[test]
 fn adapters_are_limited_to_allowlisted_protocols_and_bounded_positions() {
     let lab = Lab::new();
     let f = &lab.f;

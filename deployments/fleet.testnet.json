@@ -10,7 +10,7 @@
     {
       "hash": "958f66d361916f5e42164787c20aa7b61c3397f28df67450faf6e1c985877157",
       "title": "Rehearsal build 2",
-      "description": "Same agent_vault source with the contract meta entry leash_build=2: no behaviour change, used to rehearse an upgrade on the test fleet.",
+      "description": "Same agent_vault source, tagged as build 2 in its contract metadata: no behaviour change, used to rehearse an upgrade on the test fleet.",
       "uploadTx": "2ada0157f2dfc923c0e20b5d01c254544e8854b99b40290fbe931c207c1015d8"
     },
     {

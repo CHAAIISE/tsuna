@@ -22,9 +22,8 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000",
-  ),
+  // The public domain, not VERCEL_URL: that one is the per-deployment URL, which is access-protected.
+  metadataBase: new URL(process.env.VERCEL ? "https://tsuna-fi.vercel.app" : "http://localhost:3000"),
   title: "Tsuna — Your agents. The chain's rules.",
   description:
     "Tsuna: DeFi vaults on Stellar run by AI agents, with limits enforced on-chain. Agents propose trades; the vault checks every call and its effect on your funds.",

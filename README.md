@@ -86,6 +86,30 @@ Each demo vault also gets a `riskoff` [role](#agent-roles) held by `LEASH_RISKOF
 
 Blend requests cannot be filtered by type, so the role keeps the Blend call with vault destinations. The RiskOff outcome checks refuse borrowing and new collateral. A fresh vault registers with the role. A vault registered without it goes through `propose_role`, and the script waits out the 10-minute timelock before `apply_policy`. The role is recorded in `deployments/testnet.json` only once it is in force. The script then has the role repay 0.01 USDC of Leverage's Blend debt through `execute_as`, as a check that the role works.
 
+## Verify the deployed contracts
+
+The WASM on testnet is byte-for-byte the build of this repository. Rebuild it and compare hashes:
+
+```sh
+stellar contract build --manifest-path contracts/Cargo.toml   # stellar-cli 28.1.0
+shasum -a 256 contracts/target/wasm32v1-none/release/{agent_vault,vault_factory,policy_registry,passkey_account,passkey_webauthn_verifier}.wasm
+
+# What the chain runs: the factory itself, and the executable every vault points to.
+stellar contract fetch --network testnet --id CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL -o factory.wasm
+stellar contract fetch --network testnet --wasm-hash "$(jq -r .vaultRef deployments/testnet.json)" -o vault.wasm
+shasum -a 256 factory.wasm vault.wasm
+```
+
+| Contract | SHA-256 (local build = on-chain) | Recorded in |
+|---|---|---|
+| `agent_vault` | `92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb` | `deployments/testnet.json` → `vaultRef`, `wasm.agentVault` |
+| `vault_factory` | `03850acaf57c195d750e66e9451679e00721367b80b79a0ae5aa20e58154f8ec` | `wasm.vaultFactory` |
+| `policy_registry` | `6cb452fccf0a11f63139468ac1944502b7ab944945e373a1248b0a340a4b645d` | `wasm.policyRegistry` |
+| `passkey_account` | `f97a3bed00bb91cf3574954e4c5c75e83db3599c7ba75ed7fc7012c1c2eb87a8` | `deployments/passkey.testnet.json` → `accountWasmHash` |
+| `passkey_webauthn_verifier` | `c2857bd6479c4c846295e43ef6c2fff49bd3ee392ac3d1b9e0e7682d5097d1f3` | `verifierWasmHash` |
+
+The demo oracle router is built separately with `--features demo` (the price-forcing switch used by the crash scenario); its hash is `wasm.oracleRouterDemo`. A vault's executable can only change through the factory's two-admin, timelocked `propose_ref` / `apply_ref` flow, so the `vaultRef` hash is what every vault runs.
+
 ## Vault accounting
 
 `deposit(user, amount)` and `withdraw(user, shares)` require the holder's authorization. Deposits and session-key execution stop when paused; withdrawals do not. Shares are internal, non-transferable claims, exposed by `balance(user)` and `total_shares()`.

@@ -211,7 +211,6 @@ export function AgentsBoard() {
   const published = data?.rows.filter(row => !row.featured).length ?? 0;
   const paused = data?.rows.filter(row => row.paused).length ?? 0;
   const totalRules = data?.rows.reduce((sum, row) => sum + (row.rules?.total ?? 0), 0) ?? 0;
-  const oldest = data?.rows.reduce<number | null>((min, row) => row.since !== null && (min === null || row.since < min) ? row.since : min, null) ?? null;
 
   return (
     <div className="space-y-6">
@@ -248,9 +247,9 @@ export function AgentsBoard() {
           </dd>
         </div>
         <div data-tour="rules" className="space-y-1 border-l pl-4 sm:pl-8">
-          <dt className="text-muted-foreground">Rules enforced on-chain</dt>
+          <dt className="text-muted-foreground">Rules on-chain</dt>
           <dd className="text-subheading font-medium tabular-nums">{data ? totalRules : "—"}</dd>
-          <dd className="text-muted-foreground">{oldest ? `History since inception (${formatAge(oldest)})` : "Allowlisted calls and limits"}</dd>
+          <dd className="text-muted-foreground">Allowlisted calls and limits, all vaults</dd>
         </div>
       </dl>
 

@@ -181,7 +181,7 @@ async function main(): Promise<void> {
     fleet.builds.push({
       hash: patchHash,
       title: `Rehearsal build ${PATCH_BUILD}`,
-      description: `Same agent_vault source with the contract meta entry leash_build=${PATCH_BUILD}: no behaviour change, used to rehearse an upgrade on the test fleet.`,
+      description: `Same agent_vault source, tagged as build ${PATCH_BUILD} in its contract metadata: no behaviour change, used to rehearse an upgrade on the test fleet.`,
     });
     save(fleet);
   }

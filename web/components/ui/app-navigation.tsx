@@ -25,8 +25,7 @@ function AppNavigation() {
     <header className="border-b bg-background">
       <div className="mx-auto flex max-w-app flex-wrap items-center gap-x-4 gap-y-3 px-4 py-4 sm:px-6 lg:flex-nowrap lg:px-0">
         <Link href="/" aria-label="Tsuna home" className="shrink-0">
-          <Logo markOnly className="h-9 sm:hidden" />
-          <Logo className="hidden sm:block" />
+          <Logo className="h-4 sm:h-5" />
         </Link>
         <div className="ml-auto flex items-center gap-3 lg:order-last">
           <Badge variant="secondary" title="Every balance here is test USDC with no real value" data-testid="network-badge">

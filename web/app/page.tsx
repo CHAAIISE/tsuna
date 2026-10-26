@@ -1,4 +1,5 @@
 import { BuiltOn } from "@/components/landing/built-on";
+import { Emblem } from "@/components/landing/emblem";
 import { LandingHeader } from "@/components/landing/header";
 import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
@@ -24,6 +25,7 @@ export default function Home() {
         <div className="mx-auto min-h-screen max-w-site border-x">
           <LandingHeader />
           <main>
+            <Emblem />
             <ProductPreview />
             <Problem />
             <HowItWorks />

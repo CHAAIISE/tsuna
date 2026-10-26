@@ -13,5 +13,5 @@ export default defineConfig({
   reporter: "list",
   use: { baseURL: externalBaseURL ?? `http://localhost:${port}`, trace: "retain-on-failure", serviceWorkers: "block" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  ...(!externalBaseURL ? { webServer: { command: `pnpm dev --port ${port}`, url: `http://localhost:${port}`, reuseExistingServer: true, timeout: 180_000 } } : {}),
+  ...(!externalBaseURL ? { webServer: { command: `pnpm dev --port ${port}`, env: { LEASH_FAUCET_AMOUNT_USDC: "1000" }, url: `http://localhost:${port}`, reuseExistingServer: true, timeout: 180_000 } } : {}),
 });

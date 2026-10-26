@@ -282,20 +282,19 @@ async function usdcBalance(user: string): Promise<bigint | null> {
 export function getHoldings(user: string): Promise<HoldingsResponse> {
   return cached(`holdings:${user}`, DETAIL_TTL, async () => {
     const client = leash();
-    const [{ rows }, events, balance] = await Promise.all([listAgents(), vaultEvents(), usdcBalance(user)]);
-    const shares = await Promise.all(rows.map(entry => client.vault(entry.address).sharesOf(user)));
-    const holdings: HoldingView[] = [];
-    rows.forEach((entry, i) => {
-      const owned = shares[i] ?? 0n;
-      const flows = events.filter(event => event.vault === entry.address && event.kind !== "executed" && event.user === user);
-      if (owned === 0n && flows.length === 0) return;
+    const [{ rows }, events, balance, addresses] = await Promise.all([listAgents(), vaultEvents(), usdcBalance(user), client.vaultAddresses()]);
+    const holdings = await Promise.all(addresses.map(async address => {
+      const owned = await client.vault(address).sharesOf(user);
+      const flows = events.filter(event => event.vault === address && event.kind !== "executed" && event.user === user);
+      if (owned === 0n && flows.length === 0) return null;
+      const entry = rows.find(entry => entry.address === address) ?? row(await client.summary(address), null, undefined);
       const net = flows.reduce((sum, event) => {
         if (event.kind === "deposited") return sum + BigInt(event.amount);
         if (event.kind === "withdrawn") return sum - BigInt(event.amount);
         return sum;
       }, 0n);
       const first = flows[0];
-      holdings.push({
+      return {
         vault: entry.address,
         id: entry.id,
         name: entry.name,
@@ -305,9 +304,9 @@ export function getHoldings(user: string): Promise<HoldingsResponse> {
         firstSeen: first ? Math.floor(new Date(first.at).getTime() / 1000) : null,
         paused: entry.paused,
         pps: entry.pps,
-      });
-    });
-    return { user, holdings, usdcBalance: balance?.toString() ?? null, asOf: new Date().toISOString() };
+      } satisfies HoldingView;
+    }));
+    return { user, holdings: holdings.filter(holding => holding !== null), usdcBalance: balance?.toString() ?? null, asOf: new Date().toISOString() };
   });
 }
 

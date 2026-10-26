@@ -75,7 +75,7 @@ test("the portfolio shows a fresh user's deposit and its withdraw shortcut empti
 
   await test.step("the withdraw shortcut redeems every share", async () => {
     await page.locator(`[data-testid="holding-row"][data-vault="${target.address}"]`).getByTestId("withdraw-shortcut").click();
-    await expect(page.getByRole("tab", { name: "Withdraw" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: /^withdraw$/i })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("button", { name: /Position .* Max/ }).click();
     await page.getByTestId("withdraw-submit").click();
     await expect(page.getByTestId("action-receipt")).toBeVisible({ timeout: 180_000 });

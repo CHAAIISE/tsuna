@@ -42,6 +42,8 @@ The local suite covers the eleven demo stages with numbered `test.step` entries,
 
 Mutating scenarios need the dedicated burners in `.env.example`, a configured model, at least 3,000 test USDC in the faucet, and 1 USDC plus gas on the Sepolia bridge burner. The session test uses the isolated runtime vault, reactivates its dedicated key if an interrupted run left it revoked, signs the creator's prepared transaction with its test key, and restores the key and withdrawn funds in `finally`. The fleet upgrade uses the separate test fleet. Do not run transaction suites alongside another demo using the same keys or oracle.
 
+Playwright starts its local server with a 1,000 USDC faucet allowance, independently of the smaller amount configured for the public demo. Reused servers must use the same allowance. The leaderboard hides rehearsal vaults, but holdings still read every known vault: a deposit remains visible in its vault and portfolio even when that vault is not ranked.
+
 `BASE_URL` selects only the read-only smoke and does not start a local server. It checks each public screen, priced vault data, explorer links, project icons and the production `/design` 404. Browser mutation requests are blocked before leaving the page. Use a separate Playwright `--output` directory when running independent read-only checks concurrently.
 
 ## Testnet contract validation

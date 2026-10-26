@@ -1,25 +1,160 @@
 # Tsuna
 
-DeFi vaults on Stellar with on-chain limits for AI agents.
+**Your agents. The chain's rules.** DeFi vaults on Stellar run by AI agents, with every limit enforced on-chain by the vault contract, before and after each call, in the same transaction.
 
-**Live:** https://tsuna-fi.vercel.app · **Docs:** https://tsuna-fi.vercel.app/docs · Stellar testnet · HackMeridian 2026, tracks Stellar Composed and Stellar Unlocked.
+**Live demo:** https://tsuna-fi.vercel.app · **Docs:** https://tsuna-fi.vercel.app/docs · **Network:** Stellar testnet · **HackMeridian 2026**, path Genesis, tracks **Stellar Composed** and **Stellar Unlocked**.
 
-## Why
+> The agent proposes. The chain decides. A hijacked agent hits a wall, not your funds.
 
-AI agents now manage real money, and the only thing stopping a fooled agent is usually a prompt asking it to behave. One injected sentence on a web page is enough to make it send funds away. Tsuna moves the rules out of the prompt and into the vault contract: the agent proposes, the chain decides.
+## Demo
 
-## What it does
+Everything below runs on Stellar testnet and can be opened in an explorer. Suggested path for a judge (about 5 minutes):
 
-- **Before each call**, the vault checks the protocol, the function and every address against the agent's policy (`CallNotAllowed`, `DestinationNotVault`, `AssetNotAllowed`).
-- **After the call, in the same transaction**, it values the vault at oracle prices and checks the loss limits and the Blend health factor (`NavDropped`, `HealthFactorTooLow`). A violation reverts everything.
-- **One vault, every venue:** Blend, DeFindex, Soroswap and Aquarius behind the same rules.
-- **Passkey accounts** (smart accounts, sponsored fees), a faucet, deposits and withdrawals in a few clicks.
-- **A live agent** that reads rates and positions, simulates its calls and lets the vault authorize them; every journal line is a transaction.
-- **An attack lab** with real failed transactions: prompt injection, disguised calls, a stolen session key.
-- **A market crash** forced on the Leverage vault: borrowing is refused, the vault pauses, a risk-off role can only reduce risk, depositors can still exit.
-- **Create** an agent from a strategy and the rules it can never break; **bridge** USDC from Ethereum with Circle's CCTP; **upgrade the whole fleet** with one timelocked patch (CAP-85, CAP-86).
+1. **Sign up with a passkey** at [`/onboarding`](https://tsuna-fi.vercel.app/onboarding): an OpenZeppelin smart account is deployed for you, fees are sponsored by a relayer. No seed phrase, no gas, no jargon.
+2. **Take test USDC** from the built-in faucet, then **deposit** into [Agent Prudent](https://tsuna-fi.vercel.app/agents/prudent) for vault shares.
+3. **Run the agent**: it reads rates, positions and oracle prices, simulates its calls, and the vault authorizes them on-chain. Every journal line links to its transaction.
+4. **Attack it** in the [Attack lab](https://tsuna-fi.vercel.app/agents/prudent/attack): five attacks, five `FAILED` transactions with the vault's typed error.
+5. **Crash the market** on [Agent Leverage](https://tsuna-fi.vercel.app/agents/leverage): XLM −30 % through a testnet demo oracle, borrowing refused, vault paused, a risk-off role that can only reduce risk, and a depositor who still withdraws.
+6. **Upgrade the fleet** at [`/fleet`](https://tsuna-fi.vercel.app/fleet) (CAP-85), **bridge** USDC from Ethereum Sepolia at [`/bridge`](https://tsuna-fi.vercel.app/bridge) (Circle CCTP), **publish** your own agent at [`/create`](https://tsuna-fi.vercel.app/create).
 
-Every limit and every key the demo holds is listed under Docs → Keys and Known gaps.
+Receipts from the demo, each checked with RPC `getTransaction`:
+
+| What happened | Error | Status | Transaction |
+|---|---|---|---|
+| Prompt injection: the model read a poisoned page and tried to send the vault's USDC to the attacker | `CallNotAllowed` | FAILED | [`168a0c43…`](https://stellar.expert/explorer/testnet/tx/168a0c439467bc7d33e7522263fb477da5641a04835f56e1f08f0f80145102a1) |
+| Blend withdrawal paid to the attacker | `DestinationNotVault` | FAILED | [`035e4d10…`](https://stellar.expert/explorer/testnet/tx/035e4d1065e045005de75e8b1dfecc6cb11863b1fbd7298b63db2a01b7749072) |
+| Allowed DeFindex call that moves the vault's shares out | `NavDropped` | FAILED | [`8381a66e…`](https://stellar.expert/explorer/testnet/tx/8381a66e95630a9c64c486152e2121a4ca425daec4c0ab08afb5ecb6449f20f3) |
+| Soroswap route through the attacker's token | `AssetNotAllowed` | FAILED | [`93f85eed…`](https://stellar.expert/explorer/testnet/tx/93f85eede3277e7682fbfa296faaadc8c23979ad90f51770b5572168b124970e) |
+| Stolen session key used by the attacker | `DestinationNotVault` | FAILED | [`58cd7076…`](https://stellar.expert/explorer/testnet/tx/58cd7076115893c9e70a7de6b587fc4e48ad7e7571c063ea7e3bec6b4fc54dda) |
+| Crash: the yield agent borrows more | `HealthFactorTooLow` | FAILED | [`608e7c11…`](https://stellar.expert/explorer/testnet/tx/608e7c11fa1127a14ab15f1236d809256d4170f3f2044e040f3ea93b2161e74c) |
+| Crash: the risk-off role tries to borrow | `RiskIncreased` | FAILED | [`1d7df061…`](https://stellar.expert/explorer/testnet/tx/1d7df061806557b1dfd0e9441efd4b7571064e207c36c061d82619e9c07fbfa9) |
+| Crash: the risk-off role repays Blend debt while paused | | SUCCESS | [`0a8172d9…`](https://stellar.expert/explorer/testnet/tx/0a8172d91a077a73c4c1d0cd117289a7c980fc25cb688c414d3e94dafa04e4e1) |
+| Crash: a depositor withdraws while paused | | SUCCESS | [`803acc9b…`](https://stellar.expert/explorer/testnet/tx/803acc9b4be41319c704364c8b95eb738b369638fc75eca6eceda91b8cfad122) |
+| Fleet upgrade: one `apply_ref` moves every vault to a patched build | | SUCCESS | [`7aea427f…`](https://stellar.expert/explorer/testnet/tx/7aea427f504ce64d8f79f210c1387e52b9f64a86cfea6dc9cbd19efeabb093df) |
+| CCTP: USDC burned on Sepolia, minted on Stellar | | SUCCESS | [`389e6c67…`](https://stellar.expert/explorer/testnet/tx/389e6c673771a71444e759c16e161b8aee6d9f795f9642879f52366af47e7459) |
+| CCTP: bridged USDC deposited into a vault | | SUCCESS | [`42769b06…`](https://stellar.expert/explorer/testnet/tx/42769b06a3161116a18b01303bbbef852a9eef74e72adc95ae8f112c7d3135f7) |
+
+Only the prompt injection asks the model to choose the call; the other attacks are the calls a compromised runtime or a key thief would build, and the app labels each one with who chose it.
+
+## Why it matters
+
+AI agents now manage real money, and the only thing stopping a fooled agent is usually a prompt asking it to behave. In May 2026 a reply written in Morse code made Grok's Bankr wallet send $150–200k to a stranger, and MetaMask's security report described $204,000 drained from one prompt-injected AI wallet. Anyone who gets a sentence in front of the model can rewrite rules that live in a prompt or on a server.
+
+Tsuna moves those rules into the contract that holds the money:
+
+- **Depositors** get an adaptive DeFi strategy with limits anyone can read on-chain, loosening that waits out a public timelock, and a withdrawal that never waits for the agent, even when the vault is paused.
+- **Agent creators** publish a strategy, earn a performance fee above a high-water mark, and build a track record from on-chain `NavSnapshot` events that they cannot fake.
+- **Stellar protocols** (Blend, DeFindex, Soroswap, Aquarius) receive deposits routed by agents that cannot misuse them.
+
+## How it works
+
+```mermaid
+flowchart LR
+  M[AI agent<br/>Vercel AI SDK] -->|proposes a call<br/>with its session key| V
+  subgraph V[agent_vault, one Soroban transaction]
+    direction TB
+    P[Before: allowlist, argument rules,<br/>caps, rate, role] --> C[Protocol call<br/>Blend · DeFindex · Soroswap · Aquarius]
+    C --> Q[After: NAV at oracle prices, perimeter balances,<br/>allowances, health factor, loss budget, exposure]
+  end
+  R[policy_registry<br/>timelocked rules] --> V
+  O[oracle_router<br/>Reflector + Chainlink] --> V
+  F[vault_factory<br/>CAP-85 shared executable] --> V
+  Q -->|any violation| X[whole transaction reverts<br/>typed error, FAILED on-chain]
+  Q -->|all hold| OK[committed, NavSnapshot]
+```
+
+The agent never holds the funds. Its session key can only ask the vault to make a call; the vault builds every token authorization itself (`authorize_as_current_contract`), so the agent never chooses an approval or a recipient.
+
+## What the chain checks
+
+| When | Check | Error |
+|---|---|---|
+| Before the call | `(contract, function)` allowlisted, one rule per argument; addresses pinned to the vault; every asset in a swap path or lending request allowed | `CallNotAllowed`, `DestinationNotVault`, `AssetNotAllowed` |
+| Before the call | Per-call and daily caps in bps of NAV, calls per hour, per-role quotas | `TxCapExceeded`, `DailyCapExceeded`, `RateLimited` |
+| After the call | NAV conserved at oracle prices within the rule's tolerance | `NavDropped` |
+| After the call | Token balances kept inside the vault and its protocols; no allowance left behind | `ValueLeftPerimeter`, `AllowanceNotCleared` |
+| After the call | Blend health factor ≥ 1.3, 24 h loss budget, per-protocol exposure cap | `HealthFactorTooLow`, `DailyLossExceeded`, `ExposureCapExceeded` |
+| Outside the call | Permissionless drawdown breaker; `RiskOff` role allowed during a pause only if risk goes down; protocol code-hash pinning | pause, `RiskIncreased`, `ProtocolChanged` |
+| Always | Withdrawals stay open, even paused, even without an oracle price; a leveraged exit repays its own share of debt | |
+
+Rules live in `policy_registry`: tightening applies immediately, loosening waits out a public timelock (10 minutes on testnet, 24 h in production) so depositors can leave first. The full specification is under [Specs](#specs).
+
+## Hackathon tracks
+
+**Stellar Composed**: "combines two or more ecosystem tools or projects into something new".
+
+- **Live projects composed in one vault**: Blend (lending, borrowing, health factor), DeFindex (yield vault), Soroswap (oracle-bounded swaps), Aquarius (LP positions), all valued at oracle prices behind the same rules. Adapters in [`contracts/agent_vault/src/adapters`](contracts/agent_vault/src/adapters).
+- **Oracles**: `oracle_router` combines Reflector and Chainlink Data Feeds with freshness, deviation and jump checks ([`contracts/oracle_router`](contracts/oracle_router)).
+- **Agents that spend**: the agent pays for market signals over **x402** and **MPP** from an agent wallet, an OpenZeppelin smart account whose limit comes from **OpenZeppelin's policy library** (`spending_limit`, 5 USDC per day) ([`contracts/signal_budget`](contracts/signal_budget), [`web/app/api/signals`](web/app/api/signals)).
+- **Smart wallets people want to use**: passkey sign-up and sign-in on OpenZeppelin smart accounts with a WebAuthn verifier, sponsored fees. No seed phrases, no gas, no jargon ([`contracts/passkey_account`](contracts/passkey_account)).
+- **Bring users and liquidity to Stellar**: **Circle CCTP V2** from Ethereum Sepolia, then a Soroswap swap and a vault deposit ([`scripts/cctp-demo.ts`](scripts/cctp-demo.ts), [`/bridge`](https://tsuna-fi.vercel.app/bridge)).
+
+**Stellar Unlocked**: "gets something new out of Stellar's core protocol features".
+
+- **Externally managed contract executables (CAP-85)**: every vault runs one executable reference held by `vault_factory`; one timelocked, two-admin `propose_ref` / `apply_ref` upgrades the whole fleet with its state intact ([`contracts/vault_factory`](contracts/vault_factory)).
+- **Sparse contract type mappings (CAP-86)**: `PolicyV2` adds optional fields to `PolicyV1`; policies written before the schema change are read without migration ([`contracts/policy_registry`](contracts/policy_registry)).
+- **Create trustlines through SACs**: passkey and bridge accounts open their USDC trustlines with the Stellar Asset Contract's `trust()`.
+- **`Address::executable()`**: each vault pins the Wasm hash of every protocol it calls and pauses itself if a protocol upgrades (`ProtocolChanged`).
+
+## Built with
+
+| Technology | How Tsuna uses it |
+|---|---|
+| Soroban, soroban-sdk 28 | Six contracts: `agent_vault`, `oracle_router`, `policy_registry`, `vault_factory`, `signal_budget`, `passkey_account` |
+| Blend | Supply, collateral and debt valued by the vault's adapter; health factor checked after every call |
+| DeFindex | A USDC vault on the Blend strategy as a second yield position |
+| Soroswap | Swaps with an oracle-bounded minimum output; the CCTP leg from Circle USDC |
+| Aquarius | XLM/USDC liquidity, valued so that a skewed pool cannot inflate NAV |
+| Reflector, Chainlink Data Feeds | Both price sources in `oracle_router` (BTC priced by both) |
+| OpenZeppelin Stellar contracts | Smart accounts for passkey users and for the agent's signal budget, with the `spending_limit` policy |
+| x402, MPP | Paid signal endpoints the agent buys from its capped budget |
+| Circle CCTP V2 | Ethereum Sepolia → Stellar deposits |
+| Vercel AI SDK, OpenAI | Agent runtime with Zod-typed tools, at most 6 model steps per run |
+| Next.js 16, TanStack Query, Playwright | Web app and end-to-end tests against testnet |
+
+## Verify it yourself
+
+- **Byte-for-byte WASM**: the deployed code is the build of this repository. Rebuild with stellar-cli 28.1.0 and compare with `stellar contract fetch` ([commands and hashes](#verify-the-deployed-contracts)).
+- **Tests**: `pnpm contracts:test` runs 121 Rust tests (vault accounting, every refusal, roles, oracle failure modes, timelocks, fleet upgrade); `pnpm test` runs the TypeScript suites of the SDK, the agent runtime and the web app; `pnpm --dir web exec playwright test` replays the demo in a browser against testnet.
+- **On-chain**: every refusal in the app and in the table above is a `FAILED` transaction carrying the vault's typed error.
+
+## Deployed contracts (testnet)
+
+| Contract | Address |
+|---|---|
+| `vault_factory` | [`CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL`](https://stellar.expert/explorer/testnet/contract/CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL) |
+| `policy_registry` | [`CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN`](https://stellar.expert/explorer/testnet/contract/CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN) |
+| `oracle_router` (production build) | [`CAU563FCQGGON3Q4GG4Z4UBPGY2542GJNJJE2PHJTMA5STYNSRRGYW6F`](https://stellar.expert/explorer/testnet/contract/CAU563FCQGGON3Q4GG4Z4UBPGY2542GJNJJE2PHJTMA5STYNSRRGYW6F) |
+| `oracle_router` (demo build, crash scenario only) | [`CBGBW4I4FS4FDJDNLEXOQD3MRBBLBQRWZJV6JATSRKZOAF2UVCFVRO26`](https://stellar.expert/explorer/testnet/contract/CBGBW4I4FS4FDJDNLEXOQD3MRBBLBQRWZJV6JATSRKZOAF2UVCFVRO26) |
+| Vault Prudent (Blend + DeFindex) | [`CCRLI4LNEJQGLHVPX56OEIMQ7FVLRD6MLOAKFJHHWS7VD3JUNKV6Z3NF`](https://stellar.expert/explorer/testnet/contract/CCRLI4LNEJQGLHVPX56OEIMQ7FVLRD6MLOAKFJHHWS7VD3JUNKV6Z3NF) |
+| Vault Leverage (Blend + Soroswap) | [`CBAA6ABPK3KCUUD3H6T23UKVNCU5TL6EO5WAXYCRSX3FLO6LB47IKKT3`](https://stellar.expert/explorer/testnet/contract/CBAA6ABPK3KCUUD3H6T23UKVNCU5TL6EO5WAXYCRSX3FLO6LB47IKKT3) |
+| Vault Liquidity (Aquarius + Soroswap) | [`CDGY3M3WNZRZ23VPD473KJGE65H52ZSRRX7LOXAYHFYWJUJO4UDEUJOP`](https://stellar.expert/explorer/testnet/contract/CDGY3M3WNZRZ23VPD473KJGE65H52ZSRRX7LOXAYHFYWJUJO4UDEUJOP) |
+| Signal budget (OpenZeppelin smart account) | [`CDCFBQKZPACXNWPY362GEJZCBVHQTHMET67QSQ6K4WUMTIFEEZVSKKPL`](https://stellar.expert/explorer/testnet/contract/CDCFBQKZPACXNWPY362GEJZCBVHQTHMET67QSQ6K4WUMTIFEEZVSKKPL) |
+
+Every address the app uses is in [`deployments/`](deployments); if this table and those files disagree, the files win.
+
+## Repository layout
+
+```
+contracts/   Soroban workspace: agent_vault, oracle_router, policy_registry, vault_factory, signal_budget, passkey_account
+packages/    @tsuna/sdk (contract client, policy presets) and @tsuna/agent (runtime, attacks, keeper, crash scenario)
+web/         Next.js app: landing, /agents, vault pages, attack lab, /portfolio, /create, /bridge, /fleet, /docs, API routes
+scripts/     Testnet deployment, seeding, CCTP, crash and maintenance scripts (pnpm tsx)
+deployments/ Testnet addresses and transaction hashes (public, no secrets)
+```
+
+## What Tsuna does not protect against
+
+Tsuna stops the agent from moving value out of the vault. It cannot make Blend, Soroswap or any other protocol unhackable: once funds sit in a protocol, they share its risk. Exposure caps per protocol, the drawdown pause and code-hash pinning bound that loss. The agent can also lose money inside its rules, within the per-call tolerance and the daily loss budget. Tsuna bounds the worst case; it does not promise returns.
+
+Known gaps, each with a planned fix (also listed in the app under Docs → Limits):
+
+- **Testnet only**, test USDC only, no external audit yet. Timelocks are 10 minutes on testnet (24 h in production).
+- **Demo keys live on the server**: the creator key used by Create, both factory admins and the oracle admin (Docs → Keys lists each one and who holds it in production). The CCTP demo burns from a server-side test wallet, not from the user's own wallet.
+- **The demo price switch is immediate** on the Leverage vault's demo router, because the crash scenario needs it. Prudent, Liquidity and every published agent read the production router, which has no such function.
+- **Oracle lag**: deposits and withdrawals price at the latest Reflector update (about every 5 minutes) with no entry or exit fee. Only BTC has a second source; USDC and XLM rely on Reflector.
+- **Leveraged exits** sell collateral with up to 3 % slippage, borne by the leaver; near liquidation the exit falls back to what idle USDC repays, so a smaller part is redeemed.
+- The protocol watch trusts the first code hash it sees, not the protocols' own dependencies. The app's rate limits are kept per server instance.
 
 ## Run locally
 
@@ -38,7 +173,6 @@ Open `/agents`, create a passkey, then get test USDC before choosing a vault. Th
 
 `pnpm --dir web exec playwright test ux.spec.ts` checks one primary action, onboarding guidance and mobile overflow across the demo screens. It also creates a real passkey account on testnet to check the empty-wallet path; it does not draw from the faucet or run attacks.
 
-
 ```sh
 pnpm typecheck
 pnpm lint
@@ -47,6 +181,16 @@ pnpm build
 pnpm contracts:build
 pnpm contracts:test
 ```
+
+## Roadmap
+
+- External audit of `agent_vault` and `oracle_router`, then mainnet with real Blend and DeFindex strategies.
+- More protocols (XOXNO, DeFindex RWA strategies), a public SDK for third-party agent creators.
+- Zero-knowledge proofs so a creator can keep a strategy private while proving it stayed within its rules.
+
+# Specs
+
+The sections below document every contract interface, limit, error code and script.
 
 ## Browser verification
 

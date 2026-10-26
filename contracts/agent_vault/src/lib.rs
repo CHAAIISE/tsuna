@@ -348,7 +348,9 @@ impl AgentVault {
     /// Never blocked by pause or by the oracle. The vault exits the holder's share of every
     /// protocol position itself. Non-base assets are valued at exit prices; if any of them has
     /// no usable price, the holder receives their pro-rata share of every asset in kind instead.
-    /// A leveraged position is exited only as far as its debt can be repaid from idle balances,
+    /// A leveraged position repays the holder's share of its debt: when idle base falls short,
+    /// the vault sells that much collateral on its declared Soroswap pair first, the holder
+    /// bearing the slippage. Without a router or a price, the exit is capped by idle balances,
     /// so fewer shares than requested may be redeemed: the event and balances show how many.
     pub fn withdraw(env: Env, user: Address, shares: i128) -> Result<i128, Error> {
         user.require_auth();
@@ -369,6 +371,11 @@ impl AgentVault {
             fees::crystallize(&env, nav)?;
         }
         let supply = shares::effective_supply(&env)?;
+        // A priced exit sells collateral to repay its share of debt when idle base falls short.
+        let swap_loss = match nav {
+            Some(_) => adapters::fund_exit(&env, &asset, shares, supply, &mut prices)?,
+            None => 0,
+        };
         let shares = adapters::exitable(&env, shares, supply, nav.is_some())?;
         if shares == 0 {
             return Err(Error::RepaymentUnavailable);
@@ -399,7 +406,8 @@ impl AgentVault {
                 }
                 // The holder's share of non-base assets is bought back in base at the exit
                 // price while base liquidity lasts; the rest leaves in kind at that price.
-                let target = entitlement.min(claim);
+                // The leaver bears the slippage of the collateral sold for their exit.
+                let target = (entitlement - swap_loss).min(claim).max(0);
                 let amount = target.min(token.balance(&me));
                 let mut residual = target - amount;
                 for (index, held_asset) in assets.iter().enumerate().skip(1) {

@@ -171,6 +171,47 @@ pub(crate) fn needs(env: &Env, pool: &Address, needs: &mut Needs) -> Result<(), 
     Ok(())
 }
 
+/// Withdraws up to `units` of the first non-`base` collateral into the vault, for an exit that
+/// must sell it to repay debt. Blend refuses the withdrawal if it would leave the position
+/// unhealthy. Returns the asset and the amount released.
+pub(crate) fn release_collateral(
+    env: &Env,
+    pool: &Address,
+    base: &Address,
+    prices: &mut Prices,
+    value: i128,
+) -> Result<Option<(Address, i128)>, Error> {
+    for line in lines(env, pool)? {
+        if line.asset == *base || line.collateral <= 0 {
+            continue;
+        }
+        let held = mul_div(env, line.collateral, line.b_rate, SCALAR, false)?;
+        let Ok(units) = prices.convert(env, base, value, &line.asset) else {
+            continue;
+        };
+        let amount = units.min(held);
+        if amount <= 0 {
+            continue;
+        }
+        let me = env.current_contract_address();
+        let requests = Vec::from_array(
+            env,
+            [Request {
+                address: line.asset.clone(),
+                amount,
+                request_type: 3,
+            }],
+        );
+        let _: Val = env.invoke_contract(
+            pool,
+            &Symbol::new(env, "submit_with_allowance"),
+            (me.clone(), me.clone(), me, requests).into_val(env),
+        );
+        return Ok(Some((line.asset, amount)));
+    }
+    Ok(None)
+}
+
 pub(crate) fn unwind(env: &Env, pool: &Address, shares: i128, supply: i128) -> Result<(), Error> {
     let mut requests = Vec::new(env);
     let mut repays: Vec<(Address, i128)> = Vec::new(env);

@@ -678,6 +678,63 @@ fn leveraged_exit_redeems_only_what_idle_balances_can_repay() {
 }
 
 #[test]
+fn leveraged_exit_sells_collateral_to_repay_its_debt() {
+    let lab = Lab::new();
+    let f = &lab.f;
+    let (pool, _) = lab.blend();
+    let df = lab.defindex();
+    lab.mint(&lab.xlm, &f.vault, 2_000 * UNIT);
+    lab.submit(
+        &pool,
+        vec![
+            lab.env(),
+            lab.request(&lab.xlm, 2_000 * UNIT, 2),
+            lab.request(&f.asset, 200 * UNIT, 4),
+        ],
+    )
+    .unwrap();
+    lab.df_deposit(&df, 1_150 * UNIT).unwrap();
+    // The vault's Soroswap pair pays the oracle rate: 0.2 USDC per XLM.
+    let pair = lab.env().register(PairMock, (UNIT / 5,));
+    lab.mint(&f.asset, &pair, 10_000 * UNIT);
+    let router = lab.env().register(SoroswapRouterMock, (pair.clone(),));
+    lab.adapter(AdapterKind::Soroswap, &router);
+    f.update_policy(|policy| {
+        policy
+            .guards
+            .set(router.clone(), vec![lab.env(), pair.clone()])
+    });
+    let nav = lab.nav();
+    assert_eq!(nav, 1_400 * UNIT);
+    let shares = f.client().balance(&f.alice);
+    let held = |lab: &Lab| lab.balance(&f.asset, &f.alice) + lab.balance(&lab.xlm, &f.alice) / 5;
+    let before = held(&lab);
+    // 50 idle USDC cannot repay 200 of debt: the exit sells collateral instead of stopping short.
+    f.withdraw(&f.alice, shares);
+    assert_eq!(f.client().balance(&f.alice), 0);
+    // Performance-fee shares minted on exit stay; the debt left is exactly theirs.
+    let remaining = f.client().total_shares() + crate::shares::VIRTUAL_SHARES;
+    let supply = remaining + shares;
+    let debt: Map<u32, i128> = BlendMockClient::new(lab.env(), &pool)
+        .get_positions(&f.vault)
+        .get(Symbol::new(lab.env(), "liabilities"))
+        .unwrap()
+        .into_val(lab.env());
+    let left = debt.get(3).unwrap_or(0);
+    assert!(
+        (left - 200 * UNIT * remaining / supply).abs() <= 2,
+        "{left}"
+    );
+    // Paid in USDC, the rest in XLM at the oracle price: the holder's full share of NAV.
+    let received = held(&lab) - before;
+    let entitled = nav * shares / supply;
+    assert!(
+        (received - entitled).abs() <= UNIT / 100,
+        "{received} vs {entitled}"
+    );
+}
+
+#[test]
 fn adapters_are_limited_to_allowlisted_protocols_and_bounded_positions() {
     let lab = Lab::new();
     let f = &lab.f;

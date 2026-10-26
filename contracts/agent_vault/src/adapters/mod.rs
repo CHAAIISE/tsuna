@@ -289,6 +289,91 @@ pub(crate) fn exitable(
     Ok(exitable)
 }
 
+/// Slippage an exit accepts when it sells collateral to repay its share of debt.
+const EXIT_SWAP_SLIPPAGE_BPS: i128 = 300;
+
+/// Makes a priced exit independent of the agent: when idle base cannot repay the leaver's share
+/// of a base-asset debt, the vault withdraws that much non-base collateral and sells it for base
+/// on its own Soroswap router, through a pair the policy declares. Returns the value lost to the
+/// swap at exit prices, which the leaver bears. Does nothing when there is no shortfall, no
+/// router, no declared pair or no price: the exit then stays capped by idle balances.
+pub(crate) fn fund_exit(
+    env: &Env,
+    base: &Address,
+    shares: i128,
+    supply: i128,
+    prices: &mut Prices,
+) -> Result<i128, Error> {
+    let adapters = list(env);
+    let Some(router) = adapters
+        .iter()
+        .find(|adapter| adapter.kind == AdapterKind::Soroswap)
+        .map(|adapter| adapter.protocol)
+    else {
+        return Ok(0);
+    };
+    let Some(policy) = crate::leash::policy(env) else {
+        return Ok(0);
+    };
+    let me = env.current_contract_address();
+    let token = token::Client::new(env, base);
+    for adapter in adapters.iter() {
+        if adapter.kind != AdapterKind::Blend {
+            continue;
+        }
+        let mut needs: Needs = Map::new(env);
+        blend::needs(env, &adapter.protocol, &mut needs)?;
+        let Some((owed, margin)) = needs.get(base.clone()) else {
+            continue;
+        };
+        let required = add(mul_div(env, owed, shares, supply, true)?, margin)?;
+        let shortfall = required - token.balance(&me);
+        if shortfall <= 0 {
+            continue;
+        }
+        // Sell enough that the proceeds cover the shortfall even at the worst accepted price.
+        let value = mul_div(env, shortfall, BPS, BPS - EXIT_SWAP_SLIPPAGE_BPS, true)?;
+        let Some((asset, amount)) =
+            blend::release_collateral(env, &adapter.protocol, base, prices, value)?
+        else {
+            continue;
+        };
+        let pair: Address = env.invoke_contract(
+            &router,
+            &Symbol::new(env, "router_pair_for"),
+            (asset.clone(), base.clone()).into_val(env),
+        );
+        if !policy
+            .guards_of(&router)
+            .is_some_and(|guards| guards.contains(&pair))
+        {
+            return Err(Error::SpenderNotProtocol);
+        }
+        let quoted = prices.convert(env, &asset, amount, base)?;
+        let min_out = mul_div(env, quoted, BPS - EXIT_SWAP_SLIPPAGE_BPS, BPS, true)?;
+        let before = token.balance(&me);
+        env.authorize_as_current_contract(Vec::from_array(
+            env,
+            [transfer(env, &asset, &pair, amount)],
+        ));
+        let _: Val = env.invoke_contract(
+            &router,
+            &Symbol::new(env, "swap_exact_tokens_for_tokens"),
+            (
+                amount,
+                min_out,
+                Vec::from_array(env, [asset.clone(), base.clone()]),
+                me.clone(),
+                env.ledger().timestamp() + 300,
+            )
+                .into_val(env),
+        );
+        let received = token.balance(&me) - before;
+        return Ok((quoted - received).max(0));
+    }
+    Ok(0)
+}
+
 /// Exits `shares / supply` of every position into the vault's idle balances.
 pub(crate) fn unwind(env: &Env, shares: i128, supply: i128) -> Result<(), Error> {
     for adapter in list(env) {

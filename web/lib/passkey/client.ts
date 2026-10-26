@@ -49,6 +49,7 @@ function storePasskeyAccount(account: PasskeyAccount | null): void {
 
 export function forgetPasskeyAccount(): void {
   storePasskeyAccount(null);
+  void fetch("/api/session", { method: "DELETE" });
 }
 
 export async function api<T>(path: string, body?: unknown): Promise<T> {

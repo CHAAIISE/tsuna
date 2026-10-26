@@ -3,6 +3,8 @@ import { clientIp, rateLimit, releaseRateLimit } from "@/lib/sponsor/rate-limit"
 import { tooManyRequests } from "@/lib/sponsor/http";
 import { latestRun, prepareRun } from "@/lib/stellar/agent-runs";
 import { failure, notFound } from "@/lib/stellar/http";
+import { sessionAccount, signInRequired } from "@/lib/session/session";
+import { tsuna } from "@/lib/stellar/client";
 import { resolveVaultId } from "@/lib/stellar/vaults";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +17,15 @@ const body = z.object({ vault: z.string().min(1).max(64) });
 /** Returns the completed management cycle so its receipt does not depend on instance-local polling. */
 export async function POST(request: Request): Promise<Response> {
   try {
+    const account = sessionAccount(request);
+    if (!account) return signInRequired("run the agent");
     const address = await resolveVaultId(body.parse(await request.json()).vault);
     if (!address) return notFound();
-    const keys = [`agent-ip:${clientIp(request)}`, `agent-vault:${address}`];
-    const wait = rateLimit(keys[0] as string, 12, HOUR) || rateLimit(keys[1] as string, 20, HOUR);
+    if (await tsuna().vault(address).sharesOf(account) === 0n) {
+      return Response.json({ error: "Only depositors of this vault can run its agent. Deposit first." }, { status: 403 });
+    }
+    const keys = [`agent-ip:${clientIp(request)}`, `agent-vault:${address}`, `agent-account:${account}`];
+    const wait = rateLimit(keys[0] as string, 12, HOUR) || rateLimit(keys[1] as string, 20, HOUR) || rateLimit(keys[2] as string, 6, HOUR);
     if (wait) return tooManyRequests(wait);
     const signalsUrl = process.env.LEASH_SIGNALS_URL || new URL(request.url).origin;
     let prepared;

@@ -6,6 +6,7 @@ import { fetchJson } from "@/lib/hooks/fetch-json";
 import { queryKeys } from "@/lib/hooks/keys";
 import type { CrashResponse, CrashRunView, CrashStepId } from "@/lib/crash/types";
 import type { ActivityResponse, VaultDetail } from "@/lib/stellar/types";
+import { ensureSession } from "@/lib/passkey/session";
 
 const crashKey = (vault: string) => ["crash", vault] as const;
 
@@ -39,7 +40,10 @@ export function useCrash(vault: string) {
 export function useCrashStep(vault: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (step: CrashStepId) => (await fetchJson<{ run: CrashRunView }>("/api/crash", { step })).run,
+    mutationFn: async (step: CrashStepId) => {
+      await ensureSession("drive the crash");
+      return (await fetchJson<{ run: CrashRunView }>("/api/crash", { step })).run;
+    },
     onSuccess: run => client.setQueryData<CrashResponse>(crashKey(vault), data => (data ? { ...data, run } : data)),
   });
 }

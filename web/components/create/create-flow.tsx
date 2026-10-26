@@ -11,6 +11,7 @@ import {
   DAILY_LOSS_OPTIONS, DRAWDOWN_OPTIONS, EXPOSURE_OPTIONS, STRATEGIES,
   type CreateChoice, type Option, type PresetInfo, type StrategyId,
 } from "@/lib/fleet/strategies";
+import { ensureSession } from "@/lib/passkey/session";
 
 const EXPLORER = "https://stellar.expert/explorer/testnet";
 const STEPS = ["Strategy", "Tsuna rules", "Review"] as const;
@@ -95,6 +96,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
     setPublishing(true);
     setError(null);
     try {
+      await ensureSession("publish an agent");
       const response = await fetch("/api/create", {
         method: "POST",
         headers: { "content-type": "application/json" },

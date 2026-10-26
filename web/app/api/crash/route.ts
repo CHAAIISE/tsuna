@@ -5,6 +5,7 @@ import { CRASH_STEP_IDS } from "@/lib/crash/types";
 import { tooManyRequests } from "@/lib/sponsor/http";
 import { clientIp, rateLimit, releaseRateLimit } from "@/lib/sponsor/rate-limit";
 import { failure } from "@/lib/stellar/http";
+import { sessionAccount, signInRequired } from "@/lib/session/session";
 
 export const dynamic = "force-dynamic";
 /** The risk-off step is up to two model runs plus their transactions. */
@@ -30,6 +31,7 @@ export async function GET(request: Request): Promise<Response> {
  */
 export async function POST(request: Request): Promise<Response> {
   try {
+    if (!sessionAccount(request)) return signInRequired("drive the crash");
     const { step } = body.parse(await request.json());
     const ip = clientIp(request);
     const keys = step === "prepare" ? [`crash-run-ip:${ip}`, "crash-runs"] : [`crash-step-ip:${ip}`];

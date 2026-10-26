@@ -50,14 +50,19 @@ function assertP256Point(publicKey: Uint8Array): void {
  * address only depends on the key, so deploying twice returns the same
  * account.
  */
+/** Address of the passkey account of a key: it commits to the key, so nobody can claim it with another one. */
+export function passkeyAccountAddress(publicKey: Uint8Array, credentialId: Uint8Array): string {
+  const salt = createHash("sha256").update(Buffer.concat([publicKey, credentialId])).digest();
+  return contractId(serverKey("LEASH_RELAYER_SECRET").publicKey(), salt);
+}
+
 export async function deployAccount(publicKey: Uint8Array, credentialId: Uint8Array): Promise<{ account: string; hash: string | null }> {
   assertP256Point(publicKey);
   if (credentialId.length === 0 || credentialId.length > 255) throw new SponsorError("Invalid credential ID.");
   const relayer = serverKey("LEASH_RELAYER_SECRET");
   const keyData = Buffer.concat([publicKey, credentialId]);
-  // Commits the address to the key: nobody can claim it with another key.
   const salt = createHash("sha256").update(keyData).digest();
-  const account = contractId(relayer.publicKey(), salt);
+  const account = passkeyAccountAddress(publicKey, credentialId);
   if (await contractWasmHash(account)) return { account, hash: null };
 
   const operation = Operation.createCustomContract({

@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { FleetError } from "@/lib/fleet/admin";
 import { createChoice, publishAgent } from "@/lib/fleet/create";
+import { sessionAccount, signInRequired } from "@/lib/session/session";
 
 /** Deploy, register and one adapter per protocol: four or five transactions in a row. */
 export const maxDuration = 180;
 
 export async function POST(request: Request) {
   try {
+    if (!sessionAccount(request)) return signInRequired("publish an agent");
     const published = await publishAgent(createChoice.parse(await request.json()));
     return Response.json(published);
   } catch (error) {

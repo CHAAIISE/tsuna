@@ -1,0 +1,96 @@
+import "server-only";
+import { createHash, createHmac, createPublicKey, randomBytes, timingSafeEqual, verify } from "node:crypto";
+import { ApiError } from "@/lib/stellar/http";
+import { fromBase64Url, toBase64Url } from "@/lib/passkey/encoding";
+import { passkeyAccountAddress } from "@/lib/sponsor/relayer";
+
+/**
+ * Proof that the caller controls a passkey account, kept in an HttpOnly cookie.
+ * The account address is derived from its public key, so a valid WebAuthn assertion over a fresh
+ * server challenge, from the key the address commits to, proves control without any stored state.
+ */
+
+export const SESSION_COOKIE = "tsuna_session";
+const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+const SESSION_TTL_S = 7 * 24 * 60 * 60;
+/** WebAuthn authenticator data flags: user present, user verified. */
+const UP = 0x01;
+const UV = 0x04;
+
+function key(): Buffer {
+  const secret = process.env.LEASH_RELAYER_SECRET;
+  if (!secret) throw new ApiError("Sign-in is not configured on this server.", 503);
+  return createHash("sha256").update(`tsuna-session:${secret}`).digest();
+}
+
+const mac = (value: string) => createHmac("sha256", key()).update(value).digest("base64url");
+
+function sameMac(value: string, given: string): boolean {
+  const expected = Buffer.from(mac(value));
+  const actual = Buffer.from(given);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+/** A stateless, signed, short-lived challenge for the passkey to sign. */
+export function newChallenge(): string {
+  const body = `${Date.now()}.${randomBytes(16).toString("base64url")}`;
+  return `${body}.${mac(body)}`;
+}
+
+function checkChallenge(challenge: string): void {
+  const [issued, nonce, tag] = challenge.split(".");
+  if (!issued || !nonce || !tag || !sameMac(`${issued}.${nonce}`, tag)) throw new ApiError("Unknown sign-in challenge.", 401);
+  if (Date.now() - Number(issued) > CHALLENGE_TTL_MS) throw new ApiError("The sign-in challenge expired. Try again.", 401);
+}
+
+export interface SignIn {
+  publicKey: string;
+  credentialId: string;
+  authenticatorData: string;
+  clientDataJSON: string;
+  signature: string;
+}
+
+/** Verifies a passkey assertion over a server challenge and returns the account it controls. */
+export function verifySignIn(input: SignIn, origin: string): string {
+  const publicKey = fromBase64Url(input.publicKey);
+  const credentialId = fromBase64Url(input.credentialId);
+  const authenticatorData = fromBase64Url(input.authenticatorData);
+  const clientDataJSON = fromBase64Url(input.clientDataJSON);
+  const signature = fromBase64Url(input.signature);
+  if (publicKey.length !== 65 || publicKey[0] !== 0x04 || signature.length !== 64 || authenticatorData.length < 37) {
+    throw new ApiError("Malformed passkey signature.", 400);
+  }
+
+  const client = JSON.parse(new TextDecoder().decode(clientDataJSON)) as { type?: string; challenge?: string; origin?: string };
+  if (client.type !== "webauthn.get" || client.origin !== origin || !client.challenge) throw new ApiError("The passkey signed for another site.", 401);
+  checkChallenge(new TextDecoder().decode(fromBase64Url(client.challenge)));
+  const flags = authenticatorData[32] ?? 0;
+  if ((flags & UP) === 0 || (flags & UV) === 0) throw new ApiError("The passkey did not verify the user.", 401);
+
+  const jwk = { kty: "EC", crv: "P-256", x: toBase64Url(publicKey.subarray(1, 33)), y: toBase64Url(publicKey.subarray(33)) };
+  const signed = Buffer.concat([authenticatorData, createHash("sha256").update(clientDataJSON).digest()]);
+  const valid = verify("sha256", signed, { key: createPublicKey({ key: jwk, format: "jwk" }), dsaEncoding: "ieee-p1363" }, signature);
+  if (!valid) throw new ApiError("The passkey signature is invalid.", 401);
+  return passkeyAccountAddress(publicKey, credentialId);
+}
+
+/** `Set-Cookie` value opening a session for `account`. */
+export function sessionCookie(account: string): string {
+  const expires = Math.floor(Date.now() / 1000) + SESSION_TTL_S;
+  const value = `${account}.${expires}.${mac(`${account}.${expires}`)}`;
+  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_S}`;
+}
+
+export const clearedSessionCookie = `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+
+/** The account of the request's session, or null. */
+export function sessionAccount(request: Request): string | null {
+  const cookie = request.headers.get("cookie")?.split(/;\s*/).find(part => part.startsWith(`${SESSION_COOKIE}=`));
+  const [account, expires, tag] = cookie?.slice(SESSION_COOKIE.length + 1).split(".") ?? [];
+  if (!account || !expires || !tag || !sameMac(`${account}.${expires}`, tag)) return null;
+  return Number(expires) * 1000 > Date.now() ? account : null;
+}
+
+/** 401 for a request without a session; the client answers it with a passkey prompt. */
+export const signInRequired = (action: string): Response => Response.json({ error: `Sign in with your passkey to ${action}.` }, { status: 401 });

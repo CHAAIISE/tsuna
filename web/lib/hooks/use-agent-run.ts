@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AgentRunView } from "@/lib/stellar/types";
 import { fetchJson } from "./fetch-json";
 import { queryKeys } from "./keys";
+import { ensureSession } from "@/lib/passkey/session";
 
 /** Latest agent run of a vault started on this server, polled every 1.5 s while it runs. */
 export function useAgentRun(id: string) {
@@ -24,7 +25,10 @@ export function useAgentRun(id: string) {
 export function useStartRun(id: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async () => (await fetchJson<{ run: AgentRunView }>("/api/agent", { vault: id })).run,
+    mutationFn: async () => {
+      await ensureSession("run the agent");
+      return (await fetchJson<{ run: AgentRunView }>("/api/agent", { vault: id })).run;
+    },
     onSuccess: run => client.setQueryData(queryKeys.run(id), run),
   });
 }

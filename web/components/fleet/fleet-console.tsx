@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import type { BuildInfo, FleetState, FleetVault } from "@/lib/fleet/read";
+import { ensureSession } from "@/lib/passkey/session";
 
 const EXPLORER = "https://stellar.expert/explorer/testnet";
 /** Ledger timestamps trail the wall clock by a few seconds. */
@@ -68,6 +69,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
     setBusy(kind);
     setRefusal(null);
     try {
+      await ensureSession("propose a patch");
       const response = await fetch("/api/fleet", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -84,8 +86,8 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
         setState(body.state);
         setSelected(body.state.candidates[0]?.hash ?? "");
       }
-    } catch {
-      setRefusal({ message: "Stellar did not respond. Try again in a moment." });
+    } catch (cause) {
+      setRefusal({ message: cause instanceof Error ? cause.message : "Stellar did not respond. Try again in a moment." });
     } finally {
       setBusy(null);
     }

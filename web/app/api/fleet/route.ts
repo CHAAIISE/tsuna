@@ -3,6 +3,7 @@ import { z } from "zod";
 import { FleetError, applyPatch, proposePatch } from "@/lib/fleet/admin";
 import { FLEET_IDS, isFleetId } from "@/lib/fleet/config";
 import { readFleet } from "@/lib/fleet/read";
+import { sessionAccount, signInRequired } from "@/lib/session/session";
 
 export const maxDuration = 120;
 
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
+    if (!sessionAccount(request)) return signInRequired("propose a patch");
     const body = action.parse(await request.json());
     const result = body.action === "propose" ? await proposePatch(body.fleet, body.wasmHash) : await applyPatch(body.fleet);
     return Response.json({ hash: result.hash, state: await readFleet(body.fleet) });

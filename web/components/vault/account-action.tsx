@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Check, Copy, Droplets, Fingerprint, LogOut } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Droplets, Fingerprint, LogOut, UserRound } from "lucide-react";
 import { Popover } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { queryKeys } from "@/lib/hooks/keys";
@@ -15,7 +15,7 @@ import { shortAddress } from "@/lib/stellar/format";
 
 /**
  * Account slot of the app navigation: "Sign in with passkey" when signed out
- * (the screen's primary action when `primary`), else the account's address
+ * (the screen's primary action when `primary`), else an account icon
  * opening a menu with its balance, the faucet, the address and sign out.
  */
 export function AccountAction({ primary = false }: { primary?: boolean }) {
@@ -60,9 +60,15 @@ function AccountMenu({ address }: { address: string }) {
   return (
     <Popover.Root onOpenChange={open => { if (!open) setConfirmSignOut(false); }}>
       <Popover.Trigger asChild>
-        <Button variant="outline" data-testid="account-chip" title={address} className="font-mono text-xs tracking-wide">
-          {shortAddress(address)}
-        </Button>
+        <button
+          type="button"
+          data-testid="account-chip"
+          aria-label={`Account ${shortAddress(address)}`}
+          title={address}
+          className="flex size-10 items-center justify-center rounded-full border border-primary/40 bg-card text-primary shadow-card transition-colors hover:bg-primary hover:text-primary-foreground data-[state=open]:bg-primary data-[state=open]:text-primary-foreground"
+        >
+          <UserRound aria-hidden="true" className="size-5" />
+        </button>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content

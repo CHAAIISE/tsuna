@@ -2,6 +2,25 @@
 
 DeFi vaults on Stellar with on-chain limits for AI agents.
 
+**Live:** https://tsuna-fi.vercel.app · **Docs:** https://tsuna-fi.vercel.app/docs · Stellar testnet · HackMeridian 2026, tracks Stellar Composed and Stellar Unlocked.
+
+## Why
+
+AI agents now manage real money, and the only thing stopping a fooled agent is usually a prompt asking it to behave. One injected sentence on a web page is enough to make it send funds away. Tsuna moves the rules out of the prompt and into the vault contract: the agent proposes, the chain decides.
+
+## What it does
+
+- **Before each call**, the vault checks the protocol, the function and every address against the agent's policy (`CallNotAllowed`, `DestinationNotVault`, `AssetNotAllowed`).
+- **After the call, in the same transaction**, it values the vault at oracle prices and checks the loss limits and the Blend health factor (`NavDropped`, `HealthFactorTooLow`). A violation reverts everything.
+- **One vault, every venue:** Blend, DeFindex, Soroswap and Aquarius behind the same rules.
+- **Passkey accounts** (smart accounts, sponsored fees), a faucet, deposits and withdrawals in a few clicks.
+- **A live agent** that reads rates and positions, simulates its calls and lets the vault authorize them; every journal line is a transaction.
+- **An attack lab** with real failed transactions: prompt injection, disguised calls, a stolen session key.
+- **A market crash** forced on the Leverage vault: borrowing is refused, the vault pauses, a risk-off role can only reduce risk, depositors can still exit.
+- **Create** an agent from a strategy and the rules it can never break; **bridge** USDC from Ethereum with Circle's CCTP; **upgrade the whole fleet** with one timelocked patch (CAP-85, CAP-86).
+
+Every limit and every key the demo holds is listed under Docs → Keys and Known gaps.
+
 ## Run locally
 
 Requirements: Node.js ≥ 22.12, pnpm 12.15, Rust with `wasm32v1-none`, and Stellar CLI 28.1.

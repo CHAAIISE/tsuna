@@ -17,6 +17,11 @@
       "hash": "92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb",
       "title": "Protocol upgrade watch",
       "description": "Each vault reads on-chain the code hash of every protocol it calls. After a protocol upgrade, calls to it are refused (ProtocolChanged) and the vault can be paused until its creator acknowledges the new code."
+    },
+    {
+      "hash": "87cfe95d9d49dfe12a13277a958b45185eb937df2dc88326149e411272ed089a",
+      "title": "Audited build",
+      "description": "Current fleet code: assets dropped from a policy stay in NAV, oracle changes behind a timelock, and leveraged exits repay their share of Blend debt, falling back to a partial exit when Blend or the swap refuses."
     }
   ],
   "fleets": {

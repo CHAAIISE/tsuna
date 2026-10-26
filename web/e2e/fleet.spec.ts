@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { rpc } from "@stellar/stellar-sdk";
 
 interface FleetState {
   timelockSecs: number;
@@ -46,39 +47,44 @@ test("a policy written as v1 reads as v2 with its new fields not set", async ({ 
 test("one apply moves every vault of the test fleet to the proposed build", async ({ page, request }) => {
   const before = await fleetState(request, "test");
   test.setTimeout((before.timelockSecs + 240) * 1_000);
-  await page.goto("/fleet?fleet=test");
+  await test.step("09 · apply one executable reference to the fleet after its timelock", async () => {
+    await page.goto("/fleet?fleet=test");
 
-  let target: string;
-  if (before.pending) {
-    // A previous run proposed and stopped before applying: finish that patch.
-    target = before.pending.build.hash;
-  } else {
-    target = await page.locator('input[name="build"]:checked').inputValue();
-    expect(target).not.toBe(before.current?.hash);
-    await page.getByRole("button", { name: "Propose patch" }).click();
-    const proposed = page.getByTestId("propose-tx");
-    await expect(proposed).toBeVisible();
-    test.info().annotations.push({ type: "propose_ref", description: await proposed.getAttribute("data-hash") ?? "" });
-  }
+    let target: string;
+    if (before.pending) {
+      // A previous run proposed and stopped before applying: finish that patch.
+      target = before.pending.build.hash;
+    } else {
+      target = await page.locator('input[name="build"]:checked').inputValue();
+      expect(target).not.toBe(before.current?.hash);
+      await page.getByRole("button", { name: "Propose patch" }).click();
+      const proposed = page.getByTestId("propose-tx");
+      await expect(proposed).toBeVisible();
+      test.info().annotations.push({ type: "propose_ref", description: await proposed.getAttribute("data-hash") ?? "" });
+    }
 
-  await expect(page.getByTestId("pending-patch")).toHaveAttribute("data-hash", target);
-  await expect(page.getByTestId("timelock-countdown")).toHaveText(/^\d{2}:\d{2}$|^Ready$/);
-  const apply = page.getByRole("button", { name: "Apply to all vaults" });
-  await expect(apply).toBeDisabled();
-  await expect(apply).toBeEnabled({ timeout: (before.timelockSecs + 60) * 1_000 });
-  await apply.click();
-  const applied = page.getByTestId("apply-tx");
-  await expect(applied).toBeVisible();
-  test.info().annotations.push({ type: "apply_ref", description: await applied.getAttribute("data-hash") ?? "" });
+    await expect(page.getByTestId("pending-patch")).toHaveAttribute("data-hash", target);
+    await expect(page.getByTestId("timelock-countdown")).toHaveText(/^\d{2}:\d{2}$|^Ready$/);
+    const apply = page.getByRole("button", { name: "Apply to all vaults" });
+    await expect(apply).toBeDisabled();
+    await expect(apply).toBeEnabled({ timeout: (before.timelockSecs + 60) * 1_000 });
+    await apply.click();
+    const applied = page.getByTestId("apply-tx");
+    await expect(applied).toBeVisible();
+    test.info().annotations.push({ type: "apply_ref", description: await applied.getAttribute("data-hash") ?? "" });
+    const hash = await applied.getAttribute("data-hash") ?? "";
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect((await new rpc.Server("https://soroban-testnet.stellar.org").getTransaction(hash)).status).toBe("SUCCESS");
 
-  const cells = page.getByTestId("vault-wasm");
-  await expect(cells).toHaveCount(before.vaults.length);
-  for (const cell of await cells.all()) await expect(cell).toHaveAttribute("data-hash", target);
-  await expect(page.getByTestId("fleet-proof")).toBeVisible();
+    const cells = page.getByTestId("vault-wasm");
+    await expect(cells).toHaveCount(before.vaults.length);
+    for (const cell of await cells.all()) await expect(cell).toHaveAttribute("data-hash", target);
+    await expect(page.getByTestId("fleet-proof")).toBeVisible();
 
-  const after = await fleetState(request, "test");
-  expect(after.current?.hash).toBe(target);
-  expect(after.pending).toBeNull();
-  expect(after.vaults.every(vault => vault.wasmHash === target)).toBe(true);
-  for (const note of test.info().annotations) console.log(`${note.type.toUpperCase()} ${note.description}`);
+    const after = await fleetState(request, "test");
+    expect(after.current?.hash).toBe(target);
+    expect(after.pending).toBeNull();
+    expect(after.vaults.every(vault => vault.wasmHash === target)).toBe(true);
+    for (const note of test.info().annotations) console.log(`${note.type.toUpperCase()} ${note.description}`);
+  });
 });

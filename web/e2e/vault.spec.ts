@@ -48,7 +48,7 @@ test("a passkey user deposits 1,000 USDC, then the agent's next call is authoriz
     options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
 
-  await test.step("create a passkey account and get test USDC", async () => {
+  await test.step("03 · create a passkey account and get test USDC", async () => {
     await page.goto("/onboarding");
     await page.getByTestId("create-passkey").click();
     await expect(page.getByTestId("account-ready")).toBeVisible();
@@ -58,7 +58,7 @@ test("a passkey user deposits 1,000 USDC, then the agent's next call is authoriz
   const account = (await page.getByTestId("account-address").textContent())?.trim() ?? "";
   expect(account).toMatch(/^C[A-Z2-7]{55}$/);
 
-  await test.step("deposit 1,000 USDC into the vault", async () => {
+  await test.step("04 · deposit 1,000 USDC into Prudent and receive shares", async () => {
     await page.goto(`/agents/${target.slug}`);
     await expect(page.getByTestId("kpi-tvl")).not.toHaveText("—");
     await expect(page.locator("[data-primary]:visible")).toHaveCount(1);
@@ -75,7 +75,7 @@ test("a passkey user deposits 1,000 USDC, then the agent's next call is authoriz
   // Authorized calls already in the history (from earlier runs) do not count.
   const before = new Set(await page.locator('[data-testid="timeline-action"][data-hash]').evaluateAll(nodes => nodes.map(node => node.getAttribute("data-hash"))));
   let agentHash = "";
-  await test.step("run the agent until one of its calls is authorized", async () => {
+  await test.step("05 · run the agent until a new call is authorized on-chain", async () => {
     await page.getByTestId("run-agent").click();
     await expect(page.getByTestId("run-agent")).toHaveText(/Agent is working/);
     const authorized = page.locator('[data-testid="timeline-action"][data-outcome="authorized"][data-source="run"]');

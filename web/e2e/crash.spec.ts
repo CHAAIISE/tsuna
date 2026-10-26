@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 import { Account, Address, Contract, Networks, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { expect, test, type Page } from "@playwright/test";
+import { z } from "zod";
 
 /**
  * Drives the crash demo of the Leverage vault end to end on testnet: every step is a real
@@ -61,6 +62,36 @@ async function hashes(page: Page, id: string, testId: "crash-tx" | "crash-wall")
   return page.getByTestId(`crash-step-${id}`).getByTestId(testId).evaluateAll(nodes => nodes.map(node => node.getAttribute("data-hash") ?? ""));
 }
 
+const crashResponse = z.object({
+  run: z.object({
+    busy: z.string().nullable(),
+    needsRestore: z.boolean(),
+    steps: z.array(z.object({ id: z.string(), status: z.string(), error: z.string().nullable() })),
+  }).nullable(),
+});
+
+test.afterEach(async ({ request }) => {
+  let state: z.infer<typeof crashResponse> | undefined;
+  await expect.poll(async () => {
+    const response = await request.get("/api/crash?vault=leverage");
+    expect(response.ok()).toBe(true);
+    state = crashResponse.parse(await response.json());
+    return state.run?.busy ?? null;
+  }, { timeout: STEP_TIMEOUT, intervals: [2_000] }).toBeNull();
+  if (state?.run?.needsRestore) {
+    const restored = await request.post("/api/crash", { data: { step: "restore" } });
+    expect(restored.status()).toBe(202);
+    await expect.poll(async () => {
+      const response = await request.get("/api/crash?vault=leverage");
+      expect(response.ok()).toBe(true);
+      const current = crashResponse.parse(await response.json());
+      return current.run?.steps.find(step => step.id === "restore")?.status;
+    }, { timeout: STEP_TIMEOUT, intervals: [2_000] }).toBe("done");
+    expect(await forcedPrice()).toBeNull();
+    if (leverage) expect(await read<boolean>(leverage.address, "paused")).toBe(false);
+  }
+});
+
 test("a 30 % XLM crash: both risky calls hit the wall, the vault pauses, a depositor still withdraws, then the price is restored", async ({ page }) => {
   test.setTimeout(30 * 60_000);
   if (!leverage) throw new Error("No Leverage vault in deployments/testnet.json");
@@ -88,7 +119,7 @@ test("a 30 % XLM crash: both risky calls hit the wall, the vault pauses, a depos
   await expect(prepare).toHaveAttribute("data-state", "done", { timeout: STEP_TIMEOUT });
   const log: string[] = [`PREPARE ${(await hashes(page, "prepare", "crash-tx")).join(" ")}`];
 
-  await test.step("the demo oracle drops XLM by 30 %", async () => {
+  await test.step("08 · drop the demo oracle's XLM price by 30 %", async () => {
     await runStep(page, "crash");
     await expect(page.getByTestId("crash-xlm-price").locator("..")).toContainText("Forced by the demo oracle", { timeout: 30_000 });
     expect(await forcedPrice()).not.toBeNull();

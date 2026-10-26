@@ -25,47 +25,49 @@ async function expectSuccessful(hash: string): Promise<void> {
 }
 
 test("a passkey creates a gasless smart account and receives test USDC", async ({ page, context }) => {
-  // Chromium's virtual authenticator runs the real WebAuthn ceremony headless.
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      automaticPresenceSimulation: true,
-    },
+  await test.step("03 · create a passkey smart account, sponsor fees and get test USDC", async () => {
+    // Chromium's virtual authenticator runs the real WebAuthn ceremony headless.
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("WebAuthn.enable");
+    await cdp.send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    });
+
+    await page.goto("/onboarding");
+    const steps = page.getByTestId("onboarding-steps");
+    await expect(steps).toBeVisible();
+    await expect(steps.locator('[aria-current="step"]')).toContainText("Create your passkey");
+    await expect(page.locator("[data-primary]")).toHaveCount(1);
+
+    await page.getByTestId("create-passkey").click();
+    await expect(page.getByTestId("account-ready")).toBeVisible();
+    await expect(steps.locator('[aria-current="step"]')).toContainText("Get test USDC");
+    const account = (await page.getByTestId("account-address").textContent())?.trim() ?? "";
+    const deployHash = (await page.getByTestId("deploy-hash").textContent())?.trim() ?? "";
+    expect(account).toMatch(/^C[A-Z2-7]{55}$/);
+    await expectSuccessful(deployHash);
+    expect(await onChainBalance(account)).toBe(0n);
+
+    await page.getByTestId("get-usdc").click();
+    await expect(page.getByTestId("usdc-balance")).toContainText("1,000.00");
+    await expect(steps.locator('[aria-current="step"]')).toContainText("Pick an agent and deposit");
+    await expect(page.locator("[data-primary]")).toHaveCount(1);
+    const faucetHash = (await page.getByTestId("faucet-hash").textContent())?.trim() ?? "";
+    await expectSuccessful(faucetHash);
+    expect(await onChainBalance(account)).toBe(10_000_000_000n);
+
+    test.info().annotations.push(
+      { type: "smart-account", description: account },
+      { type: "deploy-tx", description: deployHash },
+      { type: "faucet-tx", description: faucetHash },
+    );
+    console.log(`SMART_ACCOUNT ${account}\nDEPLOY_TX ${deployHash}\nFAUCET_TX ${faucetHash}`);
   });
-
-  await page.goto("/onboarding");
-  const steps = page.getByTestId("onboarding-steps");
-  await expect(steps).toBeVisible();
-  await expect(steps.locator('[aria-current="step"]')).toContainText("Create your passkey");
-  await expect(page.locator("[data-primary]")).toHaveCount(1);
-
-  await page.getByTestId("create-passkey").click();
-  await expect(page.getByTestId("account-ready")).toBeVisible();
-  await expect(steps.locator('[aria-current="step"]')).toContainText("Get test USDC");
-  const account = (await page.getByTestId("account-address").textContent())?.trim() ?? "";
-  const deployHash = (await page.getByTestId("deploy-hash").textContent())?.trim() ?? "";
-  expect(account).toMatch(/^C[A-Z2-7]{55}$/);
-  await expectSuccessful(deployHash);
-  expect(await onChainBalance(account)).toBe(0n);
-
-  await page.getByTestId("get-usdc").click();
-  await expect(page.getByTestId("usdc-balance")).toContainText("1,000.00");
-  await expect(steps.locator('[aria-current="step"]')).toContainText("Pick an agent and deposit");
-  await expect(page.locator("[data-primary]")).toHaveCount(1);
-  const faucetHash = (await page.getByTestId("faucet-hash").textContent())?.trim() ?? "";
-  await expectSuccessful(faucetHash);
-  expect(await onChainBalance(account)).toBe(10_000_000_000n);
-
-  test.info().annotations.push(
-    { type: "smart-account", description: account },
-    { type: "deploy-tx", description: deployHash },
-    { type: "faucet-tx", description: faucetHash },
-  );
-  console.log(`SMART_ACCOUNT ${account}\nDEPLOY_TX ${deployHash}\nFAUCET_TX ${faucetHash}`);
 });

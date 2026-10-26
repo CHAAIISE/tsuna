@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Logo } from "@/components/logo";
 import { Overline } from "./section";
 
 function Limits() {
@@ -53,11 +52,30 @@ function Closing() {
   );
 }
 
+const footerLinks = [
+  { href: "/#how", label: "How it works" },
+  { href: "/docs", label: "Docs" },
+  { href: "/agents", label: "Launch app" },
+  { href: "https://github.com/CHAAIISE/tsuna", label: "GitHub" },
+] as const;
+
 function LandingFooter() {
   return (
-    <footer className="page-x flex flex-col gap-4 border-t py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-      <Logo className="h-4" />
-      <p>Built on Stellar.</p>
+    <footer className="relative overflow-hidden border-t bg-background pt-16">
+      <nav aria-label="Footer">
+        <ul className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3 px-6 text-sm text-muted-foreground">
+          {footerLinks.map(link => (
+            <li key={link.href}>
+              <Link href={link.href} className="transition-colors hover:text-primary">{link.label}</Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <p className="mt-6 text-center text-caption text-muted-foreground/80">© 2026 Tsuna · built on Stellar for HackMeridian</p>
+      {/* Giant wordmark cut by the page edge, fading from brand red into the background. */}
+      <div aria-hidden="true" className="mt-10 h-[0.62em] overflow-hidden text-center font-display text-[clamp(5rem,23vw,24rem)] leading-none font-medium tracking-[0.12em] select-none [padding-left:0.12em]">
+        <span className="bg-linear-to-b from-primary/25 via-primary/10 to-transparent bg-clip-text text-transparent">TSUNA</span>
+      </div>
     </footer>
   );
 }

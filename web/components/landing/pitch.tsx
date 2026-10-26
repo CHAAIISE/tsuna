@@ -76,7 +76,7 @@ function Links({ side }: { side: "in" | "out" }) {
     : "M0 196 H32 M32 40 V352 M32 40 H64 M32 144 H64 M32 248 H64 M32 352 H64";
   return (
     <svg aria-hidden="true" viewBox="0 0 64 392" preserveAspectRatio="none" className="hidden h-[392px] w-full text-primary/60 lg:block">
-      <path d={d} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="6 6" vectorEffect="non-scaling-stroke" />
+      <path d={d} fill="none" stroke="currentColor" strokeWidth={1.5} strokeDasharray="6 6" vectorEffect="non-scaling-stroke" className="animate-dash-flow" />
     </svg>
   );
 }

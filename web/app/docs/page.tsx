@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowUpRight } from "lucide-react";
 import { BuiltOn } from "@/components/landing/built-on";
 import { LandingNav } from "@/components/landing/hero";
+import { Keys } from "@/components/landing/keys";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { LandingFooter, Limits } from "@/components/landing/limits";
 import { Problem } from "@/components/landing/problem";
@@ -20,6 +21,7 @@ const sections = [
   { id: "proof", label: "Proof" },
   { id: "built-on", label: "Built on" },
   { id: "upgrades", label: "Upgrades" },
+  { id: "keys", label: "Keys" },
   { id: "limits", label: "Limits" },
 ] as const;
 
@@ -34,7 +36,7 @@ export default function Docs() {
           How Tsuna keeps agents <span className="italic">on a rope.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-          The threat, every check the vault contract runs, the transactions that prove it, the protocols it composes, how its code is upgraded and what it does not cover.
+          The threat, every check the vault contract runs, the transactions that prove it, the protocols it composes, how its code is upgraded, who holds which key and what it does not cover.
         </p>
         <a
           href="https://github.com/CHAAIISE/tsuna#readme"
@@ -51,6 +53,7 @@ export default function Docs() {
         <Proof />
         <BuiltOn />
         <Upgrades />
+        <Keys />
         <Limits />
       </main>
       <LandingFooter />

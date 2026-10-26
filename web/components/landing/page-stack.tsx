@@ -11,6 +11,11 @@ export function PageStack({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    // The landing opens on its hero: a reload or a return visit does not restore the old position.
+    if (!window.location.hash) {
+      window.history.scrollRestoration = "manual";
+      window.scrollTo(0, 0);
+    }
     const main = ref.current;
     if (!main) return;
     const pages = [...main.children] as HTMLElement[];
@@ -25,6 +30,7 @@ export function PageStack({ children }: { children: React.ReactNode }) {
     for (const page of pages) resize.observe(page);
     window.addEventListener("resize", place);
     return () => {
+      window.history.scrollRestoration = "auto";
       resize.disconnect();
       window.removeEventListener("resize", place);
       for (const page of pages) {

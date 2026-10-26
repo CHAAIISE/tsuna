@@ -60,7 +60,6 @@ export function SectionRail({ sections, label, revealAfter = 0 }: { sections: re
                   let top = page.parentElement.getBoundingClientRect().top + window.scrollY;
                   for (let sibling = page.previousElementSibling; sibling; sibling = sibling.previousElementSibling) top += (sibling as HTMLElement).offsetHeight;
                   window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
-                  history.replaceState(null, "", `#${section.id}`);
                 }}
                 className="group relative flex size-7 items-center justify-center focus-visible:outline-none"
               >

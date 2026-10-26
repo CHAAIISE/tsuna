@@ -11,6 +11,7 @@ import type { StepId, StepStatus, StepTx } from "@/lib/cctp/bridge";
 import { sepolia, stellar } from "@/lib/cctp/config";
 import { formatUsdc } from "@/lib/cctp/format";
 import type { BridgeJob } from "@/lib/cctp/jobs";
+import { ensureSession } from "@/lib/passkey/session";
 
 interface BridgeState {
   job: BridgeJob | null;
@@ -68,6 +69,7 @@ function BridgeTracker() {
     setStarting(true);
     setError(null);
     try {
+      await ensureSession("run the bridge");
       const response = await fetch("/api/bridge", { method: "POST" });
       const body = await response.json() as { job?: BridgeJob; error?: string };
       if (!response.ok && !body.job) throw new Error(body.error ?? `Could not start the bridge (${response.status})`);

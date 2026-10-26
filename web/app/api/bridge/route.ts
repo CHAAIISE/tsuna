@@ -5,6 +5,11 @@ import deployment from "../../../../deployments/cctp.testnet.json" with { type: 
 import { runBridge } from "@/lib/cctp/bridge";
 import { BRIDGE_AMOUNT } from "@/lib/cctp/config";
 import { createJob, getJob, updateJob } from "@/lib/cctp/jobs";
+import { sessionAccount, signInRequired } from "@/lib/session/session";
+import { tooManyRequests } from "@/lib/sponsor/http";
+import { clientIp, rateLimit } from "@/lib/sponsor/rate-limit";
+
+const DAY = 24 * 60 * 60 * 1000;
 
 /** Fast CCTP attestations from Sepolia arrive within minutes; the whole run fits this budget. */
 export const maxDuration = 300;
@@ -41,7 +46,12 @@ export async function GET(request: NextRequest) {
   return Response.json({ job: await getJob(id), bridge: describe(setup()) });
 }
 
-export async function POST() {
+/** Each run spends 1 test USDC and Sepolia gas from the server's wallet: signed-in accounts only, a few a day. */
+export async function POST(request: NextRequest) {
+  const account = sessionAccount(request);
+  if (!account) return signInRequired("run the bridge");
+  const wait = rateLimit(`bridge-account:${account}`, 3, DAY) || rateLimit(`bridge-ip:${clientIp(request)}`, 5, DAY);
+  if (wait) return tooManyRequests(wait);
   const config = setup();
   if (!config) return Response.json({ error: "The bridge is not configured on this server" }, { status: 503 });
   const facts = describe(config);

@@ -13,7 +13,7 @@ const gaps = [
   },
   {
     title: "Exits on leveraged vaults",
-    body: "An exit repays its share of the debt by selling collateral on the vault's declared Soroswap pair, accepting up to 3 % slippage, which the leaver bears. On a pool too thin for that, the swap fails and a smaller withdrawal is needed. A protocol that reverts still blocks exits.",
+    body: "An exit repays its share of the debt by selling collateral on the vault's declared Soroswap pair, accepting up to 3 % slippage, which the leaver bears. Near liquidation Blend refuses the release, and a pool too thin for 3 % misses the minimum: the exit then falls back to what idle USDC repays, so a smaller part is redeemed. The 3 % is also what a sandwich can take from the leaver. A protocol that reverts still blocks exits.",
   },
   {
     title: "Smaller ones",

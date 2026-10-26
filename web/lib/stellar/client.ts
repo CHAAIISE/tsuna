@@ -1,6 +1,7 @@
 import "server-only";
 import { Leash, TESTNET, type LeashError } from "@leash/sdk";
 import { rpc } from "@stellar/stellar-sdk";
+import { after } from "next/server";
 import { deployments } from "./deployments";
 import type { TypedError } from "./types";
 
@@ -35,11 +36,30 @@ interface Entry<T> {
 
 const entries = new Map<string, Entry<unknown>>();
 
+/** Past this many TTLs a stale value is no longer served: the request waits for fresh data. */
+const MAX_STALE_TTLS = 3;
+
+/**
+ * Runs `task` after the response is sent. On Vercel the function freezes once
+ * the response is out, so a bare floating promise may never finish: `after`
+ * keeps the invocation alive until the refresh settles. Outside a request
+ * (scripts, tests) `after` throws and the task simply runs detached.
+ */
+function background(task: () => Promise<unknown>): void {
+  const run = () => task().catch(() => undefined);
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
+}
+
 /**
  * Stale-while-revalidate memo: returns the cached value while it is younger
- * than `ttlMs`; past that, returns it still and refreshes in the background.
- * Concurrent misses share one load. Testnet reads are slow (one simulation per
- * getter), so every screen goes through this.
+ * than `ttlMs`; past that, returns it still and refreshes after the response;
+ * past `MAX_STALE_TTLS × ttlMs`, waits for the reload (stale value only if it
+ * fails). Concurrent misses share one load. Testnet reads are slow (one
+ * simulation per getter), so every screen goes through this.
  */
 export async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
   const entry = entries.get(key) as Entry<T> | undefined;
@@ -58,7 +78,9 @@ export async function cached<T>(key: string, ttlMs: number, load: () => Promise<
     return pending;
   };
   if (entry && "value" in entry) {
-    if (Date.now() - entry.at > ttlMs) refresh().catch(() => undefined);
+    const age = Date.now() - entry.at;
+    if (age > ttlMs * MAX_STALE_TTLS) return refresh().catch(() => entry.value as T);
+    if (age > ttlMs) background(refresh);
     return entry.value as T;
   }
   return refresh();

@@ -65,6 +65,9 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
     };
   }, [eta]);
 
+  // Visitors only rehearse upgrades on the test fleet; the demo fleet's admins patch it with the deploy script.
+  const readOnly = state.id === "demo";
+
   async function act(kind: "propose" | "apply") {
     setBusy(kind);
     setRefusal(null);
@@ -152,7 +155,9 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
           )}
           {refusal && <RefusalWall refusal={refusal} />}
           <p id="fleet-next-action" className="text-sm text-muted-foreground">
-            {pending
+            {readOnly
+              ? "The demo fleet is upgraded by its two admins only, never from this page. Switch to the test fleet to rehearse a patch yourself."
+              : pending
               ? ready ? "The timelock has ended. Apply this patch to update every vault." : "Apply becomes available when the timelock ends. No action is needed while you wait."
               : selected ? "This is a real upgrade proposal, signed by the demo admins. Review your selected build before proposing."
                 : "Propose patch is unavailable until another vault build is uploaded."}
@@ -161,11 +166,11 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
         </CardContent>
         <CardFooter>
           {pending ? (
-            <Button data-primary pending={busy === "apply"} disabled={!ready} aria-describedby="fleet-next-action" onClick={() => void act("apply")}>
+            <Button data-primary pending={busy === "apply"} disabled={readOnly || !ready} aria-describedby="fleet-next-action" onClick={() => void act("apply")}>
               {busy === "apply" ? "Waiting for Stellar…" : "Apply to all vaults"}
             </Button>
           ) : (
-            <Button data-primary pending={busy === "propose"} disabled={!selected} aria-describedby="fleet-next-action" onClick={() => void act("propose")}>
+            <Button data-primary pending={busy === "propose"} disabled={readOnly || !selected} aria-describedby="fleet-next-action" onClick={() => void act("propose")}>
               {busy === "propose" ? "Waiting for Stellar…" : "Propose patch"}
             </Button>
           )}

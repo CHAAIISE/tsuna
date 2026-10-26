@@ -61,7 +61,14 @@ async function invoke(fleet: FleetId, fn: string, args: xdr.ScVal[]): Promise<Tx
 const TAG = nativeToScVal(fleetRecord.tag, { type: "string" });
 
 /** Starts the factory timelock for moving every vault of `fleet` to the uploaded build `wasmHash`. */
+/**
+ * Proposes one of the builds this repository published. Visitors may rehearse an upgrade on the
+ * test fleet only: the demo fleet is patched by its admins with `scripts/deploy.ts`, never through
+ * the app, and no Wasm a visitor uploaded can ever be proposed.
+ */
 export async function proposePatch(fleet: FleetId, wasmHash: string): Promise<TxResult> {
+  if (fleet !== "test") throw new FleetError("The demo fleet is upgraded by its admins only. Rehearse a patch on the test fleet.", 403);
+  if (!fleetRecord.builds.some(build => build.hash === wasmHash)) throw new FleetError("Only the builds published by this repository can be proposed.", 422);
   const wasm = await uploadedWasm(wasmHash);
   if (!wasm) throw new FleetError("No Wasm with this hash is uploaded on Stellar.", 422);
   if (!isVaultBuild(wasm)) throw new FleetError("This Wasm does not export the vault interface.", 422);
@@ -70,5 +77,6 @@ export async function proposePatch(fleet: FleetId, wasmHash: string): Promise<Tx
 
 /** Swaps the factory's executable reference: one transaction moves every vault. */
 export function applyPatch(fleet: FleetId): Promise<TxResult> {
+  if (fleet !== "test") throw new FleetError("The demo fleet is upgraded by its admins only.", 403);
   return invoke(fleet, "apply_ref", [TAG]);
 }

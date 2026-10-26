@@ -127,6 +127,22 @@
   }
 }
 
+/* Loading placeholder: off-white block with a brand-red sheen sliding across it. */
+@utility skeleton {
+  background-image: linear-gradient(90deg, var(--secondary) 0%, var(--secondary) 35%, rgb(172 35 50 / 0.14) 50%, var(--secondary) 65%, var(--secondary) 100%);
+  background-size: 250% 100%;
+  animation: skeleton-sheen 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-sheen {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
 /* Full-bleed landing page: background spans the viewport, content keeps the site width and its 1.5rem / 3rem gutter. */
 @utility page-x {
   padding-inline: max(1.5rem, calc((100% - var(--container-site)) / 2 + 1.5rem));

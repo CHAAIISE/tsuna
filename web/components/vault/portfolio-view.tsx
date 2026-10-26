@@ -34,7 +34,7 @@ export function PortfolioView() {
   const { account, ready } = usePasskeyAccount();
   const holdings = useHoldings(account?.account ?? null);
 
-  if (!ready) return <div role="status" aria-label="Loading" className="h-40 animate-pulse rounded-xl bg-secondary" />;
+  if (!ready) return <div role="status" aria-label="Loading" className="h-40 skeleton rounded-xl" />;
   if (!account) {
     return (
       <Card className="flex flex-col items-start gap-4 p-4 sm:p-6">

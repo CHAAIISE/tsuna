@@ -48,9 +48,9 @@ function RunAgentButton({ vault }: { vault: VaultDetail }) {
 function SkeletonPage() {
   return (
     <div role="status" aria-label="Loading vault" className="space-y-6">
-      <div className="h-11 w-64 animate-pulse rounded bg-secondary" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map(i => <div key={i} className="h-28 animate-pulse rounded-xl bg-secondary" />)}</div>
-      <div className="h-64 animate-pulse rounded-xl bg-secondary" />
+      <div className="h-11 w-64 skeleton rounded" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map(i => <div key={i} className="h-28 skeleton rounded-xl" />)}</div>
+      <div className="h-64 skeleton rounded-xl" />
       <p className="text-caption text-muted-foreground">Reading the vault from Stellar…</p>
       <Button data-primary pending>Reading vault…</Button>
     </div>

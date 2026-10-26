@@ -170,11 +170,11 @@ function SkeletonRows() {
     <div aria-label="Loading agents" role="status" className="space-y-0 px-6 py-4">
       {[0, 1, 2].map(i => (
         <div key={i} className="flex h-table-row items-center gap-6 border-b last:border-0">
-          <div className="h-4 w-40 animate-pulse rounded bg-secondary" />
-          <div className="hidden h-4 w-20 animate-pulse rounded bg-secondary md:block" />
-          <div className="h-4 w-16 animate-pulse rounded bg-secondary" />
-          <div className="hidden h-4 w-28 animate-pulse rounded bg-secondary md:block" />
-          <div className="ml-auto h-6 w-24 animate-pulse rounded bg-secondary" />
+          <div className="h-4 w-40 skeleton rounded" />
+          <div className="hidden h-4 w-20 skeleton rounded md:block" />
+          <div className="h-4 w-16 skeleton rounded" />
+          <div className="hidden h-4 w-28 skeleton rounded md:block" />
+          <div className="ml-auto h-6 w-24 skeleton rounded" />
         </div>
       ))}
       <p className="pt-3 text-caption text-muted-foreground">Reading vaults from Stellar…</p>

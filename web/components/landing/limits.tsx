@@ -5,7 +5,7 @@ import { Overline } from "./section";
 const gaps = [
   {
     title: "The demo price switch is immediate",
-    body: "Feed and configuration changes now wait out a public timelock, but the demo router keeps its demo switch: its admin can force a price at once, which the crash scenario needs. The production build has no such function.",
+    body: "Feed and configuration changes wait out a public timelock, but the Leverage demo vault reads a demo router whose admin can force a price at once: the crash scenario needs it. Prudent, Liquidity and every published agent read the production router, which has no such function.",
   },
   {
     title: "Oracle lag",

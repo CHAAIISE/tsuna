@@ -97,7 +97,9 @@ export interface Published {
 export function publishAgent(choice: CreateChoice): Promise<Published> {
   const fee = serverKey(FEE_SECRET);
   const creator = serverKey(CREATOR_SECRET);
-  const { factory, policyRegistry, oracleRouter, keeper, agent } = deployments;
+  const { factory, policyRegistry, keeper, agent } = deployments;
+  // Published agents read the production router; only the crash demo vault reads the demo one.
+  const oracleRouter = deployments.oracleRouterStrict ?? deployments.oracleRouter;
   if (!fee || !creator || !factory || !policyRegistry || !oracleRouter || !keeper || !agent) {
     return Promise.reject(new FleetError("Publishing is not configured on this server.", 503));
   }

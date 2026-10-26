@@ -18,7 +18,7 @@ const keys = [
   },
   {
     key: "Oracle admin",
-    demo: "Feed and configuration changes wait out a public 10-minute timelock, and a vault only moves to another router behind its own timelock. The demo build also has a switch its admin uses to force a price for the crash scenario.",
+    demo: "Feed and configuration changes wait out a public 10-minute timelock, and a vault only moves to another router behind its own timelock. Only the Leverage demo vault reads the demo build, whose admin can force a price for the crash scenario; every other vault reads the production build, which has no such switch.",
     production: "The router without the demo feature, a timelock of days, and independent signers.",
   },
   {

@@ -4,11 +4,13 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 /**
  * Words that start slack, like a loose rope, and snap taut the first time they scroll into view.
+ * Hovering them lets the rope go slack again and pulls it back.
  * Server render and reduced motion keep the text tight; only words still below the fold go slack.
  */
 export function Taut({ children, className }: { children: string; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [slack, setSlack] = useState(false);
+  const replaying = useRef(false);
 
   useLayoutEffect(() => {
     const node = ref.current;
@@ -27,10 +29,19 @@ export function Taut({ children, className }: { children: string; className?: st
     return () => observer.disconnect();
   }, []);
 
+  const replay = () => {
+    if (slack || replaying.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    replaying.current = true;
+    setSlack(true);
+    // Two frames so the slack pose is painted before the transition back to taut starts.
+    requestAnimationFrame(() => requestAnimationFrame(() => setSlack(false)));
+    setTimeout(() => (replaying.current = false), 1000 + children.length * 22);
+  };
+
   let index = 0;
 
   return (
-    <span ref={ref} className={className}>
+    <span ref={ref} className={className} onMouseEnter={replay}>
       <span className="sr-only">{children}</span>
       <span aria-hidden="true">
         {children.split(/(\s+)/).map((word, w) => {

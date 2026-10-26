@@ -88,7 +88,7 @@ export const checkGroups: { title: string; when: string; checks: Check[] }[] = [
     checks: [
       { rule: "A drawdown past the limit pauses the agent. Anyone can trigger the check.", error: "check_drawdown" },
       { rule: "Withdrawals are never paused and don't need a fresh price. A leveraged vault repays debt only from idle USDC, and a protocol that reverts blocks exits.", error: "withdraw" },
-      { rule: "Loosening a rule waits out a public timelock. Tightening applies at once, and removing an asset counts as tightening (see Limits).", error: "TimelockActive" },
+      { rule: "Loosening a rule waits out a public timelock. Tightening applies at once; an asset dropped from the rules still counts in NAV.", error: "TimelockActive" },
     ],
   },
 ];

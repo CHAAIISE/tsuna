@@ -4,10 +4,6 @@ import { Overline } from "./section";
 /** Known gaps, from our own review and an external one. Each has a fix planned; none is hidden. */
 const gaps = [
   {
-    title: "Removing an asset applies at once",
-    body: "The registry treats dropping an asset from a policy as a tightening, and NAV only counts the policy's assets. A creator could drop XLM, deposit at the lower share price and add it back after the timelock. Fix: count every asset the vault ever allowed, and timelock removals.",
-  },
-  {
     title: "The oracle admin is not timelocked",
     body: "The router's admin can change feeds and the allowed divergence immediately, for every vault. Fix: put configuration changes behind the same public timelock as policies, under independent signers.",
   },

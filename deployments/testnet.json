@@ -6,7 +6,7 @@
     "oracleRouterDemo": "84c4c2eb2c464dc2717c8dcb604bd2b8153c65e91ecb8175cd8dee4b8a441e11",
     "policyRegistry": "6cb452fccf0a11f63139468ac1944502b7ab944945e373a1248b0a340a4b645d",
     "vaultFactory": "03850acaf57c195d750e66e9451679e00721367b80b79a0ae5aa20e58154f8ec",
-    "agentVault": "92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb"
+    "agentVault": "d37b52679be66507a9a246b4f87c89fda06d68e3a6b62c164dccd8fb999193b1"
   },
   "transactions": {
     "oracleRouterDeploy": "3159b23d828fe8d65fcc013c89ad9d1bb2858a0444d96c3a55dcba918151ef48",
@@ -17,8 +17,8 @@
     "policyRegistryDeploy": "9a8cce9a7d2909909567c1ea5978ce6733284ca2933414b3912677a9886ef015",
     "factoryDeploy": "c2e8f36ccd2a08ab11acee2bf3870f71c2b2fcc04c91150f908bd768e5a171b6",
     "factorySetRef": "95cf6cff50abae4e083de52521ce001b7f4e38b4e382ffa1b7d2fcf13e70aa82",
-    "factoryProposeRef": "44a505d8b05104de4fc01712b49748df311fde0304a2642555d58bd95c9bfb3a",
-    "factoryApplyRef": "c70361afded45a2c417611efbef0d3b815dda178a8ffeecceef3d254d02dd081"
+    "factoryProposeRef": "1d1e632375ee4da44f2afbc18c655499416c322d9c51dc6afeed4abdb6faf432",
+    "factoryApplyRef": "7aea427f504ce64d8f79f210c1387e52b9f64a86cfea6dc9cbd19efeabb093df"
   },
   "vaults": [
     {
@@ -216,7 +216,7 @@
   },
   "policyRegistry": "CAFCIHI5SO5AC46AYRVPFXSEKS4QNVWHRXD67PJNVQ55TT3NLVL2DFDN",
   "factory": "CBANZEDTXPSMYO2SSV67LVF3LHKT5NKUD4KAA6V5VNISCHYU5XCRWSRL",
-  "vaultRef": "92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb",
+  "vaultRef": "d37b52679be66507a9a246b4f87c89fda06d68e3a6b62c164dccd8fb999193b1",
   "liquidity": {
     "soroswapAlignTx": "39836480c1e1bb7675e34908a205e97861052103966ac4409acdabb23e89e6e9",
     "soroswapAddLiquidityTx": "10ec3877dcb23d9a7b9e6018f4f2589ee3294b1e54264c1024640703fed82c65",

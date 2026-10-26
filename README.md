@@ -102,7 +102,7 @@ shasum -a 256 factory.wasm vault.wasm
 
 | Contract | SHA-256 (local build = on-chain) | Recorded in |
 |---|---|---|
-| `agent_vault` | `92e77976c71dc597fe7df4b50c5b00c00528583148f5c20ee160599095fb2ebb` | `deployments/testnet.json` → `vaultRef`, `wasm.agentVault` |
+| `agent_vault` | `d37b52679be66507a9a246b4f87c89fda06d68e3a6b62c164dccd8fb999193b1` | `deployments/testnet.json` → `vaultRef`, `wasm.agentVault` |
 | `vault_factory` | `03850acaf57c195d750e66e9451679e00721367b80b79a0ae5aa20e58154f8ec` | `wasm.vaultFactory` |
 | `policy_registry` | `6cb452fccf0a11f63139468ac1944502b7ab944945e373a1248b0a340a4b645d` | `wasm.policyRegistry` |
 | `passkey_account` | `f97a3bed00bb91cf3574954e4c5c75e83db3599c7ba75ed7fc7012c1c2eb87a8` | `deployments/passkey.testnet.json` → `accountWasmHash` |
@@ -194,6 +194,8 @@ The vault's owner installs the first policy with `register(vault, policy)`, once
 
 - **Tightening** (remove a call, protocol, guard or asset; lower a cap, tolerance or rate; raise the minimum health factor; constrain an `Any` argument; drop `approve`) applies immediately (`PolicyTightened`) and cancels any pending proposal, which could otherwise undo it.
 - **Loosening** (anything the current policy does not grant) is stored as `pending_policy(vault)` with an `eta` of now plus `policy_timelock()` (`PolicyProposed`), so depositors can see it and leave first. A change that tightens some fields and loosens others is a loosening. `apply_policy(vault)` installs it once the timelock has passed (`PolicyApplied`), else fails with `TimelockActive` (6).
+
+Removing an asset is a tightening, but it never takes value out of NAV: the vault records every asset a policy of it has listed (`deposit`, `withdraw`, `execute` and `check_drawdown` add the current ones) and keeps valuing those dropped since. Otherwise a creator could drop an asset the vault holds, deposit at the lower share price and list the asset again after the timelock. The fix shipped to the whole fleet through `propose_ref` / `apply_ref` (apply transaction `7aea427f504ce64d8f79f210c1387e52b9f64a86cfea6dc9cbd19efeabb093df`), and `check_drawdown` was then called on every vault to record their assets.
 
 The timelock is fixed at deployment: 24 h in production, 10 minutes for the testnet demo. Invalid policies (caps above 100%, a zero rate, a health factor below 1, a different base asset, more than 16 calls, 8 assets or 8 protocols, 4 guards per protocol) fail with `InvalidPolicy` (3).
 

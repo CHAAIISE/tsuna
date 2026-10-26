@@ -147,7 +147,8 @@ export interface TimelineAction {
   type: "action";
   id: string;
   at: string;
-  source: "run" | "chain";
+  /** `run`: journaled by an agent run; `attack`: sent by the demo attacker; `chain`: seen on-chain only. */
+  source: "run" | "chain" | "attack";
   runId: string | null;
   role: string;
   /** Human label: the runtime's action label, or the contract and function called. */

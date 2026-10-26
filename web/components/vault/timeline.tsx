@@ -47,14 +47,21 @@ function ActionItem({ item }: { item: TimelineAction }) {
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-caption text-muted-foreground">{roleLabel(item.role)} · {item.source === "run" ? "run from this app" : "seen on-chain"} · {formatWhen(item.at)}</p>
+          <p className="text-caption text-muted-foreground">
+            {item.source === "attack" ? "Attack lab · attacker's key" : item.source === "run" ? `${roleLabel(item.role)} · run from this app` : `${roleLabel(item.role)}'s key · on-chain, no run journal`} · {formatWhen(item.at)}
+          </p>
           <p className="font-medium break-words">{item.label}</p>
         </div>
-        <div className="grid w-full grid-cols-3 items-center gap-1 sm:flex sm:w-auto sm:flex-wrap" aria-label="Stages">
-          <Stage label="Proposed" state={item.proposed ? "done" : "skipped"} />
-          <ArrowRight aria-hidden="true" className="hidden size-3 text-muted-foreground sm:block" />
-          <Stage label="Simulated" state={simulated} />
-          <ArrowRight aria-hidden="true" className="hidden size-3 text-muted-foreground sm:block" />
+        <div className={cn("grid w-full items-center gap-1 sm:flex sm:w-auto sm:flex-wrap", item.source === "run" ? "grid-cols-3" : "grid-cols-1")} aria-label="Stages">
+          {/* Proposal and simulation are only known for journaled runs; on-chain sightings show the outcome alone. */}
+          {item.source === "run" && (
+            <>
+              <Stage label="Proposed" state={item.proposed ? "done" : "skipped"} />
+              <ArrowRight aria-hidden="true" className="hidden size-3 text-muted-foreground sm:block" />
+              <Stage label="Simulated" state={simulated} />
+              <ArrowRight aria-hidden="true" className="hidden size-3 text-muted-foreground sm:block" />
+            </>
+          )}
           <Stage
             label={outcomeLabel}
             state={item.outcome === "authorized" ? "authorized" : item.outcome === "blocked" ? "blocked" : "skipped"}

@@ -7,6 +7,8 @@ import type { TimelineAction, TimelineItem, TimelineNote, TypedError } from "./t
 /** A refused vault call found on-chain (FAILED transaction), with its decoded error. */
 export interface FailedAttempt {
   hash: string;
+  /** Account that submitted the transaction. */
+  signer: string;
   at: string;
   role: string;
   target: string;
@@ -139,6 +141,8 @@ export function mergeTimeline(opts: {
   events: VaultEvent[];
   failed: FailedAttempt[];
   name: (contract: string) => string;
+  /** The demo attacker's account: its refused calls are attack-lab traffic, not the agent's. */
+  attacker?: string;
 }): TimelineItem[] {
   const runs = new Map<string, { role: string; entries: JournalEntry[] }>();
   const items: TimelineItem[] = [];
@@ -174,7 +178,7 @@ export function mergeTimeline(opts: {
       }
       items.push({
         type: "action", id: `event:${event.hash}:${event.fn}`, at: event.at, source: "chain", runId: null, role: event.role,
-        label: `${opts.name(event.target)} · ${event.fn}`, proposed: true, simulation: null, outcome: "authorized",
+        label: `${opts.name(event.target)} · ${event.fn}`, proposed: false, simulation: null, outcome: "authorized",
         error: null, reason: null, hash: event.hash, navBefore: event.navBefore, navAfter: event.navAfter,
       });
     } else {
@@ -191,8 +195,9 @@ export function mergeTimeline(opts: {
       continue;
     }
     items.push({
-      type: "action", id: `failed:${attempt.hash}`, at: attempt.at, source: "chain", runId: null, role: attempt.role,
-      label: `${opts.name(attempt.target)} · ${attempt.fn}`, proposed: true, simulation: null, outcome: "blocked",
+      type: "action", id: `failed:${attempt.hash}`, at: attempt.at,
+      source: opts.attacker && attempt.signer === opts.attacker ? "attack" : "chain", runId: null, role: attempt.role,
+      label: `${opts.name(attempt.target)} · ${attempt.fn}`, proposed: false, simulation: null, outcome: "blocked",
       error: attempt.error, reason: null, hash: attempt.hash, navBefore: null, navAfter: null,
     });
   }

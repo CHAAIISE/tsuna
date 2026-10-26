@@ -20,6 +20,7 @@ interface HorizonTx {
   successful: boolean;
   created_at: string;
   envelope_xdr: string;
+  source_account: string;
 }
 
 /** Latest transactions of `account`, failed ones included. */
@@ -80,6 +81,7 @@ async function failedAttempts(vault: string, members: string[]): Promise<FailedA
   candidates.sort((a, b) => b.created_at.localeCompare(a.created_at));
   return Promise.all(candidates.slice(0, MAX_FAILED).map(async tx => ({
     hash: tx.hash,
+    signer: tx.source_account,
     at: tx.created_at,
     role: tx.call.role,
     target: tx.call.target,
@@ -99,7 +101,8 @@ export function getActivity(vault: string): Promise<ActivityResponse> {
       readJournal(vault),
     ]);
     const adapters = deployments.vaults.find(entry => entry.address === vault)?.adapters ?? [];
-    const items = mergeTimeline({ journal, events, failed, name: contract => contractName(contract, adapters) });
+    const attacker = process.env.LEASH_ATTACKER_PUBLIC;
+    const items = mergeTimeline({ journal, events, failed, name: contract => contractName(contract, adapters), ...(attacker ? { attacker } : {}) });
     return { items, sources: { events: true, failedTxs: true, journal: journal.length > 0 }, asOf: new Date().toISOString() };
   });
 }

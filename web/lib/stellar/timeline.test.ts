@@ -59,12 +59,18 @@ describe("merged timeline", () => {
         { kind: "executed", vault: "V", role: "default", target: "B", fn: "submit", navBefore: "10", navAfter: "11", hash: "aa", at: at(2), ledger: 1 },
         { kind: "deposited", vault: "V", user: "U", amount: "5", shares: "50", hash: "dd", at: at(0), ledger: 0 },
       ],
-      failed: [{ hash: "ff", at: at(4), role: "default", target: "B", fn: "submit", error: { contract: "vault", code: 2, name: "DestinationNotVault", message: "m" } }],
+      failed: [
+        { hash: "ff", signer: "S", at: at(4), role: "default", target: "B", fn: "submit", error: { contract: "vault", code: 2, name: "DestinationNotVault", message: "m" } },
+        { hash: "ee", signer: "A", at: at(5), role: "default", target: "B", fn: "submit", error: { contract: "vault", code: 2, name: "DestinationNotVault", message: "m" } },
+      ],
       name: () => "Blend",
+      attacker: "A",
     });
-    expect(items.map(item => item.type === "action" ? `${item.outcome}:${item.hash}` : item.type)).toEqual(["blocked:ff", "authorized:aa", "run", "deposit"]);
-    expect(items[1]).toMatchObject({ navBefore: "10", navAfter: "11", source: "run" });
-    expect(items[2]).toMatchObject({ status: "finished", at: at(1) });
-    expect(items[0]).toMatchObject({ label: "Blend · submit", source: "chain" });
+    expect(items.map(item => item.type === "action" ? `${item.outcome}:${item.hash}` : item.type)).toEqual(["blocked:ee", "blocked:ff", "authorized:aa", "run", "deposit"]);
+    expect(items[2]).toMatchObject({ navBefore: "10", navAfter: "11", source: "run" });
+    expect(items[3]).toMatchObject({ status: "finished", at: at(1) });
+    // Calls seen only on-chain were never proposed or simulated by a journaled run, and the attacker's are not the agent's.
+    expect(items[0]).toMatchObject({ source: "attack", proposed: false });
+    expect(items[1]).toMatchObject({ label: "Blend · submit", source: "chain", proposed: false });
   });
 });

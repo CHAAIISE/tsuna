@@ -36,6 +36,22 @@ const SEND_RETRY_MS = 2_000;
  */
 const INSTRUCTIONS_LEEWAY = 1.1;
 const BYTES_LEEWAY = 2_048;
+
+/** What the network's pre-execution result codes mean, for logs and for a model reading its own failures. */
+const TX_RESULT_HINTS: Record<string, string> = {
+  txBadSeq: "the signing account's sequence number moved (another transaction from the same key landed first); retry",
+  txInsufficientFee: "the fee bid was too low for the current network load; retry",
+  txInsufficientBalance: "the fee payer cannot cover the fee",
+  txTooLate: "the transaction expired before inclusion; retry",
+};
+
+/** `txBadSeq (…hint…)` for a rejected submission, instead of its raw XDR. */
+function describeTxResult(result: xdr.TransactionResult | undefined): string | undefined {
+  if (!result) return undefined;
+  const code = result.result.type;
+  const hint = TX_RESULT_HINTS[code];
+  return hint ? `${code} (${hint})` : code;
+}
 const FEE_LEEWAY = 500_000n;
 /** Extra instructions and fee for a refused call submitted with a reconstructed budget. */
 const REFUSED_INSTRUCTIONS_MARGIN = 5_000_000;
@@ -146,7 +162,7 @@ export class Chain {
     if (sent.status !== "PENDING" && sent.status !== "DUPLICATE") {
       const raw = errorFromEvents(sent.diagnosticEvents ?? []);
       if (raw) throw new TsunaRefusal(this.toTsunaError(raw, fallback), `Submission ${sent.status}`);
-      throw new Error(`Submission ${sent.status}: ${sent.errorResult?.toXDR("base64") ?? sent.hash}`);
+      throw new Error(`Submission ${sent.status}: ${describeTxResult(sent.errorResult) ?? sent.hash}`);
     }
     const result = await this.server.pollTransaction(sent.hash, {
       attempts: 60, sleepStrategy: rpc.BasicSleepStrategy,

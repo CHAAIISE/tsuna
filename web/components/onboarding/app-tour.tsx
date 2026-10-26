@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { CircleHelp } from "lucide-react";
 import { cn } from "cn";
 import { usePasskeyAccount } from "@/lib/hooks/use-passkey-account";
 
@@ -33,8 +34,9 @@ const STEPS = [
 ] as const;
 
 /**
- * First-visit tour of the agents screen: a card pinned next to each part of the screen, with the rest dimmed.
- * Shown once per browser; automated browsers skip it so scripted runs see the bare screen.
+ * Tour of the agents screen: a card pinned next to each part of the screen, with the rest dimmed.
+ * Starts by itself on the first visit (automated browsers excepted, so scripted runs see the bare screen);
+ * the "?" button replays it from any app screen.
  */
 export function AppTour() {
   const pathname = usePathname();
@@ -47,6 +49,7 @@ export function AppTour() {
     () => false,
   );
   const [step, setStep] = useState<number | null>(0);
+  const [replay, setReplay] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const spotlight = useRef<HTMLDivElement>(null);
   const next = useRef<HTMLButtonElement>(null);
@@ -56,7 +59,7 @@ export function AppTour() {
     setStep(null);
   };
 
-  const current = step === null || !firstVisit || pathname !== "/agents" ? null : STEPS[step];
+  const current = step === null || !(firstVisit || replay) || pathname !== "/agents" ? null : STEPS[step];
 
   useEffect(() => {
     if (!current) return;
@@ -116,7 +119,23 @@ export function AppTour() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (step === null || !current) return null;
+  if (step === null || !current) {
+    return (
+      <button
+        type="button"
+        aria-label="Replay the tour"
+        title="Replay the tour"
+        onClick={() => {
+          setReplay(true);
+          setStep(0);
+          if (pathname !== "/agents") router.push("/agents");
+        }}
+        className="fixed right-5 bottom-5 z-40 flex size-11 items-center justify-center rounded-full border border-primary/40 bg-card text-primary shadow-card transition-colors hover:bg-primary hover:text-primary-foreground"
+      >
+        <CircleHelp aria-hidden="true" className="size-5" />
+      </button>
+    );
+  }
 
   const last = step === STEPS.length - 1;
 
@@ -125,7 +144,7 @@ export function AppTour() {
       <div
         ref={spotlight}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-50 rounded-xl opacity-0 shadow-[0_0_0_100vmax_rgb(15_23_42/0.45)] transition-[transform,width,height,opacity] duration-300 ease-out"
+        className="pointer-events-none fixed top-0 left-0 z-50 rounded-xl opacity-0 shadow-[0_0_0_100vmax_rgb(15_23_42/0.35)] transition-[transform,width,height,opacity] duration-300 ease-out"
       />
       <div
         ref={card}
@@ -133,20 +152,20 @@ export function AppTour() {
         aria-modal="false"
         aria-labelledby="tour-title"
         aria-describedby="tour-body"
-        className="fixed top-0 left-0 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-3xl border border-white/10 bg-foreground p-6 text-background shadow-2xl transition-transform duration-300 ease-out"
+        className="fixed top-0 left-0 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-primary/25 bg-card p-6 text-card-foreground shadow-2xl transition-transform duration-300 ease-out"
       >
-        <p className="font-display text-xs tracking-[0.18em] text-background/60 uppercase">
+        <p className="font-display text-xs tracking-[0.18em] text-primary uppercase">
           Step {step + 1} / {STEPS.length}
         </p>
-        <h2 id="tour-title" className="mt-2 text-lg font-medium">{current.title}</h2>
-        <p id="tour-body" className="mt-2 text-sm leading-relaxed text-background/70">{current.body}</p>
+        <h2 id="tour-title" className="mt-2 font-editorial text-2xl font-medium text-heading">{current.title}</h2>
+        <p id="tour-body" className="mt-2 text-sm leading-relaxed text-muted-foreground">{current.body}</p>
         <div aria-hidden="true" className="mt-5 flex items-center gap-1.5">
           {STEPS.map((item, index) => (
-            <span key={item.target} className={cn("h-1.5 rounded-full transition-all duration-300", index === step ? "w-6 bg-background" : "w-1.5 bg-background/30")} />
+            <span key={item.target} className={cn("h-1.5 rounded-full transition-all duration-300", index === step ? "w-6 bg-primary" : "w-1.5 bg-primary/20")} />
           ))}
         </div>
         <div className="mt-6 flex items-center justify-between gap-3">
-          <button type="button" onClick={finish} className="rounded-full px-2 py-1 text-sm text-background/60 transition-colors hover:text-background focus-visible:outline-background">
+          <button type="button" onClick={finish} className="rounded-sm px-1 py-1 text-sm text-muted-foreground transition-colors hover:text-heading">
             Skip the tour
           </button>
           <button
@@ -157,7 +176,7 @@ export function AppTour() {
               finish();
               if (!account) router.push("/onboarding");
             }}
-            className="rounded-full bg-background px-5 py-2.5 text-sm font-medium text-foreground ring-2 ring-background ring-offset-2 ring-offset-foreground transition-opacity hover:opacity-90 focus-visible:outline-background"
+            className="rounded-sm bg-primary px-5 py-2.5 font-display text-xs tracking-[0.14em] text-primary-foreground uppercase transition-colors hover:bg-primary-hover"
           >
             {last ? (account ? "Done" : "Create my passkey") : "Next"}
           </button>

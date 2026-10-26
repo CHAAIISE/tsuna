@@ -117,3 +117,35 @@
     }
   }
 }
+
+@layer components {
+  /* The rising content covers the sticky hero; where scroll-driven animations exist,
+     the wordmark also recedes as the edge passes over it. */
+  @supports (animation-timeline: scroll()) {
+    .hero-recede {
+      animation: hero-recede linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 85svh;
+    }
+
+    .hero-scroll-cue {
+      animation: hero-fade linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 20svh;
+    }
+  }
+
+  @keyframes hero-recede {
+    to {
+      opacity: 0.12;
+      transform: translateY(-8svh) scale(0.94);
+      letter-spacing: 0.1em;
+    }
+  }
+
+  @keyframes hero-fade {
+    to {
+      opacity: 0;
+    }
+  }
+}

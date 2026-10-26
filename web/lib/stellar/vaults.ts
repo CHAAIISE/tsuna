@@ -37,6 +37,23 @@ function ruleCount(policy: Policy | null) {
   return { calls, limits: LIMIT_COUNT, total: calls + LIMIT_COUNT };
 }
 
+/** `(value - base) / base` in bps, to a thousandth of a bp, as the leaderboard scores it. */
+const changeBps = (value: bigint, base: bigint) => Number((value - base) * 10_000_000n / base) / 1_000;
+
+/**
+ * Return and drawdown up to the live share price. Snapshots are only taken when the vault acts,
+ * so between two calls the price keeps moving (a priced XLM position, accrued interest) while
+ * the last snapshot stands still.
+ */
+function liveScore(board: LeaderboardRow | undefined, pps: bigint | undefined): { returnBps: number | null; worstDrawdownBps: number | null } {
+  const first = board?.snapshots[0]?.pps;
+  if (!board || !first || first <= 0n || pps === undefined || pps <= 0n) {
+    return { returnBps: board?.returnBps ?? null, worstDrawdownBps: board?.worstDrawdownBps ?? null };
+  }
+  const peak = board.snapshots.reduce((max, snapshot) => snapshot.pps > max ? snapshot.pps : max, pps);
+  return { returnBps: changeBps(pps, first), worstDrawdownBps: Math.max(board.worstDrawdownBps, -changeBps(pps, peak)) };
+}
+
 function row(summary: VaultSummary, policy: Policy | null, board: LeaderboardRow | undefined): AgentRow {
   const record = recordOf(summary.address);
   return {
@@ -57,8 +74,7 @@ function row(summary: VaultSummary, policy: Policy | null, board: LeaderboardRow
     assets: summary.assets,
     stablecoinOnly: summary.assets.length === 1 && summary.assets[0] === passkeyDeployment.usdc,
     rules: ruleCount(policy),
-    returnBps: board?.returnBps ?? null,
-    worstDrawdownBps: board?.worstDrawdownBps ?? null,
+    ...liveScore(board, summary.pps ?? undefined),
     since: board?.since ?? null,
     snapshots: downsample(board?.snapshots.map(s => ({ ts: s.ts, pps: s.pps.toString() })) ?? []),
   };

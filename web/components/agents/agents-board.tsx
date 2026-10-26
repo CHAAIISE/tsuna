@@ -97,7 +97,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[1080px] table-fixed text-left text-table" data-testid="agents-table">
           <colgroup>
-            {["22%", "9%", "9%", "10%", "13%", "9%", "6%", "10%", "12%"].map((width, i) => <col key={i} style={{ width }} />)}
+            {["18%", "8%", "8%", "9%", "13%", "9%", "6%", "9%", "20%"].map((width, i) => <col key={i} style={{ width }} />)}
           </colgroup>
           <thead className="border-b text-caption text-muted-foreground">
             <tr>

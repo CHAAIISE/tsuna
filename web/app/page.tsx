@@ -1,6 +1,7 @@
 import { BuiltOn } from "@/components/landing/built-on";
 import { Emblem } from "@/components/landing/emblem";
 import { Hero, LandingNav } from "@/components/landing/hero";
+import { PageStack } from "@/components/landing/page-stack";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Closing, LandingFooter, Limits } from "@/components/landing/limits";
 import { Problem } from "@/components/landing/problem";
@@ -25,18 +26,16 @@ export default function Home() {
       <SectionRail />
       <div className="relative z-10 bg-background">
         <RisingEdge />
-        <div className="mx-auto min-h-screen max-w-site">
-          <main>
-            <Emblem />
-            <Problem />
-            <HowItWorks />
-            <Proof />
-            <BuiltOn />
-            <Limits />
-            <Closing />
-          </main>
-          <LandingFooter />
-        </div>
+        <PageStack>
+          <Emblem />
+          <Problem />
+          <HowItWorks />
+          <Proof />
+          <BuiltOn />
+          <Limits />
+          <Closing />
+        </PageStack>
+        <LandingFooter />
       </div>
     </div>
   );

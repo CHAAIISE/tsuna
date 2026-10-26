@@ -3,11 +3,11 @@ import { Overline, SectionIntro } from "./section";
 
 function Problem() {
   return (
-    <section id="problem" aria-labelledby="problem-title" className="scroll-mt-4 border-t bg-muted px-6 py-20 sm:px-12 sm:py-24">
+    <section id="problem" aria-labelledby="problem-title" className="page-x border-t bg-muted py-20 sm:py-24">
       <SectionIntro
         id="problem-title"
         overline="The problem"
-        title={<>The prompt is not a <span className="text-muted-foreground">security boundary.</span></>}
+        title={<>The prompt is not a <span className="font-editorial text-[1.1em] italic">security boundary.</span></>}
         lead="Agents that hold money are already being robbed. In each case the safety rules lived in a prompt or on a server, and someone got a sentence in front of the model."
       />
       <ol className="mt-14 border-b">

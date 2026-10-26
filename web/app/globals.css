@@ -118,6 +118,14 @@
   }
 }
 
+/* Full-bleed landing page: background spans the viewport, content keeps the site width and its 1.5rem / 3rem gutter. */
+@utility page-x {
+  padding-inline: max(1.5rem, calc((100% - var(--container-site)) / 2 + 1.5rem));
+  @media (width >= 40rem) {
+    padding-inline: max(3rem, calc((100% - var(--container-site)) / 2 + 3rem));
+  }
+}
+
 @layer components {
   /* The rising content covers the sticky hero; where scroll-driven animations exist,
      the wordmark also recedes as the edge passes over it. */

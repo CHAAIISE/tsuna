@@ -9,11 +9,11 @@ const statusLabel: Record<Brick["status"], string> = {
 
 function BuiltOn() {
   return (
-    <section id="built-on" aria-labelledby="built-on-title" className="scroll-mt-4 border-t px-6 py-20 sm:px-12 sm:py-24">
+    <section id="built-on" aria-labelledby="built-on-title" className="page-x bg-background border-t py-20 sm:py-24">
       <SectionIntro
         id="built-on-title"
         overline="Built on"
-        title={<>Composed from Stellar&apos;s live protocols, <span className="text-muted-foreground">checked by one contract.</span></>}
+        title={<>Composed from Stellar&apos;s live protocols, <span className="font-editorial text-[1.1em] italic">checked by one contract.</span></>}
         lead="The status on each line says where it stands today."
       />
       <dl className="mt-14 border-b">

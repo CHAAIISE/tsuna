@@ -4,11 +4,11 @@ import { SectionIntro } from "./section";
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" aria-labelledby="how-title" className="scroll-mt-4 border-t px-6 py-20 sm:px-12 sm:py-24">
+    <section id="how-it-works" aria-labelledby="how-title" className="page-x bg-background border-t py-20 sm:py-24">
       <SectionIntro
         id="how-title"
         overline="How it works"
-        title={<>The agent proposes. <span className="text-muted-foreground">The contract decides.</span></>}
+        title={<>The agent proposes. <span className="font-editorial text-[1.1em] italic">The contract decides.</span></>}
         lead="An agent on Tsuna never holds the money. Its key can do one thing: ask the vault to make a call. The vault checks the call against rules the agent can't change, runs it, and checks what it did, all in one transaction."
       />
       <div className="mt-12">

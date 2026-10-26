@@ -34,11 +34,11 @@ function Proof() {
   const refused = proofs.filter(item => item.outcome === "refused");
   const allowed = proofs.filter(item => item.outcome === "allowed");
   return (
-    <section id="proof" aria-labelledby="proof-title" className="scroll-mt-4 border-t bg-muted px-6 py-20 sm:px-12 sm:py-24">
+    <section id="proof" aria-labelledby="proof-title" className="page-x border-t bg-muted py-20 sm:py-24">
       <SectionIntro
         id="proof-title"
         overline="Proof"
-        title={<>Don&apos;t take our word for it. <span className="text-muted-foreground">Open the transactions.</span></>}
+        title={<>Don&apos;t take our word for it. <span className="font-editorial text-[1.1em] italic">Open the transactions.</span></>}
         lead="Every row is a real transaction on Stellar. Refused calls were still submitted, so the failure and its error code live in the ledger."
       />
       <h3 className="mt-14 text-subheading font-medium text-heading">Refused</h3>

@@ -23,10 +23,16 @@ export function SectionRail() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
 
+    // Pinned pages stay in view under the ones covering them: the current page is the last one in the band.
+    const inBand = new Set<string>();
     const observer = new IntersectionObserver(
       entries => {
-        const inView = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (inView[0]) setActive(inView[0].target.id);
+        for (const entry of entries) {
+          if (entry.isIntersecting) inBand.add(entry.target.id);
+          else inBand.delete(entry.target.id);
+        }
+        const current = SECTIONS.findLast(section => inBand.has(section.id));
+        if (current) setActive(current.id);
       },
       { rootMargin: "-45% 0px -50% 0px" },
     );
@@ -62,7 +68,12 @@ export function SectionRail() {
                 onClick={event => {
                   event.preventDefault();
                   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                  document.getElementById(section.id)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+                  const page = document.getElementById(section.id);
+                  if (!page?.parentElement) return;
+                  // A pinned page reports its pinned position: scroll to where it starts in the flow instead.
+                  let top = page.parentElement.getBoundingClientRect().top + window.scrollY;
+                  for (let sibling = page.previousElementSibling; sibling; sibling = sibling.previousElementSibling) top += (sibling as HTMLElement).offsetHeight;
+                  window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
                   history.replaceState(null, "", `#${section.id}`);
                 }}
                 className="group relative flex size-7 items-center justify-center"

@@ -7,9 +7,15 @@ import { queryKeys } from "./keys";
 
 /** Latest agent run of a vault started on this server, polled every 1.5 s while it runs. */
 export function useAgentRun(id: string) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: queryKeys.run(id),
-    queryFn: async () => (await fetchJson<{ run: AgentRunView | null }>(`/api/agent?vault=${encodeURIComponent(id)}`)).run,
+    queryFn: async () => {
+      const incoming = (await fetchJson<{ run: AgentRunView | null }>(`/api/agent?vault=${encodeURIComponent(id)}`)).run;
+      const current = client.getQueryData<AgentRunView | null>(queryKeys.run(id));
+      if (!incoming || (current && (incoming.startedAt < current.startedAt || (incoming.id === current.id && current.status !== "running")))) return current ?? incoming;
+      return incoming;
+    },
     refetchInterval: query => query.state.data?.status === "running" ? 1_500 : false,
   });
 }

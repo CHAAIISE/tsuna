@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { z } from "zod";
 import { clientIp, rateLimit, releaseRateLimit } from "@/lib/sponsor/rate-limit";
 import { tooManyRequests } from "@/lib/sponsor/http";
@@ -13,7 +12,7 @@ export const maxDuration = 300;
 const HOUR = 60 * 60 * 1000;
 const body = z.object({ vault: z.string().min(1).max(64) });
 
-/** Starts one bounded management cycle of a vault's agent; the journal is polled with GET. */
+/** Returns the completed management cycle so its receipt does not depend on instance-local polling. */
 export async function POST(request: Request): Promise<Response> {
   try {
     const address = await resolveVaultId(body.parse(await request.json()).vault);
@@ -30,9 +29,8 @@ export async function POST(request: Request): Promise<Response> {
       for (const key of keys) releaseRateLimit(key);
       throw error;
     }
-    const { run, task } = prepared;
-    after(task);
-    return Response.json({ run }, { status: 202 });
+    const run = await prepared.task();
+    return Response.json({ run });
   } catch (error) {
     return failure(error);
   }

@@ -35,7 +35,10 @@ const view = (run: RunState): AgentRunView => ({
   role: run.role,
   model: run.model,
   error: run.error,
-  items: runTimeline(run.id, run.role, run.entries).reverse(),
+  items: [
+    ...runTimeline(run.id, run.role, run.entries).reverse(),
+    { type: "run", id: `run:${run.id}`, at: run.startedAt, runId: run.id, status: run.status, role: run.role, model: run.model, error: run.error },
+  ],
 });
 
 export function latestRun(vault: string): AgentRunView | null {
@@ -48,7 +51,7 @@ export function latestRun(vault: string): AgentRunView | null {
  * session key from the server environment. Refuses while a run holding the
  * same key is in flight. The returned task performs the run.
  */
-export function prepareRun(vault: string, signalsBaseUrl: string): { run: AgentRunView; task: () => Promise<void> } {
+export function prepareRun(vault: string, signalsBaseUrl: string): { task: () => Promise<AgentRunView> } {
   if (!process.env.OPENAI_API_KEY) throw new ApiError("The agent's model is not configured on this server.", 503);
   const target = resolveVault(vault, knownVaults(fleet));
   if (!target.strategyId) throw new ApiError("This vault has no strategy the agent runtime knows.", 400);
@@ -97,6 +100,7 @@ export function prepareRun(vault: string, signalsBaseUrl: string): { run: AgentR
       release();
       for (const key of [`vault:${vault}`, `activity:${vault}`, "agents", "events"]) invalidate(key);
     }
+    return view(run);
   };
-  return { run: view(run), task };
+  return { task };
 }

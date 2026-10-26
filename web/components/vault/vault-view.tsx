@@ -31,11 +31,11 @@ const OVERVIEW_ITEMS = 12;
 function RunAgentButton({ vault }: { vault: VaultDetail }) {
   const run = useAgentRun(vault.id);
   const start = useStartRun(vault.id);
-  const running = run.data?.status === "running";
+  const running = start.isPending || run.data?.status === "running";
   return (
     <div className="flex flex-col items-start gap-2 sm:items-end">
-      <Button variant="outline" onClick={() => start.mutate()} pending={start.isPending || running} disabled={!vault.runnable} data-testid="run-agent">
-        {!(start.isPending || running) && <Play aria-hidden="true" />}
+      <Button variant="outline" onClick={() => start.mutate()} pending={running} disabled={!vault.runnable} data-testid="run-agent">
+        {!running && <Play aria-hidden="true" />}
         {running ? "Agent is working…" : "Run agent"}
       </Button>
       {!vault.runnable && <p className="text-caption text-muted-foreground">This server does not hold this agent&apos;s session key.</p>}
@@ -69,24 +69,27 @@ export function VaultView({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>("overview");
 
   // When a run ends, read the vault and its activity again past the server caches.
-  const lastStatus = useRef(run.data?.status);
+  const lastFinishedRun = useRef<string | null>(null);
   useEffect(() => {
-    const status = run.data?.status;
-    if (lastStatus.current === "running" && status && status !== "running") {
+    if (run.data && run.data.status !== "running" && lastFinishedRun.current !== run.data.id) {
+      lastFinishedRun.current = run.data.id;
       void Promise.all([
         fetchJson<ActivityResponse>(`/api/vaults/${encodeURIComponent(id)}/activity?fresh=1`).then(data => client.setQueryData(queryKeys.activity(id), data)),
         fetchJson<VaultDetail>(`/api/vaults/${encodeURIComponent(id)}?fresh=1`).then(data => client.setQueryData(queryKeys.vault(id), data)),
       ]).catch(() => undefined);
     }
-    lastStatus.current = status;
-  }, [run.data?.status, id, client]);
+  }, [run.data, id, client]);
 
   const journal = useMemo(() => {
-    const live = running ? run.data?.items ?? [] : [];
+    const live = run.data?.items ?? [];
     const seen = new Set(live.map(item => item.id));
-    const stored = (activity.data?.items ?? []).filter(item => !seen.has(item.id) && !(running && item.type === "run" && item.runId === run.data?.id));
+    const hashes = new Set(live.flatMap(item => "hash" in item && item.hash ? [item.hash] : []));
+    const stored = (activity.data?.items ?? []).filter(item =>
+      !seen.has(item.id)
+      && !("runId" in item && item.runId === run.data?.id)
+      && !(item.type === "action" && item.hash && hashes.has(item.hash)));
     return [...live, ...stored];
-  }, [running, run.data, activity.data]);
+  }, [run.data, activity.data]);
   const agentItems = journal.filter((item): item is Exclude<TimelineItem, { type: "deposit" | "withdraw" }> => item.type !== "deposit" && item.type !== "withdraw");
 
   if (vault.isPending) return <SkeletonPage />;

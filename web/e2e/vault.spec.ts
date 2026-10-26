@@ -58,6 +58,11 @@ test("a passkey user deposits 1,000 USDC, then the agent's next call is authoriz
   const account = (await page.getByTestId("account-address").textContent())?.trim() ?? "";
   expect(account).toMatch(/^C[A-Z2-7]{55}$/);
 
+  let emptyRunReads = 0;
+  await page.route("**/api/agent?*", route => {
+    emptyRunReads++;
+    return route.fulfill({ json: { run: null } });
+  });
   await test.step("04 · deposit 1,000 USDC into Prudent and receive shares", async () => {
     await page.goto(`/agents/${target.slug}`);
     await expect(page.getByTestId("kpi-tvl")).not.toHaveText("—");
@@ -75,6 +80,11 @@ test("a passkey user deposits 1,000 USDC, then the agent's next call is authoriz
   // Authorized calls already in the history (from earlier runs) do not count.
   const before = new Set(await page.locator('[data-testid="timeline-action"][data-hash]').evaluateAll(nodes => nodes.map(node => node.getAttribute("data-hash"))));
   let agentHash = "";
+  // Another serverless instance can have no run and a stale activity snapshot.
+  const activity = await page.request.get(`/api/vaults/${target.slug}/activity?fresh=1`);
+  expect(activity.ok()).toBe(true);
+  const staleActivity: unknown = await activity.json();
+  await page.route(`**/api/vaults/${target.slug}/activity*`, route => route.fulfill({ json: staleActivity }));
   await test.step("05 · run the agent until a new call is authorized on-chain", async () => {
     await page.getByTestId("run-agent").click();
     await expect(page.getByTestId("run-agent")).toHaveText(/Agent is working/);
@@ -88,6 +98,15 @@ test("a passkey user deposits 1,000 USDC, then the agent's next call is authoriz
   const link = page.locator(`[data-testid="timeline-action"][data-hash="${agentHash}"]`).getByTestId("tx-link");
   await expect(link).toHaveAttribute("href", `https://stellar.expert/explorer/testnet/tx/${agentHash}`);
   expect(await status(agentHash)).toBe("SUCCESS");
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(page.getByTestId("agent-journal")).toContainText("Agent run finished");
+  await expect(page.getByTestId("agent-journal")).not.toContainText("Agent run in progress");
+  expect(emptyRunReads).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: "../.hack/design/self/vault-run-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "../.hack/design/self/vault-run-mobile.png", fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
   console.log(`VAULT_USER ${account}\nDEPOSIT_TX ${depositHash}\nSHARES ${shares}\nAGENT_TX ${agentHash}`);
 });

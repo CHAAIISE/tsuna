@@ -258,6 +258,8 @@ The runtime is not a safety control. The model can be fooled, so every menu also
 
 `pnpm tsx scripts/agent-vault.ts` deploys a Prudent-style vault through the factory whose owner, session key, risk-off member and fee payer are keys of their own (`LEASH_AGENTRUN_*`), funds it with 100 USDC borrowed on Blend and records it in `deployments/agent.testnet.json`; the CLI resolves it as `agent-prudent` and signs with the keys recorded there, the fee payer as transaction source.
 
+The web app keeps “Run agent” pending until `POST /api/agent` returns the completed run and its transaction receipts. That response stays authoritative in the page even if polling reaches another serverless instance with no run or stale activity. The journal file and GET history are still instance-local; they are not durable off-chain storage across redeployments.
+
 ## TypeScript SDK
 
 `@leash/sdk` (`packages/sdk`) is what the agent runtime and the web app use to talk to the contracts:

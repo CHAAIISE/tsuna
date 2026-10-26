@@ -136,7 +136,7 @@ function AccountMenu({ address }: { address: string }) {
           </div>
           {confirmSignOut && (
             <p className="mt-3 text-caption text-muted-foreground">
-              This browser forgets the account, and Tsuna cannot reopen it afterwards. Withdraw your deposits first: the funds stay on-chain either way.
+              This browser forgets the account. Your funds stay on-chain: sign in again any time with “I already have a passkey”, here or on any device your passkey syncs to.
             </p>
           )}
         </Popover.Content>

@@ -2,7 +2,7 @@ import { xdr } from "@stellar/stellar-sdk";
 import { keyData, signAuthEntry } from "./auth";
 import { passkeyDeployment } from "./deployment";
 import { fromBase64Url, toBase64Url } from "./encoding";
-import { createPasskey, signWithPasskey } from "./webauthn";
+import { createPasskey, signWithAnyPasskey, signWithPasskey } from "./webauthn";
 
 /** A passkey account remembered on this device (public data only). */
 export interface PasskeyAccount {
@@ -70,6 +70,25 @@ export async function createPasskeyAccount(): Promise<PasskeyAccount> {
   const publicKey = toBase64Url(passkey.publicKey);
   const { account, hash } = await api<{ account: string; hash: string | null }>("/api/sponsor", { action: "deploy", publicKey, credentialId });
   const stored: PasskeyAccount = { account, credentialId, publicKey, deployHash: hash };
+  storePasskeyAccount(stored);
+  return stored;
+}
+
+/**
+ * Finds the account of a passkey this browser does not remember (another device, cleared storage, a
+ * passkey synced by iCloud or Google). The server recovers the key from one signature and opens a session.
+ */
+export async function signInWithExistingPasskey(): Promise<PasskeyAccount> {
+  const { challenge } = await api<{ challenge: string }>("/api/session");
+  const { credentialId, assertion } = await signWithAnyPasskey(new TextEncoder().encode(challenge));
+  const id = toBase64Url(credentialId);
+  const { account, publicKey } = await api<{ account: string; publicKey: string }>("/api/session", {
+    credentialId: id,
+    authenticatorData: toBase64Url(assertion.authenticatorData),
+    clientDataJSON: toBase64Url(assertion.clientDataJSON),
+    signature: toBase64Url(assertion.signature),
+  });
+  const stored: PasskeyAccount = { account, credentialId: id, publicKey, deployHash: null };
   storePasskeyAccount(stored);
   return stored;
 }

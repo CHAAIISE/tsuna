@@ -44,6 +44,25 @@ export async function createPasskey(): Promise<CreatedPasskey> {
   return { credentialId: new Uint8Array(credential.rawId), publicKey: p256PublicKeyFromSpki(new Uint8Array(spki)) };
 }
 
+/** Lets the user pick any of their Tsuna passkeys to sign `challenge`; returns which one signed. */
+export async function signWithAnyPasskey(challenge: Uint8Array): Promise<{ credentialId: Uint8Array; assertion: PasskeyAssertion }> {
+  const credential = await navigator.credentials.get({
+    publicKey: { challenge: new Uint8Array(challenge), userVerification: "required", timeout: TIMEOUT_MS },
+  });
+  if (!(credential instanceof PublicKeyCredential) || !(credential.response instanceof AuthenticatorAssertionResponse)) {
+    throw new Error("The passkey did not sign.");
+  }
+  const response = credential.response;
+  return {
+    credentialId: new Uint8Array(credential.rawId),
+    assertion: {
+      authenticatorData: new Uint8Array(response.authenticatorData),
+      clientDataJSON: new Uint8Array(response.clientDataJSON),
+      signature: derToLowSRawSignature(new Uint8Array(response.signature)),
+    },
+  };
+}
+
 /** Signs `challenge` with the passkey and returns the assertion in on-chain form. */
 export async function signWithPasskey(credentialId: Uint8Array, challenge: Uint8Array): Promise<PasskeyAssertion> {
   const credential = await navigator.credentials.get({

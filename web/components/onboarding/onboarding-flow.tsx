@@ -11,7 +11,7 @@ import { OnboardingSteps } from "@/components/ui/onboarding-steps";
 import { queryKeys } from "@/lib/hooks/keys";
 import type { HoldingsResponse } from "@/lib/stellar/types";
 import {
-  createPasskeyAccount, forgetPasskeyAccount, parsePasskeyAccount, passkeyAccountSnapshot,
+  createPasskeyAccount, forgetPasskeyAccount, parsePasskeyAccount, passkeyAccountSnapshot, signInWithExistingPasskey,
   readUsdcBalance, requestTestUsdc, subscribePasskeyAccount,
 } from "@/lib/passkey/client";
 import { EXPLORER_URL, formatUsdc, passkeyDeployment } from "@/lib/passkey/deployment";
@@ -20,7 +20,7 @@ import { addUsdcTrustline, connectWallet } from "@/lib/wallet/kit";
 import { TransactionDetails, type DetailRow } from "./transaction-details";
 
 type Mode = "passkey" | "wallet";
-type Pending = "create" | "connect" | "trustline" | "faucet";
+type Pending = "create" | "recover" | "connect" | "trustline" | "faucet";
 interface Receipt {
   label: string;
   hash: string;
@@ -95,6 +95,12 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
     await refreshBalance(created.account);
   });
 
+  const recover = () => run("recover", async () => {
+    setBalance(undefined);
+    const found = await signInWithExistingPasskey();
+    await refreshBalance(found.account);
+  });
+
   const connect = () => run("connect", async () => {
     setBalance(undefined);
     const address = await connectWallet();
@@ -156,6 +162,9 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
               <CardFooter className="flex-col items-stretch sm:flex-row sm:items-center">
                 <Button data-primary data-testid="create-passkey" onClick={createAccount} pending={pending === "create"} disabled={!supported}>
                   {pending === "create" ? WAITING : "Create passkey"}
+                </Button>
+                <Button variant="outline" data-testid="recover-passkey" onClick={recover} pending={pending === "recover"} disabled={!supported || (pending !== null && pending !== "recover")}>
+                  <Fingerprint aria-hidden="true" />I already have a passkey
                 </Button>
                 <Button variant="outline" onClick={() => switchMode("wallet")} disabled={pending !== null}><Wallet aria-hidden="true" />Use a wallet extension</Button>
               </CardFooter>

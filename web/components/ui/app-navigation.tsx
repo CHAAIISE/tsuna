@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "cn";
 import { Logo } from "@/components/logo";
-import { Badge } from "@/components/ui/badge";
 import { AccountAction } from "@/components/vault/account-action";
 
 const links = [
@@ -18,7 +17,7 @@ const links = [
 /** Screen where signing in is the main action for a signed-out visitor; elsewhere the screen has its own. */
 const SIGN_IN_SCREEN = "/agents";
 
-/** Header of every app screen: tabs with the current one marked, network badge and passkey account. */
+/** Header of every app screen: tabs with the current one marked and the passkey account. */
 function AppNavigation() {
   const pathname = usePathname();
   return (
@@ -28,10 +27,6 @@ function AppNavigation() {
           <Logo className="h-4 sm:h-5" />
         </Link>
         <div className="ml-auto flex items-center gap-3 lg:order-last">
-          <Badge variant="secondary" title="Every balance here is test USDC with no real value" data-testid="network-badge">
-            <span className="sm:hidden">Testnet</span>
-            <span className="hidden sm:inline">Stellar testnet</span>
-          </Badge>
           {pathname !== "/onboarding" && <span data-tour="account" className="inline-flex"><AccountAction primary={pathname === SIGN_IN_SCREEN} /></span>}
         </div>
         <nav aria-label="Main navigation" data-tour="nav" className="flex w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1 lg:ml-8 lg:w-auto lg:bg-transparent">

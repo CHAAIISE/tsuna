@@ -2,14 +2,13 @@ import { Emblem } from "@/components/landing/emblem";
 import { Hero, LandingNav } from "@/components/landing/hero";
 import { Closing, LandingFooter } from "@/components/landing/limits";
 import { PageStack } from "@/components/landing/page-stack";
-import { Features, Flow, ProofTeaser } from "@/components/landing/pitch";
+import { Flow, Schema } from "@/components/landing/pitch";
 import { SectionRail } from "@/components/landing/section-rail";
 
 const sections = [
   { id: "idea", label: "The idea" },
   { id: "how", label: "How it works" },
   { id: "inside", label: "Inside" },
-  { id: "proof", label: "Proof" },
   { id: "start", label: "Start" },
 ] as const;
 
@@ -34,8 +33,7 @@ export default function Home() {
         <PageStack>
           <Emblem />
           <Flow />
-          <Features />
-          <ProofTeaser />
+          <Schema />
           <Closing />
         </PageStack>
         <LandingFooter />

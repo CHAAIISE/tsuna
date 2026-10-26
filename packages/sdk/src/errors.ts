@@ -50,6 +50,8 @@ export const VAULT_ERRORS: Table = {
   35: ["NotRoleMember", "The signer is not the member of this role."],
   36: ["RiskIncreased", "A risk-off call left the vault riskier or poorer than before."],
   37: ["ProtocolChanged", "The protocol's code changed since the vault pinned it; the owner must review and acknowledge it."],
+  38: ["OracleTimelockActive", "The proposed oracle router cannot take over before its timelock has passed."],
+  39: ["NoPendingOracle", "No oracle router change is pending."],
 };
 
 /** `policy_registry` `Error`. */
@@ -72,6 +74,8 @@ export const ORACLE_ERRORS: Table = {
   5: ["InvalidConfig", "The oracle configuration is out of bounds."],
   6: ["BadSourceData", "A price source returned unusable data."],
   7: ["DemoDisabled", "Forced demo prices are disabled on this router."],
+  8: ["TimelockActive", "The pending change to the router's sources cannot apply before its timelock has passed."],
+  9: ["NoChange", "No change to the router's sources is pending, or the router is already locked."],
 };
 
 /** `vault_factory` `Error`. */

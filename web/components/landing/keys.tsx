@@ -18,8 +18,8 @@ const keys = [
   },
   {
     key: "Oracle admin",
-    demo: "The demo router is built with a feature its admin uses to force a price for the crash scenario. In every build, the admin can also change feeds and the allowed divergence immediately, for every vault.",
-    production: "The router without the demo feature, and feed or configuration changes behind a public timelock under independent signers.",
+    demo: "Feed and configuration changes wait out a public 10-minute timelock, and a vault only moves to another router behind its own timelock. The demo build also has a switch its admin uses to force a price for the crash scenario.",
+    production: "The router without the demo feature, a timelock of days, and independent signers.",
   },
   {
     key: "Bridge wallet",

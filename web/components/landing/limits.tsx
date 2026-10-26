@@ -4,8 +4,8 @@ import { Overline } from "./section";
 /** Known gaps, from our own review and an external one. Each has a fix planned; none is hidden. */
 const gaps = [
   {
-    title: "The oracle admin is not timelocked",
-    body: "The router's admin can change feeds and the allowed divergence immediately, for every vault. Fix: put configuration changes behind the same public timelock as policies, under independent signers.",
+    title: "The demo price switch is immediate",
+    body: "Feed and configuration changes now wait out a public timelock, but the demo router keeps its demo switch: its admin can force a price at once, which the crash scenario needs. The production build has no such function.",
   },
   {
     title: "Oracle lag",

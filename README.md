@@ -102,7 +102,7 @@ shasum -a 256 factory.wasm vault.wasm
 
 | Contract | SHA-256 (local build = on-chain) | Recorded in |
 |---|---|---|
-| `agent_vault` | `d37b52679be66507a9a246b4f87c89fda06d68e3a6b62c164dccd8fb999193b1` | `deployments/testnet.json` → `vaultRef`, `wasm.agentVault` |
+| `agent_vault` | `8c39221ba114926c67f164d2a3a20ee68a0a9dbe6c56f3c6e6e3b434589416ac` | `deployments/testnet.json` → `vaultRef`, `wasm.agentVault` |
 | `vault_factory` | `03850acaf57c195d750e66e9451679e00721367b80b79a0ae5aa20e58154f8ec` | `wasm.vaultFactory` |
 | `policy_registry` | `6cb452fccf0a11f63139468ac1944502b7ab944945e373a1248b0a340a4b645d` | `wasm.policyRegistry` |
 | `passkey_account` | `f97a3bed00bb91cf3574954e4c5c75e83db3599c7ba75ed7fc7012c1c2eb87a8` | `deployments/passkey.testnet.json` → `accountWasmHash` |
@@ -211,6 +211,8 @@ cargo test -p policy-registry
 ## Oracle
 
 `oracle_router` turns Reflector and Chainlink Data Feeds into prices in USDC with 7 decimals: the asset's USD price divided by USDC's USD price. The admin configures a feed per asset (`set_feed(asset, Feed { reflector, chainlink })`, with `reflector` a Reflector `Stellar(address)` or `Other(symbol)` asset and `chainlink` an optional feed ID). An asset without a feed has no price (`NoPriceFeed`), which the vault counts as zero.
+
+Admin changes are timelocked once the router is set up. `lock(timelock)` ends the setup phase; from then on `set_config`, `set_feed` and `remove_feed` only record a `pending_change()` with an `eta`, which anyone installs with `apply_change()` once the timelock has passed (`TimelockActive`, 8, before; a new proposal replaces the pending one and restarts its clock; the admin can `cancel_change()`). A vault's router is just as slow to change: the owner's `propose_oracle(router)` waits out the registry's policy timelock before anyone can `apply_oracle()` (`OracleTimelockActive`, 38). The deployed demo router `CBGBW4I4FS4FDJDNLEXOQD3MRBBLBQRWZJV6JATSRKZOAF2UVCFVRO26` is locked at 10 minutes (24 h in production); the demo vaults and agents published with Create moved to it through `propose_oracle` / `apply_oracle`. Three test vaults whose owner keys live with their own scripts (the runtime test vault and two SDK test vaults) still read the previous router.
 
 | Source | Call | Format | Default maximum age |
 | --- | --- | --- | --- |

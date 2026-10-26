@@ -1,5 +1,6 @@
 import { bricks, type Brick } from "./data";
 import { SectionIntro } from "./section";
+import { Taut } from "./taut";
 
 const statusLabel: Record<Brick["status"], string> = {
   testnet: "On testnet",
@@ -13,7 +14,7 @@ function BuiltOn() {
       <SectionIntro
         id="built-on-title"
         overline="Built on"
-        title={<>Composed from Stellar&apos;s live protocols, <span className="text-muted-foreground">checked by one contract.</span></>}
+        title={<>Composed from Stellar&apos;s live protocols, <Taut className="text-muted-foreground">checked by one contract.</Taut></>}
         lead="The status on each line says where it stands today: every brick below runs on Stellar testnet."
       />
       <dl className="mt-14 border-b">

@@ -24,7 +24,7 @@ function Hero() {
       </div>
 
       <a
-        href="#product"
+        href="#idea"
         className="hero-scroll-cue mx-auto flex flex-col items-center gap-2 font-display text-xs tracking-[0.3em] text-muted-foreground/70 uppercase transition-colors hover:text-heading"
       >
         Scroll

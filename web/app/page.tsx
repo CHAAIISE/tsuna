@@ -5,7 +5,6 @@ import { HowItWorks } from "@/components/landing/how-it-works";
 import { Closing, LandingFooter, Limits } from "@/components/landing/limits";
 import { Problem } from "@/components/landing/problem";
 import { Proof } from "@/components/landing/proof";
-import { ProductPreview } from "@/components/landing/product-preview";
 import { SectionRail } from "@/components/landing/section-rail";
 
 function RisingEdge() {
@@ -27,7 +26,6 @@ export default function Home() {
         <div className="mx-auto min-h-screen max-w-site">
           <main>
             <Emblem />
-            <ProductPreview />
             <Problem />
             <HowItWorks />
             <Proof />

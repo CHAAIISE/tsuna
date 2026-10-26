@@ -10,7 +10,6 @@ Requirements: Node.js ≥ 22.12, pnpm 12.15, Rust with `wasm32v1-none`, and Stel
 pnpm install
 cp .env.example .env.local
 ln -s ../.env.local web/.env.local
-pnpm capture:product
 pnpm dev
 ```
 
@@ -20,7 +19,6 @@ Open `/agents`, create a passkey, then get test USDC before choosing a vault. Th
 
 `pnpm --dir web exec playwright test ux.spec.ts` checks one primary action, onboarding guidance and mobile overflow across the demo screens. It also creates a real passkey account on testnet to check the empty-wallet path; it does not draw from the faucet or run attacks.
 
-The landing uses real Prudent vault snapshots at desktop and mobile widths, not a fabricated dashboard. `pnpm capture:product` starts a temporary read-only preview, captures the current testnet state into generated assets, and stops the preview. Chromium is installed if missing. To refresh against an app that is already running, use `pnpm capture:product --url http://localhost:3000`. These images are excluded from Git; a clean web build generates them before compiling. The first build therefore needs Chromium and access to the Stellar testnet RPC. The landing labels the images as snapshots and links to the live vault.
 
 ```sh
 pnpm typecheck

@@ -14,7 +14,6 @@
     "lint": "pnpm -r lint && eslint scripts",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
-    "capture:product": "tsx scripts/capture-product.ts",
     "contracts:build": "stellar contract build --manifest-path contracts/Cargo.toml",
     "contracts:test": "cargo test --manifest-path contracts/Cargo.toml --workspace"
   },

@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import { cn } from "cn";
 
 const SECTIONS = [
-  { id: "idea", numeral: "I", label: "The idea" },
-  { id: "product", numeral: "II", label: "The vault" },
-  { id: "problem", numeral: "III", label: "The problem" },
-  { id: "how-it-works", numeral: "IV", label: "How it works" },
-  { id: "proof", numeral: "V", label: "Proof" },
-  { id: "built-on", numeral: "VI", label: "Built on" },
-  { id: "limits", numeral: "VII", label: "Limits" },
-  { id: "start", numeral: "VIII", label: "Start" },
+  { id: "idea", label: "The idea" },
+  { id: "problem", label: "The problem" },
+  { id: "how-it-works", label: "How it works" },
+  { id: "proof", label: "Proof" },
+  { id: "built-on", label: "Built on" },
+  { id: "limits", label: "Limits" },
+  { id: "start", label: "Start" },
 ] as const;
 
 /** Rope-like index on the right edge: shows up once the content has covered the hero and tracks the section in view. */
@@ -44,13 +43,15 @@ export function SectionRail() {
   return (
     <nav
       aria-label="Landing sections"
+      // Centred in the gutter between the content's right edge (site width + its 3rem padding) and the viewport edge.
+      style={{ right: "calc((100vw - var(--container-site)) / 4 + 1.5rem)" }}
       className={cn(
-        "fixed top-1/2 right-6 z-30 hidden -translate-y-1/2 transition-[opacity,transform] duration-500 ease-out xl:block",
-        visible ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-4 opacity-0",
+        "fixed top-1/2 z-30 hidden translate-x-1/2 -translate-y-1/2 transition-[opacity,margin] duration-500 ease-out min-[1400px]:block",
+        visible ? "mr-0 opacity-100" : "pointer-events-none -mr-4 opacity-0",
       )}
     >
-      <ol className="relative flex flex-col gap-5 py-2">
-        <span aria-hidden="true" className="absolute top-0 right-[5.5px] bottom-0 w-px translate-x-1/2 bg-foreground/25" />
+      <ol className="relative flex flex-col items-center gap-3 py-1">
+        <span aria-hidden="true" className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-foreground/25" />
         {SECTIONS.map(section => {
           const current = section.id === active;
           return (
@@ -64,26 +65,25 @@ export function SectionRail() {
                   document.getElementById(section.id)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
                   history.replaceState(null, "", `#${section.id}`);
                 }}
-                className="group flex items-center justify-end gap-3"
+                className="group relative flex size-7 items-center justify-center"
               >
-                <span
-                  className={cn(
-                    "font-display text-[0.7rem] tracking-[0.2em] uppercase transition-all duration-300",
-                    current
-                      ? "translate-x-0 text-primary opacity-100"
-                      : "translate-x-2 text-muted-foreground opacity-0 group-hover:translate-x-0 group-hover:opacity-100",
-                  )}
-                >
-                  <span className="mr-2 font-editorial text-sm tracking-normal normal-case italic">{section.numeral}</span>
-                  {section.label}
-                </span>
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "relative z-10 size-[11px] shrink-0 rounded-full border transition-colors duration-300",
-                    current ? "border-primary bg-primary" : "border-foreground/50 bg-background group-hover:border-primary",
+                    "size-[9px] rounded-full border border-foreground/50 bg-background transition-[opacity,scale] duration-300",
+                    current ? "scale-0 opacity-0" : "group-hover:scale-0 group-hover:opacity-0 group-focus-visible:scale-0 group-focus-visible:opacity-0",
                   )}
                 />
+                <span
+                  className={cn(
+                    "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-2 py-1 font-display text-[0.7rem] whitespace-nowrap tracking-[0.18em] uppercase transition-[opacity,scale] duration-300",
+                    current
+                      ? "scale-100 text-primary opacity-100"
+                      : "scale-90 text-heading opacity-0 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100",
+                  )}
+                >
+                  {section.label}
+                </span>
               </a>
             </li>
           );

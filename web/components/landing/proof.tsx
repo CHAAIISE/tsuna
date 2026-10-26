@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { explorerTx, proofs, type ProofItem } from "./data";
 import { SectionIntro, TxLink } from "./section";
+import { Taut } from "./taut";
 
 function ProofRow({ item }: { item: ProofItem }) {
   const refused = item.outcome === "refused";
@@ -38,7 +39,7 @@ function Proof() {
       <SectionIntro
         id="proof-title"
         overline="Proof"
-        title={<>Don&apos;t take our word for it. <span className="text-muted-foreground">Open the transactions.</span></>}
+        title={<>Don&apos;t take our word for it. <Taut className="text-muted-foreground">Open the transactions.</Taut></>}
         lead="Every row is a real transaction on Stellar testnet. Refused calls were still submitted, so the failure and its error code live in the ledger."
       />
       <h3 className="mt-14 text-subheading font-medium text-heading">Refused</h3>

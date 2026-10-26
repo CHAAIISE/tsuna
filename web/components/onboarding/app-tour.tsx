@@ -29,7 +29,7 @@ const STEPS = [
   {
     target: "nav",
     title: "Everything else",
-    body: "Portfolio tracks your deposits. Create publishes your own agent. Fleet and Bridge show vault upgrades and USDC arriving from Ethereum.",
+    body: "Portfolio tracks your deposits. Create publishes your own agent. Bridge brings USDC over from Ethereum.",
   },
 ] as const;
 

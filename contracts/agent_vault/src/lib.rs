@@ -70,6 +70,8 @@ enum Key {
     /// Every asset a policy of this vault has listed. Removing an asset from the policy is a tightening
     /// that applies at once, so NAV keeps valuing what the vault may still hold of it.
     KnownAssets,
+    /// Oracle router the owner proposed, and the ledger time it may take over.
+    PendingOracle,
 }
 
 #[contractevent]
@@ -216,6 +218,38 @@ impl AgentVault {
         Self::owner(env.clone()).require_auth();
         env.storage().instance().set(&Key::Agent, &agent);
         env.storage().instance().set(&Key::Revoked, &false);
+    }
+
+    /// Proposes another oracle router. Prices decide NAV and every check, so the switch waits out
+    /// the registry's policy timelock in public, like any loosening of the rules.
+    pub fn propose_oracle(env: Env, oracle: Address) -> u64 {
+        Self::owner(env.clone()).require_auth();
+        let registry: Address = env.storage().instance().get(&Key::Registry).unwrap();
+        let timelock: u64 = env.invoke_contract(
+            &registry,
+            &Symbol::new(&env, "policy_timelock"),
+            Vec::new(&env),
+        );
+        let eta = env.ledger().timestamp() + timelock;
+        env.storage()
+            .instance()
+            .set(&Key::PendingOracle, &(oracle, eta));
+        eta
+    }
+
+    pub fn pending_oracle(env: Env) -> Option<(Address, u64)> {
+        env.storage().instance().get(&Key::PendingOracle)
+    }
+
+    /// Switches to the proposed oracle router once its timelock has passed. Anyone may call it.
+    pub fn apply_oracle(env: Env) -> Result<(), Error> {
+        let (oracle, eta) = Self::pending_oracle(env.clone()).ok_or(Error::NoPendingOracle)?;
+        if env.ledger().timestamp() < eta {
+            return Err(Error::OracleTimelockActive);
+        }
+        env.storage().instance().set(&Key::Oracle, &oracle);
+        env.storage().instance().remove(&Key::PendingOracle);
+        Ok(())
     }
 
     pub fn session(env: Env) -> Option<Address> {

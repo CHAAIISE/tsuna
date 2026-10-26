@@ -32,6 +32,10 @@ pub enum Error {
     InvalidConfig = 5,
     BadSourceData = 6,
     DemoDisabled = 7,
+    /// The pending change's timelock has not passed yet.
+    TimelockActive = 8,
+    /// Nothing is pending, or `lock` was already called.
+    NoChange = 9,
 }
 
 /// Asset identifier understood by Reflector (SEP-40).
@@ -73,6 +77,23 @@ pub struct LastPrice {
     pub ts: u64,
 }
 
+/// A change to the price sources, public until it applies.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Change {
+    Config(Config),
+    Feed(Address, Feed),
+    RemoveFeed(Address),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingChange {
+    pub change: Change,
+    /// Ledger time from which `apply_change` installs it.
+    pub eta: u64,
+}
+
 #[contracttype]
 enum Key {
     Admin,
@@ -80,6 +101,9 @@ enum Key {
     Config,
     Feed(Address),
     Last(Address),
+    /// Seconds a change waits once the router is locked; absent while it is being set up.
+    Timelock,
+    Pending,
 }
 
 #[contract]
@@ -113,6 +137,44 @@ impl OracleRouter {
         );
     }
 
+    /// Ends the setup phase: from now on every change to the config or the feeds waits
+    /// `timelock` seconds in public (`pending_change`) before anyone can apply it.
+    pub fn lock(env: Env, timelock: u64) -> Result<(), Error> {
+        Self::admin(env.clone()).require_auth();
+        if Self::timelock(env.clone()).is_some() {
+            return Err(Error::NoChange);
+        }
+        if timelock == 0 {
+            return Err(Error::InvalidConfig);
+        }
+        env.storage().instance().set(&Key::Timelock, &timelock);
+        Ok(())
+    }
+
+    pub fn timelock(env: Env) -> Option<u64> {
+        env.storage().instance().get(&Key::Timelock)
+    }
+
+    pub fn pending_change(env: Env) -> Option<PendingChange> {
+        env.storage().instance().get(&Key::Pending)
+    }
+
+    /// Installs the pending change once its timelock has passed. Anyone may call it.
+    pub fn apply_change(env: Env) -> Result<(), Error> {
+        let pending = Self::pending_change(env.clone()).ok_or(Error::NoChange)?;
+        if env.ledger().timestamp() < pending.eta {
+            return Err(Error::TimelockActive);
+        }
+        env.storage().instance().remove(&Key::Pending);
+        install(&env, pending.change);
+        Ok(())
+    }
+
+    pub fn cancel_change(env: Env) {
+        Self::admin(env.clone()).require_auth();
+        env.storage().instance().remove(&Key::Pending);
+    }
+
     pub fn set_config(env: Env, config: Config) -> Result<(), Error> {
         Self::admin(env.clone()).require_auth();
         if config.reflector_decimals > 30
@@ -125,18 +187,18 @@ impl OracleRouter {
         {
             return Err(Error::InvalidConfig);
         }
-        env.storage().instance().set(&Key::Config, &config);
+        propose(&env, Change::Config(config));
         Ok(())
     }
 
     pub fn set_feed(env: Env, asset: Address, feed: Feed) {
         Self::admin(env.clone()).require_auth();
-        env.storage().persistent().set(&Key::Feed(asset), &feed);
+        propose(&env, Change::Feed(asset, feed));
     }
 
     pub fn remove_feed(env: Env, asset: Address) {
         Self::admin(env.clone()).require_auth();
-        env.storage().persistent().remove(&Key::Feed(asset));
+        propose(&env, Change::RemoveFeed(asset));
     }
 
     pub fn admin(env: Env) -> Address {
@@ -308,4 +370,27 @@ fn accept(env: &Env, asset: &Address, price: i128) {
         },
     );
     temporary.extend_ttl(&key, LAST_TTL, LAST_TTL);
+}
+
+/// Applies at once during setup; once locked, queues the change behind the timelock
+/// (a new proposal replaces the pending one and restarts its clock).
+fn propose(env: &Env, change: Change) {
+    match OracleRouter::timelock(env.clone()) {
+        None => install(env, change),
+        Some(timelock) => env.storage().instance().set(
+            &Key::Pending,
+            &PendingChange {
+                change,
+                eta: env.ledger().timestamp() + timelock,
+            },
+        ),
+    }
+}
+
+fn install(env: &Env, change: Change) {
+    match change {
+        Change::Config(config) => env.storage().instance().set(&Key::Config, &config),
+        Change::Feed(asset, feed) => env.storage().persistent().set(&Key::Feed(asset), &feed),
+        Change::RemoveFeed(asset) => env.storage().persistent().remove(&Key::Feed(asset)),
+    }
 }

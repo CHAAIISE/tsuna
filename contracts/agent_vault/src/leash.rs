@@ -55,7 +55,10 @@ pub(crate) fn assets(env: &Env) -> Vec<Address> {
 }
 
 fn known(env: &Env) -> Vec<Address> {
-    env.storage().instance().get(&Key::KnownAssets).unwrap_or(vec![env])
+    env.storage()
+        .instance()
+        .get(&Key::KnownAssets)
+        .unwrap_or(vec![env])
 }
 
 /// The policy's assets, then any asset an earlier policy listed and this one dropped.

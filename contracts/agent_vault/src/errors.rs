@@ -51,4 +51,8 @@ pub enum Error {
     /// The target runs code other than the Wasm hash the vault pinned for it; the owner must
     /// review and acknowledge the new code first.
     ProtocolChanged = 37,
+    /// `apply_oracle` before the proposal's timelock has passed.
+    OracleTimelockActive = 38,
+    /// `apply_oracle` with no oracle change pending.
+    NoPendingOracle = 39,
 }

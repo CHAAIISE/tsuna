@@ -23,6 +23,8 @@ const VAULT_TAG = "vault-v1";
 const DEMO_DIR = fileURLToPath(new URL("../contracts/target/demo", import.meta.url));
 
 const admin = signer("LEASH_ADMIN_SECRET");
+/** Vault owners the scripts hold keys for: demo vaults (admin) and agents published with Create. */
+const OWNER_KEYS = ["LEASH_ADMIN_SECRET", "LEASH_CREATOR_SECRET"] as const;
 const keeper = signer("LEASH_KEEPER_SECRET");
 const agent = signer("LEASH_AGENT_SECRET");
 const fresh = process.argv.includes("--fresh");
@@ -127,6 +129,12 @@ async function main(): Promise<void> {
     transactions.oracleDemoMode = enabled.txHash;
     console.log(`ORACLE_DEMO_MODE ${enabled.txHash}`);
   }
+  // After setup, every change to the router's config or feeds waits out a public timelock.
+  if (await read<bigint | null>(admin, router, "timelock") === null) {
+    const locked = await send(admin, call(router, "lock", [u64(BigInt(POLICY_TIMELOCK))]));
+    transactions.oracleLock = locked.txHash;
+    console.log(`ORACLE_LOCKED ${POLICY_TIMELOCK}s ${locked.txHash}`);
+  }
   save();
   console.log(`ORACLE_PRICES xlm=${await read<bigint>(admin, router, "price_strict", [address(testnet.xlm)])} wbtc=${await read<bigint>(admin, router, "price_strict", [address(WBTC)])}`);
 
@@ -173,11 +181,42 @@ async function main(): Promise<void> {
   }
   wasm.agentVault = built;
   record.vaultRef = built;
-  // Vaults belong to one factory, registry and router; a new one starts an empty fleet.
-  const sameFleet = previous.factory === factory && previous.policyRegistry === registry && previous.oracleRouter === router;
+  // Vaults belong to one factory and registry; a new one starts an empty fleet. A new router is
+  // adopted by the existing vaults through their own timelocked oracle switch.
+  const sameFleet = previous.factory === factory && previous.policyRegistry === registry;
   if (!sameFleet) record.vaults = [];
+  else if (previous.oracleRouter && previous.oracleRouter !== router) await moveFleetToRouter(factory, router, transactions);
   save();
   console.log(`DEPLOYED router=${router} registry=${registry} factory=${factory} signalBudget=${pay.signalBudget}`);
+}
+
+/** `propose_oracle` on every vault whose owner key is held here, waits out the timelock, then `apply_oracle`. */
+async function moveFleetToRouter(factory: string, router: string, transactions: Record<string, string>): Promise<void> {
+  const owners = new Map(OWNER_KEYS.flatMap(name => process.env[name] ? [[signer(name).publicKey(), signer(name)] as const] : []));
+  let latest = 0;
+  const moving: string[] = [];
+  for (const vault of await read<string[]>(admin, factory, "vaults")) {
+    if (await read<string>(admin, vault, "oracle") === router) continue;
+    const owner = owners.get(await read<string>(admin, vault, "owner"));
+    if (!owner) {
+      console.log(`ORACLE_SKIP ${vault} (owner key not held)`);
+      continue;
+    }
+    const proposed = await send(owner, call(vault, "propose_oracle", [address(router)]));
+    const pending = await read<[string, bigint]>(admin, vault, "pending_oracle");
+    latest = Math.max(latest, Number(pending[1]));
+    moving.push(vault);
+    console.log(`ORACLE_PROPOSED ${vault} eta=${pending[1]} ${proposed.txHash}`);
+  }
+  for (let left = latest - Date.now() / 1000; moving.length > 0 && left > -10; left = latest - Date.now() / 1000) {
+    console.log(`ORACLE_TIMELOCK ${Math.ceil(left) + 10}s left`);
+    await sleep(Math.min(60, left + 10) * 1000);
+  }
+  for (const vault of moving) {
+    const applied = await send(keeper, call(vault, "apply_oracle", []));
+    transactions[`oracleSwitch:${vault}`] = applied.txHash;
+    console.log(`ORACLE_SWITCHED ${vault} ${applied.txHash}`);
+  }
 }
 
 main().catch(fail);

@@ -3,7 +3,11 @@ use crate::{
     AgentVault, AgentVaultClient, Error,
 };
 use policy_registry::{Limits, PolicyChange, PolicyV1};
-use soroban_sdk::{map, symbol_short, Address, IntoVal, Symbol};
+use soroban_sdk::{
+    map, symbol_short,
+    testutils::{Address as _, Ledger},
+    Address, IntoVal, Symbol,
+};
 
 /// Zero-amount approval: a neutral call the policy allows once `approve_noop` ran.
 fn approve(f: &Fixture) -> Result<(), Error> {
@@ -151,4 +155,26 @@ fn v1_policy_entry_drives_vault() {
         policy.calls.remove(approve_call(&f));
     });
     assert_eq!(approve(&f), Err(Error::CallNotAllowed));
+}
+
+#[test]
+fn oracle_switch_waits_for_the_policy_timelock() {
+    let f = Fixture::new();
+    let client = f.client();
+    assert_eq!(client.try_apply_oracle(), Err(Ok(Error::NoPendingOracle)));
+    let next = Address::generate(&f.env);
+    f.env.ledger().set_timestamp(1_000);
+    let eta = client.mock_all_auths().propose_oracle(&next);
+    assert_eq!(client.pending_oracle(), Some((next.clone(), eta)));
+    // Until it applies, prices keep coming from the current router.
+    f.env.ledger().set_timestamp(eta - 1);
+    assert_eq!(
+        client.try_apply_oracle(),
+        Err(Ok(Error::OracleTimelockActive))
+    );
+    assert_eq!(client.oracle(), f.oracle);
+    f.env.ledger().set_timestamp(eta);
+    client.apply_oracle();
+    assert_eq!(client.oracle(), next);
+    assert_eq!(client.pending_oracle(), None);
 }

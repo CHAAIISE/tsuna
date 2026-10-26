@@ -292,3 +292,30 @@ fn demo_prices_are_admin_only_flagged_and_never_stored() {
     f.client().mock_all_auths().set_demo(&false);
     assert_eq!(f.strict(&f.xlm), Ok(1_700_000));
 }
+
+#[test]
+fn locked_router_waits_out_the_timelock_before_changing_sources() {
+    let f = Fixture::new();
+    let client = f.client().mock_all_auths();
+    client.lock(&600);
+    assert_eq!(client.try_lock(&600), Err(Ok(Error::NoChange)));
+    assert_eq!(f.strict(&f.xlm), Ok(1_700_000));
+    // Dropping a feed is proposed, not applied: the price still comes from Reflector.
+    client.remove_feed(&f.xlm);
+    assert_eq!(f.strict(&f.xlm), Ok(1_700_000));
+    let pending = client.pending_change().unwrap();
+    assert_eq!(pending.eta, START + 600);
+    assert_eq!(client.try_apply_change(), Err(Ok(Error::TimelockActive)));
+    // Widening the allowed divergence waits as well, and replaces the earlier proposal.
+    let mut loose = client.config();
+    loose.max_deviation_bps = 10_000;
+    client.set_config(&loose);
+    assert_eq!(client.config().max_deviation_bps, 200);
+    f.at(START + 600);
+    f.push("XLM", 17 * R_USD / 100, START + 600);
+    client.apply_change();
+    assert_eq!(client.config().max_deviation_bps, 10_000);
+    assert_eq!(client.feed(&f.xlm).is_some(), true);
+    assert_eq!(client.pending_change(), None);
+    assert_eq!(client.try_apply_change(), Err(Ok(Error::NoChange)));
+}

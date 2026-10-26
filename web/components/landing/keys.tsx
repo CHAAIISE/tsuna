@@ -17,9 +17,9 @@ const keys = [
     production: "Two independent signers, such as separate teams or a multisig, and a timelock of days so depositors can exit before a patch lands.",
   },
   {
-    key: "Demo oracle switch",
-    demo: "The demo fleet's oracle router is built with a demo feature its admin uses to force a price for the crash scenario.",
-    production: "The strict router, built without that feature: prices come only from Reflector and Chainlink, cross-checked.",
+    key: "Oracle admin",
+    demo: "The demo router is built with a feature its admin uses to force a price for the crash scenario. In every build, the admin can also change feeds and the allowed divergence immediately, for every vault.",
+    production: "The router without the demo feature, and feed or configuration changes behind a public timelock under independent signers.",
   },
   {
     key: "Bridge wallet",

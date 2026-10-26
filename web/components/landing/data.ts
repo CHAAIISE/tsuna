@@ -64,9 +64,9 @@ export const checkGroups: { title: string; when: string; checks: Check[] }[] = [
     when: "Read from the rules the agent can't edit.",
     checks: [
       { rule: "The function is on the allowlist for that exact contract.", error: "CallNotAllowed" },
-      { rule: "Every address argument points back to the vault.", error: "DestinationNotVault" },
+      { rule: "Address arguments the rule pins must be the vault. A rule can leave one open (Prudent's DeFindex share transfer); the after-call checks then bound it.", error: "DestinationNotVault" },
       { rule: "Every token in a swap path or lending request is an allowed asset.", error: "AssetNotAllowed" },
-      { rule: "The amount fits the per-call and daily caps.", error: "TxCapExceeded · DailyCapExceeded" },
+      { rule: "The amount fits the per-call and daily caps. A call with no amount argument counts as zero.", error: "TxCapExceeded · DailyCapExceeded" },
       { rule: "The agent hasn't used up its calls for the hour.", error: "RateLimited" },
     ],
   },
@@ -87,8 +87,8 @@ export const checkGroups: { title: string; when: string; checks: Check[] }[] = [
     when: "Guards that don't depend on the agent acting.",
     checks: [
       { rule: "A drawdown past the limit pauses the agent. Anyone can trigger the check.", error: "check_drawdown" },
-      { rule: "Withdrawals stay open, even while paused or without a fresh price.", error: "withdraw" },
-      { rule: "Loosening a rule waits out a public timelock. Tightening applies at once.", error: "TimelockActive" },
+      { rule: "Withdrawals are never paused and don't need a fresh price. A leveraged vault repays debt only from idle USDC, and a protocol that reverts blocks exits.", error: "withdraw" },
+      { rule: "Loosening a rule waits out a public timelock. Tightening applies at once, and removing an asset counts as tightening (see Limits).", error: "TimelockActive" },
     ],
   },
 ];

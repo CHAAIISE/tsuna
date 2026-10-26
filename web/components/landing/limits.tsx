@@ -1,6 +1,30 @@
 import Link from "next/link";
 import { Overline } from "./section";
 
+/** Known gaps, from our own review and an external one. Each has a fix planned; none is hidden. */
+const gaps = [
+  {
+    title: "Removing an asset applies at once",
+    body: "The registry treats dropping an asset from a policy as a tightening, and NAV only counts the policy's assets. A creator could drop XLM, deposit at the lower share price and add it back after the timelock. Fix: count every asset the vault ever allowed, and timelock removals.",
+  },
+  {
+    title: "The oracle admin is not timelocked",
+    body: "The router's admin can change feeds and the allowed divergence immediately, for every vault. Fix: put configuration changes behind the same public timelock as policies, under independent signers.",
+  },
+  {
+    title: "Oracle lag",
+    body: "Deposits and withdrawals price at the latest Reflector update (about every 5 minutes), with no entry or exit fee. Someone who sees the market move first can trade against that lag. Fix: a small exit fee or a one-update delay.",
+  },
+  {
+    title: "Exits on leveraged vaults",
+    body: "A leveraged vault repays debt only from idle USDC, so after the first large withdrawal the next ones can fail with RepaymentUnavailable until the agent or the risk-off role frees more. A protocol that reverts also blocks exits.",
+  },
+  {
+    title: "Smaller ones",
+    body: "Only BTC has a second price source (Chainlink); USDC and XLM rely on Reflector alone. A deposit sent before a vault's policy is registered locks it. The protocol watch trusts the first code hash it sees and not the protocols' own dependencies. The app's rate limits are kept per server instance.",
+  },
+] as const;
+
 function Limits() {
   return (
     <section id="limits" aria-labelledby="limits-title" className="page-x border-t bg-muted py-20 sm:py-24">
@@ -23,6 +47,15 @@ function Limits() {
           </p>
         </div>
       </div>
+      <h3 className="mt-16 text-subheading font-medium text-heading">Known gaps</h3>
+      <dl className="mt-4 border-b">
+        {gaps.map(gap => (
+          <div key={gap.title} className="grid gap-2 border-t py-6 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-12">
+            <dt className="font-medium text-heading">{gap.title}</dt>
+            <dd className="leading-relaxed text-muted-foreground">{gap.body}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }

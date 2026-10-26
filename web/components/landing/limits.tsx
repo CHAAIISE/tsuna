@@ -13,7 +13,7 @@ const gaps = [
   },
   {
     title: "Exits on leveraged vaults",
-    body: "A leveraged vault repays debt only from idle USDC, so after the first large withdrawal the next ones can fail with RepaymentUnavailable until the agent or the risk-off role frees more. A protocol that reverts also blocks exits.",
+    body: "An exit repays its share of the debt by selling collateral on the vault's declared Soroswap pair, accepting up to 3 % slippage, which the leaver bears. On a pool too thin for that, the swap fails and a smaller withdrawal is needed. A protocol that reverts still blocks exits.",
   },
   {
     title: "Smaller ones",

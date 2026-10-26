@@ -247,14 +247,14 @@ export function AgentsBoard() {
             {data ? `${data.rows.length - published} demo, ${published} published with Create${paused > 0 ? ` · ${paused} paused` : ""}` : "Reading the vault factory…"}
           </dd>
         </div>
-        <div className="space-y-1 border-l pl-4 sm:pl-8">
+        <div data-tour="rules" className="space-y-1 border-l pl-4 sm:pl-8">
           <dt className="text-muted-foreground">Rules enforced on-chain</dt>
           <dd className="text-subheading font-medium tabular-nums">{data ? totalRules : "—"}</dd>
           <dd className="text-muted-foreground">{oldest ? `History since inception (${formatAge(oldest)})` : "Allowlisted calls and limits"}</dd>
         </div>
       </dl>
 
-      <Card className="overflow-hidden">
+      <Card data-tour="agents" className="overflow-hidden">
         <div className="flex flex-col gap-3 border-b px-4 py-4 sm:px-6 lg:flex-row lg:items-center">
           <div className="flex flex-wrap gap-2">
             <FilterPills label="Strategy" options={STRATEGIES} value={strategy} onChange={setStrategy} />

@@ -32,7 +32,7 @@ function Flow() {
   return (
     <section id="how" aria-labelledby="how-title" className="page-x border-t bg-background py-20 sm:py-28">
       <div className={twoColumns}>
-        <div>
+        <div className="lg:order-last">
           <p className="font-display text-sm tracking-[0.2em] text-primary uppercase">How it works</p>
           <h2 id="how-title" className="mt-5 font-editorial text-5xl leading-[1.05] font-medium text-heading sm:text-6xl">
             The agent proposes. <span className="italic">The chain decides.</span>
@@ -59,7 +59,7 @@ function Features() {
   return (
     <section id="inside" aria-labelledby="inside-title" className="page-x border-t bg-muted py-20 sm:py-28">
       <div className={twoColumns}>
-        <div className="lg:order-last">
+        <div>
           <p className="font-display text-sm tracking-[0.2em] text-primary uppercase">Inside the vault</p>
           <h2 id="inside-title" className="mt-5 font-editorial text-5xl leading-[1.05] font-medium text-heading sm:text-6xl">
             Built for agents. <span className="italic">Bound by code.</span>
@@ -85,7 +85,7 @@ function ProofTeaser() {
   return (
     <section id="proof" aria-labelledby="proof-title" className="page-x border-t bg-background py-20 sm:py-28">
       <div className={twoColumns}>
-        <div>
+        <div className="lg:order-last">
           <p className="font-display text-sm tracking-[0.2em] text-primary uppercase">Proof</p>
           <h2 id="proof-title" className="mt-5 font-editorial text-5xl leading-[1.05] font-medium text-heading sm:text-6xl">
             Real attacks. <span className="italic">Refused on‑chain.</span>

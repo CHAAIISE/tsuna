@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown } from "lucide-react";
 
@@ -5,8 +6,20 @@ function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className="sticky top-0 flex h-svh flex-col bg-card bg-[radial-gradient(ellipse_55%_40%_at_50%_48%,rgb(172_35_50/0.09),transparent_70%)] px-6 py-6 sm:px-10 sm:py-7"
+      className="sticky top-0 isolate flex h-svh flex-col overflow-hidden bg-card px-6 py-6 sm:px-10 sm:py-7"
     >
+      <Image
+        src="/landing/hero-rope.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="pointer-events-none -z-10 object-cover object-[15%_100%] opacity-70 mix-blend-multiply select-none"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_50%_32%_at_50%_46%,rgb(255_255_255/0.9),transparent_75%)]"
+      />
       <div aria-hidden="true" className="h-11 sm:h-12" />
 
       <div className="hero-recede flex flex-1 flex-col items-center justify-center text-center">

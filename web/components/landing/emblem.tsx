@@ -17,11 +17,11 @@ export function Emblem() {
         </div>
         <figure className="mx-auto w-full max-w-xl">
           <Image
-            src="/landing/winged-lion.jpg"
-            width={1254}
-            height={1254}
+            src="/landing/winged-lion-tethered.jpg"
+            width={1024}
+            height={1024}
             sizes="(min-width: 1024px) 36rem, 100vw"
-            alt="Engraving of a winged lion leaping inside a celestial frame."
+            alt="Engraving of a winged lion leaping upward, one hind paw tied by a crimson rope to an iron ring in a stone block."
             className="h-auto w-full rounded-sm shadow-glow-strong"
             priority={false}
           />

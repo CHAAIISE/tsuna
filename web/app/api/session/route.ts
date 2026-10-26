@@ -25,7 +25,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const input = body.parse(await request.json());
     const origin = new URL(request.url).origin;
-    const signedIn = "publicKey" in input ? { account: verifySignIn(input, origin), publicKey: input.publicKey } : await recoverSignIn(input, origin);
+    const signedIn = "publicKey" in input ? { account: await verifySignIn(input, origin), publicKey: input.publicKey } : await recoverSignIn(input, origin);
     return Response.json(signedIn, { headers: { "Set-Cookie": sessionCookie(signedIn.account) } });
   } catch (error) {
     return failure(error);

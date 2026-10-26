@@ -3,6 +3,7 @@ import { createHash, createHmac, createPublicKey, randomBytes, timingSafeEqual, 
 import { ApiError } from "@/lib/stellar/http";
 import { fromBase64Url, toBase64Url } from "@/lib/passkey/encoding";
 import { passkeyAccountAddress } from "@/lib/sponsor/relayer";
+import { passkeyDeployment } from "@/lib/passkey/deployment";
 import { contractWasmHash } from "@/lib/sponsor/stellar";
 import { p256 } from "@noble/curves/p256";
 
@@ -72,15 +73,26 @@ function signedBytes(input: Assertion, origin: string): { signed: Buffer; signat
   return { signed: Buffer.concat([authenticatorData, createHash("sha256").update(clientDataJSON).digest()]), signature, credentialId };
 }
 
+/**
+ * True when `account` is a Tsuna passkey account on-chain. Its address commits to the key it was
+ * deployed with (the relayer's salt is the key's hash), so a deployed account at the address derived
+ * from a key is that key's account: a valid signature from a key without one proves nothing.
+ */
+async function isPasskeyAccount(account: string): Promise<boolean> {
+  return (await contractWasmHash(account)) === passkeyDeployment.accountWasmHash;
+}
+
 /** Verifies a passkey assertion over a server challenge and returns the account it controls. */
-export function verifySignIn(input: SignIn, origin: string): string {
+export async function verifySignIn(input: SignIn, origin: string): Promise<string> {
   const publicKey = fromBase64Url(input.publicKey);
   if (publicKey.length !== 65 || publicKey[0] !== 0x04) throw new ApiError("Malformed passkey signature.", 400);
   const { signed, signature, credentialId } = signedBytes(input, origin);
   const jwk = { kty: "EC", crv: "P-256", x: toBase64Url(publicKey.subarray(1, 33)), y: toBase64Url(publicKey.subarray(33)) };
   const valid = verify("sha256", signed, { key: createPublicKey({ key: jwk, format: "jwk" }), dsaEncoding: "ieee-p1363" }, signature);
   if (!valid) throw new ApiError("The passkey signature is invalid.", 401);
-  return passkeyAccountAddress(publicKey, credentialId);
+  const account = passkeyAccountAddress(publicKey, credentialId);
+  if (!(await isPasskeyAccount(account))) throw new ApiError("No Tsuna account uses this passkey. Create one first.", 404);
+  return account;
 }
 
 /**
@@ -99,7 +111,7 @@ export async function recoverSignIn(input: Assertion, origin: string): Promise<{
       continue;
     }
     const account = passkeyAccountAddress(publicKey, credentialId);
-    if (await contractWasmHash(account)) return { account, publicKey: toBase64Url(publicKey) };
+    if (await isPasskeyAccount(account)) return { account, publicKey: toBase64Url(publicKey) };
   }
   throw new ApiError("No Tsuna account uses this passkey. Create one first.", 404);
 }

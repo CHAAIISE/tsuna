@@ -1,5 +1,6 @@
 use soroban_sdk::{
-    contracttype, symbol_short, token, Address, Env, IntoVal, Map, Symbol, TryFromVal, Val, Vec,
+    contracttype, symbol_short, token, Address, Env, IntoVal, InvokeError, Map, Symbol, TryFromVal,
+    Val, Vec,
 };
 
 use super::{add, need, Holding, Needs};
@@ -171,9 +172,10 @@ pub(crate) fn needs(env: &Env, pool: &Address, needs: &mut Needs) -> Result<(), 
     Ok(())
 }
 
-/// Withdraws up to `units` of the first non-`base` collateral into the vault, for an exit that
-/// must sell it to repay debt. Blend refuses the withdrawal if it would leave the position
-/// unhealthy. Returns the asset and the amount released.
+/// Withdraws non-`base` collateral worth `value` into the vault, for an exit that must sell it
+/// to repay debt. Returns the asset and the amount released, or `None` when there is none or
+/// Blend refuses (the withdrawal would leave the position unhealthy): the exit then falls back
+/// to what idle balances can repay instead of reverting.
 pub(crate) fn release_collateral(
     env: &Env,
     pool: &Address,
@@ -202,12 +204,12 @@ pub(crate) fn release_collateral(
                 request_type: 3,
             }],
         );
-        let _: Val = env.invoke_contract(
+        let released = env.try_invoke_contract::<Val, InvokeError>(
             pool,
             &Symbol::new(env, "submit_with_allowance"),
             (me.clone(), me.clone(), me, requests).into_val(env),
         );
-        return Ok(Some((line.asset, amount)));
+        return Ok(matches!(released, Ok(Ok(_))).then_some((line.asset, amount)));
     }
     Ok(None)
 }

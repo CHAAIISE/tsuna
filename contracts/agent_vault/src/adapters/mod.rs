@@ -10,7 +10,8 @@ pub(crate) mod xoxno;
 use policy_registry::{CallRule, PolicyV2};
 use soroban_sdk::{
     auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation},
-    contracttype, symbol_short, token, Address, Env, IntoVal, Map, Symbol, TryFromVal, Val, Vec,
+    contracttype, symbol_short, token, Address, Env, IntoVal, InvokeError, Map, Symbol, TryFromVal,
+    Val, Vec,
 };
 
 use crate::{oracle::Prices, shares::mul_div, Error, Key, BPS};
@@ -295,8 +296,9 @@ const EXIT_SWAP_SLIPPAGE_BPS: i128 = 300;
 /// Makes a priced exit independent of the agent: when idle base cannot repay the leaver's share
 /// of a base-asset debt, the vault withdraws that much non-base collateral and sells it for base
 /// on its own Soroswap router, through a pair the policy declares. Returns the value lost to the
-/// swap at exit prices, which the leaver bears. Does nothing when there is no shortfall, no
-/// router, no declared pair or no price: the exit then stays capped by idle balances.
+/// swap at exit prices, which the leaver bears. It never makes an exit fail: with no shortfall,
+/// router, declared pair or price, or when Blend refuses the release (an unhealthy position) or
+/// the swap misses its minimum, it does nothing and the exit stays capped by idle balances.
 pub(crate) fn fund_exit(
     env: &Env,
     base: &Address,
@@ -338,25 +340,30 @@ pub(crate) fn fund_exit(
         else {
             continue;
         };
-        let pair: Address = env.invoke_contract(
+        let Ok(Ok(pair)) = env.try_invoke_contract::<Address, InvokeError>(
             &router,
             &Symbol::new(env, "router_pair_for"),
             (asset.clone(), base.clone()).into_val(env),
-        );
+        ) else {
+            return Ok(0);
+        };
         if !policy
             .guards_of(&router)
             .is_some_and(|guards| guards.contains(&pair))
         {
-            return Err(Error::SpenderNotProtocol);
+            return Ok(0);
         }
-        let quoted = prices.convert(env, &asset, amount, base)?;
+        let Ok(quoted) = prices.convert(env, &asset, amount, base) else {
+            return Ok(0);
+        };
         let min_out = mul_div(env, quoted, BPS - EXIT_SWAP_SLIPPAGE_BPS, BPS, true)?;
         let before = token.balance(&me);
         env.authorize_as_current_contract(Vec::from_array(
             env,
             [transfer(env, &asset, &pair, amount)],
         ));
-        let _: Val = env.invoke_contract(
+        // A missed minimum leaves the released collateral idle in the vault, valued as before.
+        let swapped = env.try_invoke_contract::<Val, InvokeError>(
             &router,
             &Symbol::new(env, "swap_exact_tokens_for_tokens"),
             (
@@ -368,6 +375,9 @@ pub(crate) fn fund_exit(
             )
                 .into_val(env),
         );
+        if !matches!(swapped, Ok(Ok(_))) {
+            return Ok(0);
+        }
         let received = token.balance(&me) - before;
         return Ok((quoted - received).max(0));
     }

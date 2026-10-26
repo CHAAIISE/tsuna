@@ -735,6 +735,43 @@ fn leveraged_exit_sells_collateral_to_repay_its_debt() {
 }
 
 #[test]
+fn strained_leveraged_exit_falls_back_to_what_idle_balances_repay() {
+    let lab = Lab::new();
+    let f = &lab.f;
+    let (pool, _) = lab.blend();
+    let df = lab.defindex();
+    lab.mint(&lab.xlm, &f.vault, 2_000 * UNIT);
+    lab.submit(
+        &pool,
+        vec![
+            lab.env(),
+            lab.request(&lab.xlm, 2_000 * UNIT, 2),
+            lab.request(&f.asset, 200 * UNIT, 4),
+        ],
+    )
+    .unwrap();
+    lab.df_deposit(&df, 1_150 * UNIT).unwrap();
+    let pair = lab.env().register(PairMock, (UNIT / 5,));
+    lab.mint(&f.asset, &pair, 10_000 * UNIT);
+    let router = lab.env().register(SoroswapRouterMock, (pair.clone(),));
+    lab.adapter(AdapterKind::Soroswap, &router);
+    f.update_policy(|policy| {
+        policy
+            .guards
+            .set(router.clone(), vec![lab.env(), pair.clone()])
+    });
+    // Near liquidation, Blend refuses to release collateral on its own: the exit must not
+    // revert, it redeems what the 50 idle USDC can repay, as without a router.
+    BlendMockClient::new(lab.env(), &pool).set_strained(&true);
+    let shares = f.client().balance(&f.alice);
+    let supply = f.client().total_shares() + crate::shares::VIRTUAL_SHARES;
+    f.withdraw(&f.alice, shares);
+    let redeemed = (50 * UNIT - 6) * supply / (200 * UNIT);
+    assert_eq!(f.client().balance(&f.alice), shares - redeemed);
+    assert_eq!(lab.balance(&lab.xlm, &pair), 0);
+}
+
+#[test]
 fn adapters_are_limited_to_allowlisted_protocols_and_bounded_positions() {
     let lab = Lab::new();
     let f = &lab.f;

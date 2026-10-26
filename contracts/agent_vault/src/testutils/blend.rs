@@ -22,6 +22,7 @@ enum BlendKey {
     Collateral(Address, u32),
     Debt(Address, u32),
     Sink,
+    Strained,
 }
 
 #[contract]
@@ -64,6 +65,11 @@ impl BlendMock {
     }
 
     /// Simulates a compromised pool: inflows go to `sink` while positions are still credited.
+    /// Puts the position near its liquidation threshold: collateral-only withdrawals fail.
+    pub fn set_strained(env: Env, strained: bool) {
+        env.storage().instance().set(&BlendKey::Strained, &strained);
+    }
+
     pub fn set_sink(env: Env, sink: Address) {
         env.storage().instance().set(&BlendKey::Sink, &sink);
     }
@@ -136,6 +142,14 @@ impl BlendMock {
         }
         let s = env.storage().instance();
         let me = env.current_contract_address();
+        // Like Blend's health check: releasing collateral without repaying anything is refused
+        // while the position is near its liquidation threshold.
+        if s.get::<_, bool>(&BlendKey::Strained).unwrap_or(false)
+            && requests.iter().any(|request| request.request_type == 3)
+            && !requests.iter().any(|request| request.request_type == 5)
+        {
+            panic!("health factor too low");
+        }
         let mut nets: Map<Address, i128> = Map::new(&env);
         for request in requests {
             let index: u32 = s.get(&BlendKey::Index(request.address.clone())).unwrap();

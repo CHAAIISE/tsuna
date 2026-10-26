@@ -79,6 +79,8 @@
   --tracking-overline: 0.18em;
   --shadow-card: 0 1px 1px rgb(0 0 0 / 0.1), 0 0 2px rgb(0 0 0 / 0.08);
   --shadow-editorial: 0 16px 32px rgb(50 50 93 / 0.12);
+  --shadow-glow: 0 24px 48px -20px rgb(172 35 50 / 0.28), 0 2px 6px -2px rgb(172 35 50 / 0.12);
+  --shadow-glow-strong: 0 32px 64px -20px rgb(172 35 50 / 0.45), 0 0 0 6px rgb(172 35 50 / 0.06);
   --spacing-table-row: 3.9375rem;
   --default-transition-duration: 180ms;
   --text-hero: 3.5rem;

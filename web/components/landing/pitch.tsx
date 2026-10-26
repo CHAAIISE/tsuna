@@ -37,7 +37,7 @@ function Flow() {
       </h2>
       <SlideIn className="mt-16 grid gap-6 md:grid-cols-3">
         {steps.map(step => (
-          <article key={step.title} className="flex w-full flex-col items-center rounded-xl border bg-card p-8 text-center shadow-card sm:p-10">
+          <article key={step.title} className="flex w-full flex-col items-center rounded-xl border border-primary/20 border-t-2 border-t-primary bg-card p-8 text-center shadow-glow transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-glow-strong sm:p-10">
             <h3 className="font-display text-lg tracking-[0.16em] text-heading uppercase">{step.title}</h3>
             <span aria-hidden="true" className="mt-4 flex items-center gap-3 font-display text-sm tracking-[0.2em] text-primary">
               <span className="h-px w-8 bg-primary/40" />
@@ -56,8 +56,8 @@ function Node({ name, detail, main = false }: { name: string; detail: string; ma
   return (
     <div
       className={cn(
-        "flex h-20 flex-col items-center justify-center rounded-xl border bg-card px-4 text-center shadow-card",
-        main && "h-auto border-primary/60 py-8 ring-4 ring-primary/5",
+        "flex h-20 flex-col items-center justify-center rounded-xl border border-primary/15 bg-card px-4 text-center shadow-glow",
+        main && "h-auto border-primary py-8 shadow-glow-strong",
       )}
     >
       <span className={cn("text-heading", main ? "font-display text-2xl tracking-[0.16em] uppercase" : "text-lg font-medium")}>{name}</span>

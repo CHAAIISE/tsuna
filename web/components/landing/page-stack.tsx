@@ -35,7 +35,7 @@ export function PageStack({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <main ref={ref} className="*:shadow-[0_-24px_48px_-32px_rgb(15_23_42/0.22)]">
+    <main ref={ref} className="*:shadow-[0_-24px_48px_-28px_rgb(172_35_50/0.3)]">
       {children}
     </main>
   );

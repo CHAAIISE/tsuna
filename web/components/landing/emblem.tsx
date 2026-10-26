@@ -22,7 +22,7 @@ export function Emblem() {
             height={1254}
             sizes="(min-width: 1024px) 36rem, 100vw"
             alt="Engraving of a winged lion leaping inside a celestial frame."
-            className="h-auto w-full rounded-sm shadow-editorial"
+            className="h-auto w-full rounded-sm shadow-glow-strong"
             priority={false}
           />
         </figure>

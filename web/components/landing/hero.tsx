@@ -5,7 +5,7 @@ function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className="sticky top-0 flex h-svh flex-col bg-card px-6 py-6 sm:px-10 sm:py-7"
+      className="sticky top-0 flex h-svh flex-col bg-card bg-[radial-gradient(ellipse_55%_40%_at_50%_48%,rgb(172_35_50/0.09),transparent_70%)] px-6 py-6 sm:px-10 sm:py-7"
     >
       <div aria-hidden="true" className="h-11 sm:h-12" />
 

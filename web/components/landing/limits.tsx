@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { Overline } from "./section";
 
@@ -36,13 +35,19 @@ function Closing() {
       <h2 id="closing-title" className="mt-5 max-w-3xl font-editorial text-5xl leading-[1.05] font-medium text-heading sm:text-6xl">
         Try to break it. <span className="italic">Watch the chain say no.</span>
       </h2>
-      <div className="mt-10 flex flex-wrap gap-3">
-        <Button asChild size="lg" variant="outline" className="border-input">
-          <Link href="/agents">Explore agents</Link>
-        </Button>
-        <Button asChild size="lg" variant="outline" className="border-input">
-          <Link href="/onboarding">Create your passkey</Link>
-        </Button>
+      <div className="mt-10 flex flex-wrap gap-4">
+        {[
+          { href: "/agents", label: "Explore agents" },
+          { href: "/onboarding", label: "Create your passkey" },
+        ].map(link => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="rounded-sm border border-primary/70 bg-card px-7 py-3.5 font-display text-sm tracking-[0.14em] text-primary uppercase shadow-glow transition-[background-color,color,box-shadow] hover:bg-primary hover:text-primary-foreground hover:shadow-glow-strong"
+          >
+            {link.label}
+          </Link>
+        ))}
       </div>
     </section>
   );

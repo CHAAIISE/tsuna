@@ -19,7 +19,7 @@ function Hero() {
         <Link
           href="/agents"
           data-primary
-          className="rounded-sm border border-destructive/70 px-5 py-2.5 font-display text-sm tracking-[0.14em] text-destructive uppercase transition-colors hover:bg-destructive hover:text-white sm:px-8 sm:py-3"
+          className="rounded-sm border border-primary/70 px-5 py-2.5 font-display text-sm tracking-[0.14em] text-primary uppercase transition-colors hover:bg-primary hover:text-primary-foreground sm:px-8 sm:py-3"
         >
           Launch app
         </Link>

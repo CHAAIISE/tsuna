@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export function Emblem() {
   return (
-    <section aria-labelledby="emblem-title" className="px-6 py-20 sm:px-12 sm:py-28">
+    <section id="idea" aria-labelledby="emblem-title" className="scroll-mt-4 px-6 py-20 sm:px-12 sm:py-28">
       <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-20">
         <div className="max-w-lg">
           <p className="font-display text-sm tracking-[0.2em] text-primary uppercase">Power on a rope</p>

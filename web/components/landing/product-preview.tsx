@@ -5,7 +5,7 @@ import { SectionIntro } from "./section";
 
 export function ProductPreview() {
   return (
-    <section id="product" aria-labelledby="product-title" className="scroll-mt-0 border-t px-6 py-16 sm:px-12 sm:py-24">
+    <section id="product" aria-labelledby="product-title" className="scroll-mt-4 border-t px-6 py-16 sm:px-12 sm:py-24">
       <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
         <SectionIntro
           id="product-title"

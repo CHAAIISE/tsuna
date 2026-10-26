@@ -3,7 +3,7 @@ import { Overline, SectionIntro } from "./section";
 
 function Problem() {
   return (
-    <section aria-labelledby="problem-title" className="border-t bg-muted px-6 py-20 sm:px-12 sm:py-24">
+    <section id="problem" aria-labelledby="problem-title" className="scroll-mt-4 border-t bg-muted px-6 py-20 sm:px-12 sm:py-24">
       <SectionIntro
         id="problem-title"
         overline="The problem"

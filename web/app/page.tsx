@@ -6,6 +6,7 @@ import { Closing, LandingFooter, Limits } from "@/components/landing/limits";
 import { Problem } from "@/components/landing/problem";
 import { Proof } from "@/components/landing/proof";
 import { ProductPreview } from "@/components/landing/product-preview";
+import { SectionRail } from "@/components/landing/section-rail";
 
 function RisingEdge() {
   return (
@@ -20,6 +21,7 @@ export default function Home() {
     <>
       <Hero />
       <LandingNav />
+      <SectionRail />
       <div className="relative z-10 bg-background">
         <RisingEdge />
         <div className="mx-auto min-h-screen max-w-site">

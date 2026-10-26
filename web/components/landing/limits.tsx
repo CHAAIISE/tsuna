@@ -6,7 +6,7 @@ import { Overline } from "./section";
 
 function Limits() {
   return (
-    <section aria-labelledby="limits-title" className="border-t bg-muted px-6 py-20 sm:px-12 sm:py-24">
+    <section id="limits" aria-labelledby="limits-title" className="scroll-mt-4 border-t bg-muted px-6 py-20 sm:px-12 sm:py-24">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
         <div>
           <Overline>Limits</Overline>
@@ -32,7 +32,7 @@ function Limits() {
 
 function Closing() {
   return (
-    <section aria-labelledby="closing-title" className="border-t px-6 py-20 sm:px-12 sm:py-24">
+    <section id="start" aria-labelledby="closing-title" className="scroll-mt-4 border-t px-6 py-20 sm:px-12 sm:py-24">
       <h2 id="closing-title" className="max-w-3xl text-3xl font-light tracking-tight text-heading sm:text-[2.5rem] sm:leading-[1.15]">
         Try to break it. <span className="text-muted-foreground">Create a passkey, get test USDC, and watch the chain say no.</span>
       </h2>

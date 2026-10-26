@@ -11,7 +11,7 @@ function Hero() {
     >
       <div aria-hidden="true" className="h-11 sm:h-12" />
 
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
+      <div className="hero-recede flex flex-1 flex-col items-center justify-center text-center">
         <h1
           id="hero-title"
           className="font-display text-[clamp(4rem,15vw,14rem)] leading-none font-medium tracking-[0.16em] text-foreground uppercase [padding-left:0.16em]"

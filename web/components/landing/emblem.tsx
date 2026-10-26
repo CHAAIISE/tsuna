@@ -18,8 +18,9 @@ export function Emblem() {
         <figure className="mx-auto w-full max-w-xl">
           <Image
             src="/landing/winged-lion.jpg"
-            width={630}
-            height={630}
+            width={1254}
+            height={1254}
+            sizes="(min-width: 1024px) 36rem, 100vw"
             alt="Engraving of a winged lion leaping inside a celestial frame."
             className="h-auto w-full rounded-sm shadow-editorial"
             priority={false}

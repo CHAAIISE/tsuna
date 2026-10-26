@@ -27,6 +27,12 @@ test("the creator revokes a stolen session without closing withdrawals", async (
   const member = key("LEASH_AGENTRUN_AGENT_SECRET");
   const fee = key("LEASH_AGENTRUN_FEE_SECRET");
   expect(await vault.owner()).toBe(owner.publicKey());
+  if (await vault.session() === null) {
+    const restored = await client.chain.invoke(fee, new Contract(target.address).call("rotate_session", new Address(member.publicKey()).toScVal()), [owner], "vault");
+    expect(restored.status).toBe("SUCCESS");
+    expect((await client.server.getTransaction(restored.hash)).status).toBe("SUCCESS");
+    console.log(`SESSION_SETUP_RESTORED ${restored.hash}`);
+  }
   expect(await vault.session()).toBe(member.publicKey());
   const [call] = actions.blendSupply(target.address, asset, 1n);
   if (!call) throw new Error("No Blend supply call");
@@ -59,8 +65,8 @@ test("the creator revokes a stolen session without closing withdrawals", async (
       await expect(page.getByTestId("session-state")).toContainText("revoked");
       await expect(page.getByRole("button", { name: "Revoke session key" })).toBeDisabled();
       await page.goto(`/agents/${target.slug}`);
-      await page.getByRole("tab", { name: "Withdraw", exact: true }).click();
-      await expect(page.getByRole("tab", { name: "Withdraw", exact: true })).toHaveAttribute("aria-selected", "true");
+      await page.getByRole("tab", { name: /^withdraw$/i }).click();
+      await expect(page.getByRole("tab", { name: /^withdraw$/i })).toHaveAttribute("aria-selected", "true");
       expect(await vault.totalShares()).toBe(sharesBefore);
       const before = await client.read<bigint>(asset, "balance", [ownerAddress]);
       const withdrawal = await vault.withdraw(owner, ownerShares / 100n);

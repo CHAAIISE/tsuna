@@ -37,10 +37,14 @@ function Flow() {
       </h2>
       <SlideIn className="mt-16 grid gap-6 md:grid-cols-3">
         {steps.map(step => (
-          <article key={step.title} className="w-full rounded-xl border bg-card p-8 shadow-card sm:p-10">
-            <span className="font-editorial text-3xl text-primary italic">{step.numeral}</span>
-            <h3 className="mt-8 font-display text-lg tracking-[0.16em] text-heading uppercase">{step.title}</h3>
-            <p className="mt-3 leading-relaxed text-muted-foreground">{step.body}</p>
+          <article key={step.title} className="flex w-full flex-col items-center rounded-xl border bg-card p-8 text-center shadow-card sm:p-10">
+            <h3 className="font-display text-lg tracking-[0.16em] text-heading uppercase">{step.title}</h3>
+            <span aria-hidden="true" className="mt-4 flex items-center gap-3 font-display text-sm tracking-[0.2em] text-primary">
+              <span className="h-px w-8 bg-primary/40" />
+              {step.numeral}
+              <span className="h-px w-8 bg-primary/40" />
+            </span>
+            <p className="mt-5 leading-relaxed text-muted-foreground">{step.body}</p>
           </article>
         ))}
       </SlideIn>

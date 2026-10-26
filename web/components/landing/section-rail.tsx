@@ -14,30 +14,21 @@ export function SectionRail({ sections, label, revealAfter = 0 }: { sections: re
   const [active, setActive] = useState(sections[0]?.id);
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY >= window.innerHeight * revealAfter);
+    const nodes = sections.map(section => document.getElementById(section.id));
+    // The current section is the last one whose top has passed the middle of the viewport: pinned pages sit at
+    // or above the top, so the page sliding over them takes over as soon as it reaches the middle.
+    const onScroll = () => {
+      setVisible(window.scrollY >= window.innerHeight * revealAfter);
+      const middle = window.innerHeight / 2;
+      const index = nodes.findLastIndex(node => node !== null && node.getBoundingClientRect().top <= middle);
+      setActive(sections[Math.max(index, 0)]?.id);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-
-    // Pinned pages stay in view under the ones covering them: the current page is the last one in the band.
-    const inBand = new Set<string>();
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) inBand.add(entry.target.id);
-          else inBand.delete(entry.target.id);
-        }
-        const current = sections.findLast(section => inBand.has(section.id));
-        if (current) setActive(current.id);
-      },
-      { rootMargin: "-45% 0px -50% 0px" },
-    );
-    for (const { id } of sections) {
-      const node = document.getElementById(id);
-      if (node) observer.observe(node);
-    }
+    window.addEventListener("resize", onScroll);
     return () => {
       window.removeEventListener("scroll", onScroll);
-      observer.disconnect();
+      window.removeEventListener("resize", onScroll);
     };
   }, [sections, revealAfter]);
 
@@ -51,7 +42,7 @@ export function SectionRail({ sections, label, revealAfter = 0 }: { sections: re
         visible ? "mr-0 opacity-100" : "pointer-events-none -mr-4 opacity-0",
       )}
     >
-      <ol className="relative flex flex-col items-center gap-3 py-1">
+      <ol className="relative flex flex-col items-center gap-5 py-1">
         <span aria-hidden="true" className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-foreground/25" />
         {sections.map(section => {
           const current = section.id === active;
@@ -71,7 +62,7 @@ export function SectionRail({ sections, label, revealAfter = 0 }: { sections: re
                   window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
                   history.replaceState(null, "", `#${section.id}`);
                 }}
-                className="group relative flex size-7 items-center justify-center"
+                className="group relative flex size-7 items-center justify-center focus-visible:outline-none"
               >
                 <span
                   aria-hidden="true"

@@ -17,8 +17,10 @@ function RisingEdge() {
 
 export default function Home() {
   return (
-    <>
+    <div className="relative">
       <Hero />
+      {/* Left half of the rising edge, redrawn above the pinned DOCS link so the line sweeps across it; LAUNCH APP stays on top. */}
+      <div aria-hidden="true" className="pointer-events-none absolute top-[100svh] left-0 z-40 h-px w-1/2 bg-foreground" />
       <LandingNav />
       <SectionRail />
       <div className="relative z-10 bg-background">
@@ -36,6 +38,6 @@ export default function Home() {
           <LandingFooter />
         </div>
       </div>
-    </>
+    </div>
   );
 }

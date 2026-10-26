@@ -49,8 +49,50 @@ pub(crate) fn rules(env: &Env) -> Result<PolicyV2, Error> {
 /// Assets counted in NAV and paid out on withdrawal, base asset first.
 pub(crate) fn assets(env: &Env) -> Vec<Address> {
     match policy(env) {
-        Some(policy) => policy.assets,
+        Some(policy) => valued(env, &policy),
         None => vec![env, env.storage().instance().get(&Key::Asset).unwrap()],
+    }
+}
+
+fn known(env: &Env) -> Vec<Address> {
+    env.storage().instance().get(&Key::KnownAssets).unwrap_or(vec![env])
+}
+
+/// The policy's assets, then any asset an earlier policy listed and this one dropped.
+/// Dropping an asset applies without a timelock; valuing only the current list would let the
+/// creator hide holdings from NAV, deposit at the lower share price and list the asset again.
+pub(crate) fn valued(env: &Env, policy: &PolicyV2) -> Vec<Address> {
+    let mut assets = policy.assets.clone();
+    for asset in known(env).iter() {
+        if !assets.contains(&asset) {
+            assets.push_back(asset);
+        }
+    }
+    assets
+}
+
+/// `assets`, recording the policy's assets first: for entry points that change state.
+pub(crate) fn sync(env: &Env) -> Vec<Address> {
+    match policy(env) {
+        Some(policy) => {
+            remember(env, &policy);
+            valued(env, &policy)
+        }
+        None => vec![env, env.storage().instance().get(&Key::Asset).unwrap()],
+    }
+}
+
+/// Adds the policy's assets to the known ones; every state-changing entry point calls it.
+pub(crate) fn remember(env: &Env, policy: &PolicyV2) {
+    let mut known = known(env);
+    let before = known.len();
+    for asset in policy.assets.iter() {
+        if !known.contains(&asset) {
+            known.push_back(asset);
+        }
+    }
+    if known.len() != before {
+        env.storage().instance().set(&Key::KnownAssets, &known);
     }
 }
 

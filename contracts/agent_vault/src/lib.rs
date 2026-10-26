@@ -67,6 +67,9 @@ enum Key {
     HaltedProtocols,
     /// Set while the pause in force comes from the protocol watch alone.
     WatchPaused,
+    /// Every asset a policy of this vault has listed. Removing an asset from the policy is a tightening
+    /// that applies at once, so NAV keeps valuing what the vault may still hold of it.
+    KnownAssets,
 }
 
 #[contractevent]
@@ -235,7 +238,8 @@ impl AgentVault {
 
     pub fn check_drawdown(env: Env) -> Result<bool, Error> {
         let policy = leash::rules(&env)?;
-        let nav = nav_of(&env, &policy.assets)?;
+        leash::remember(&env, &policy);
+        let nav = nav_of(&env, &leash::valued(&env, &policy))?;
         let price = shares::price(&env, nav)?;
         if drawdown::breached(&env, price, policy.limits.max_drawdown_bps)? {
             env.storage().instance().set(&Key::Paused, &true);
@@ -279,7 +283,7 @@ impl AgentVault {
         if env.storage().instance().get(&Key::Paused).unwrap_or(false) {
             return Err(Error::Paused);
         }
-        let nav = Self::nav(env.clone())?;
+        let nav = nav_of(&env, &leash::sync(&env))?;
         fees::crystallize(&env, nav)?;
         let minted = shares::mul_div(
             &env,
@@ -323,7 +327,7 @@ impl AgentVault {
         let asset: Address = env.storage().instance().get(&Key::Asset).unwrap();
         let token = token::Client::new(&env, &asset);
         let me = env.current_contract_address();
-        let assets = leash::assets(&env);
+        let assets = leash::sync(&env);
         let mut prices = Prices::exit(&env, &asset);
         let nav = exit_nav(&env, &asset, &assets, &mut prices)?;
         if let Some(nav) = nav {
@@ -495,7 +499,9 @@ impl AgentVault {
         let call = leash::inspect(&env, &policy, &target, &fn_name, &args, &mut prices)?;
         // Only allowlisted targets get pinned; a refused call never reaches the protocol check.
         protocols::verify(&env, &target)?;
-        let before = valuation(&env, &policy.assets, &mut prices)?;
+        leash::remember(&env, &policy);
+        let valued = leash::valued(&env, &policy);
+        let before = valuation(&env, &valued, &mut prices)?;
         let prepared = adapters::prepare(
             &env,
             &policy,
@@ -508,7 +514,7 @@ impl AgentVault {
         let committed = prepared.value.unwrap_or(call.value);
         leash::charge(&env, &policy.limits, committed, before.nav, role)?;
         let held = perimeter::holdings(&env, &policy, &target)?;
-        let assets_before = (mode == RoleMode::RiskOff).then(|| oracle::held(&env, &policy.assets));
+        let assets_before = (mode == RoleMode::RiskOff).then(|| oracle::held(&env, &valued));
         if call.rule.approve {
             let me = env.current_contract_address();
             for (pulled, amount) in call.pulls.iter() {
@@ -527,7 +533,7 @@ impl AgentVault {
         }
         let out: Val = env.invoke_contract(&target, &fn_name, args.clone());
         adapters::settle(&env, &target, &fn_name, &args, &out)?;
-        let after = valuation(&env, &policy.assets, &mut prices)?;
+        let after = valuation(&env, &valued, &mut prices)?;
         let (nav_before, nav_after) = (before.nav, after.nav);
         let max_loss = call.rule.max_loss_bps;
         let guarded = (|| -> Result<(), Error> {
@@ -546,7 +552,7 @@ impl AgentVault {
         })();
         roles::outcome(mode, guarded)?;
         if let Some(assets_before) = assets_before {
-            let assets_after = oracle::held(&env, &policy.assets);
+            let assets_after = oracle::held(&env, &valued);
             let tolerance = shares::mul_div(&env, nav_before, max_loss.into(), BPS, false)?;
             roles::risk_not_increased(&before, &after, &assets_before, &assets_after, tolerance)?;
         } else {

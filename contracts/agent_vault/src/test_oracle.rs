@@ -165,6 +165,22 @@ fn idle_assets_are_valued_at_strict_prices() {
 }
 
 #[test]
+fn dropping_an_asset_from_the_policy_keeps_it_in_nav() {
+    let m = Market::new(Fixture::new(), Some(START));
+    m.swap(34 * UNIT, 200 * UNIT).unwrap();
+    assert_eq!(m.nav(), Ok(200 * UNIT));
+    // Removing XLM is a tightening, applied at once: the vault's 200 XLM must stay in NAV,
+    // or the creator could deposit at a crushed share price and list XLM again later.
+    m.f.set_assets(vec![&m.f.env, m.f.asset.clone()]);
+    assert_eq!(m.f.policy().assets.len(), 1);
+    assert_eq!(m.nav(), Ok(200 * UNIT));
+    let supply = m.f.client().total_shares();
+    let minted = m.f.deposit(&m.f.bob, 100 * UNIT);
+    assert_eq!(minted, supply / 2);
+    assert_eq!(m.nav(), Ok(300 * UNIT));
+}
+
+#[test]
 fn exit_with_stale_oracle_haircut() {
     let m = Market::new(Fixture::new(), Some(START));
     m.swap(34 * UNIT, 200 * UNIT).unwrap();

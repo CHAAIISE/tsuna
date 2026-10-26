@@ -31,9 +31,10 @@ function Limits() {
 
 function Closing() {
   return (
-    <section id="start" aria-labelledby="closing-title" className="page-x bg-background border-t py-20 sm:py-24">
-      <h2 id="closing-title" className="max-w-3xl text-3xl font-light tracking-tight text-heading sm:text-[2.5rem] sm:leading-[1.15]">
-        Try to break it. <span className="font-editorial text-[1.1em] italic">Create a passkey, get test USDC, and watch the chain say no.</span>
+    <section id="start" aria-labelledby="closing-title" className="page-x border-t bg-background py-20 sm:py-28">
+      <p className="font-display text-sm tracking-[0.2em] text-primary uppercase">Start</p>
+      <h2 id="closing-title" className="mt-5 max-w-3xl font-editorial text-5xl leading-[1.05] font-medium text-heading sm:text-6xl">
+        Try to break it. <span className="italic">Watch the chain say no.</span>
       </h2>
       <div className="mt-10 flex flex-wrap gap-3">
         <Button asChild size="lg" variant="outline" className="border-input">

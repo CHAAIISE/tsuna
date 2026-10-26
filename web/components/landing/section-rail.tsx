@@ -3,23 +3,18 @@
 import { useEffect, useState } from "react";
 import { cn } from "cn";
 
-const SECTIONS = [
-  { id: "idea", label: "The idea" },
-  { id: "problem", label: "The problem" },
-  { id: "how-it-works", label: "How it works" },
-  { id: "proof", label: "Proof" },
-  { id: "built-on", label: "Built on" },
-  { id: "limits", label: "Limits" },
-  { id: "start", label: "Start" },
-] as const;
+type Section = { id: string; label: string };
 
-/** Rope-like index on the right edge: shows up once the content has covered the hero and tracks the section in view. */
-export function SectionRail() {
+/**
+ * Rope-like index on the right edge that tracks the section in view.
+ * `revealAfter` is the share of the viewport height to scroll before it shows (the landing waits for its hero to be covered).
+ */
+export function SectionRail({ sections, label, revealAfter = 0 }: { sections: readonly Section[]; label: string; revealAfter?: number }) {
   const [visible, setVisible] = useState(false);
-  const [active, setActive] = useState<string>(SECTIONS[0].id);
+  const [active, setActive] = useState(sections[0]?.id);
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > window.innerHeight * 0.85);
+    const onScroll = () => setVisible(window.scrollY >= window.innerHeight * revealAfter);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
 
@@ -31,12 +26,12 @@ export function SectionRail() {
           if (entry.isIntersecting) inBand.add(entry.target.id);
           else inBand.delete(entry.target.id);
         }
-        const current = SECTIONS.findLast(section => inBand.has(section.id));
+        const current = sections.findLast(section => inBand.has(section.id));
         if (current) setActive(current.id);
       },
       { rootMargin: "-45% 0px -50% 0px" },
     );
-    for (const { id } of SECTIONS) {
+    for (const { id } of sections) {
       const node = document.getElementById(id);
       if (node) observer.observe(node);
     }
@@ -44,11 +39,11 @@ export function SectionRail() {
       window.removeEventListener("scroll", onScroll);
       observer.disconnect();
     };
-  }, []);
+  }, [sections, revealAfter]);
 
   return (
     <nav
-      aria-label="Landing sections"
+      aria-label={label}
       // Centred in the gutter between the content's right edge (site width + its 3rem padding) and the viewport edge.
       style={{ right: "calc((100vw - var(--container-site)) / 4 + 1.5rem)" }}
       className={cn(
@@ -58,7 +53,7 @@ export function SectionRail() {
     >
       <ol className="relative flex flex-col items-center gap-3 py-1">
         <span aria-hidden="true" className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-foreground/25" />
-        {SECTIONS.map(section => {
+        {sections.map(section => {
           const current = section.id === active;
           return (
             <li key={section.id} className="relative">

@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { ArrowDown } from "lucide-react";
 
-const docsUrl = "https://github.com/CHAAIISE/tsuna#readme";
-
 function Hero() {
   return (
     <section
@@ -34,16 +32,16 @@ function Hero() {
   );
 }
 
-/** DOCS and LAUNCH APP stay pinned over the hero and over the content that rises over it. */
-function LandingNav() {
+/** The left link (DOCS on the landing, HOME on the docs) and LAUNCH APP stay pinned over the page. */
+function LandingNav({ href = "/docs", label = "Docs" }: { href?: string; label?: string }) {
   return (
     <nav aria-label="Site" className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-center justify-between px-6 pt-6 sm:px-10 sm:pt-7">
-      <a
-        href={docsUrl}
+      <Link
+        href={href}
         className="pointer-events-auto rounded-sm px-2 py-1 font-display text-sm tracking-[0.18em] text-muted-foreground uppercase transition-colors hover:text-heading"
       >
-        Docs
-      </a>
+        {label}
+      </Link>
       <Link
         href="/agents"
         data-primary

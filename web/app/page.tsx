@@ -1,12 +1,17 @@
-import { BuiltOn } from "@/components/landing/built-on";
 import { Emblem } from "@/components/landing/emblem";
 import { Hero, LandingNav } from "@/components/landing/hero";
+import { Closing, LandingFooter } from "@/components/landing/limits";
 import { PageStack } from "@/components/landing/page-stack";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { Closing, LandingFooter, Limits } from "@/components/landing/limits";
-import { Problem } from "@/components/landing/problem";
-import { Proof } from "@/components/landing/proof";
+import { Features, Flow, ProofTeaser } from "@/components/landing/pitch";
 import { SectionRail } from "@/components/landing/section-rail";
+
+const sections = [
+  { id: "idea", label: "The idea" },
+  { id: "how", label: "How it works" },
+  { id: "inside", label: "Inside" },
+  { id: "proof", label: "Proof" },
+  { id: "start", label: "Start" },
+] as const;
 
 function RisingEdge() {
   return (
@@ -23,16 +28,14 @@ export default function Home() {
       {/* Left half of the rising edge, redrawn above the pinned DOCS link so the line sweeps across it; LAUNCH APP stays on top. */}
       <div aria-hidden="true" className="pointer-events-none absolute top-[100svh] left-0 z-40 h-px w-1/2 bg-foreground" />
       <LandingNav />
-      <SectionRail />
+      <SectionRail sections={sections} label="Landing sections" revealAfter={0.85} />
       <div className="relative z-10 bg-background">
         <RisingEdge />
         <PageStack>
           <Emblem />
-          <Problem />
-          <HowItWorks />
-          <Proof />
-          <BuiltOn />
-          <Limits />
+          <Flow />
+          <Features />
+          <ProofTeaser />
           <Closing />
         </PageStack>
         <LandingFooter />

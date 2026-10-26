@@ -1,5 +1,5 @@
 import { Keypair } from "@stellar/stellar-sdk";
-import { parseDeployments } from "@leash/sdk";
+import { parseDeployments } from "@tsuna/sdk";
 import { describe, expect, it } from "vitest";
 import { CrashError, CrashScenario, budgetRepayAmount, refusedBorrowAmount } from "./crash.js";
 

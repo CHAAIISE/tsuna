@@ -1,12 +1,12 @@
 import { StrKey } from "@stellar/stellar-sdk";
-import { actions, type Call } from "@leash/sdk";
+import { actions, type Call } from "@tsuna/sdk";
 import { z } from "zod";
 import { DECIMAL_AMOUNT, fromUnits, toUnits } from "./amounts.js";
 
 /**
  * Everything the model can ask the vault to do. The model picks one of these
  * names with amounts; the runtime turns it into `actions.*` calls from
- * `@leash/sdk` and never lets the model write raw contract arguments.
+ * `@tsuna/sdk` and never lets the model write raw contract arguments.
  */
 export const ACTION_NAMES = [
   "blend_supply",
@@ -158,7 +158,7 @@ const venue = (value: string | undefined, name: string): string => {
   return value;
 };
 
-/** Turns a validated action into the vault calls built by `@leash/sdk`. */
+/** Turns a validated action into the vault calls built by `@tsuna/sdk`. */
 export async function buildCalls(action: Action, venues: Venues, quote: SwapQuote): Promise<Call[]> {
   const { vault, assets } = venues;
   switch (action.action) {

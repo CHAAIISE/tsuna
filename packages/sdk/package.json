@@ -1,5 +1,5 @@
 {
-  "name": "@leash/sdk",
+  "name": "@tsuna/sdk",
   "version": "0.1.0",
   "private": true,
   "type": "module",

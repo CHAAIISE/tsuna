@@ -1,5 +1,5 @@
 import type { Keypair } from "@stellar/stellar-sdk";
-import type { Leash, LeashError, VaultClient } from "@leash/sdk";
+import type { Tsuna, TsunaError, VaultClient } from "@tsuna/sdk";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { buySignal, type BuySignalOptions } from "../tools/signals.js";
@@ -14,7 +14,7 @@ import type { Strategy } from "./strategies.js";
 
 /** Everything the tools of one run act on. */
 export interface ToolContext {
-  leash: Leash;
+  tsuna: Tsuna;
   vault: VaultClient;
   venues: Venues & RateVenues;
   strategy: Strategy;
@@ -41,11 +41,11 @@ export function plain(value: unknown): unknown {
 }
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
-const errorName = (error: LeashError) => `${error.name} (${error.contract} #${error.code})`;
+const errorName = (error: TsunaError) => `${error.name} (${error.contract} #${error.code})`;
 const summary = (value: unknown) => JSON.stringify(plain(value));
 
 export function createTools(ctx: ToolContext): ToolSet {
-  const { journal, strategy, vault, leash } = ctx;
+  const { journal, strategy, vault, tsuna } = ctx;
   const proposal = proposalSchema(strategy.menu);
   const roleOption = ctx.role === "default" ? {} : { role: ctx.role };
 
@@ -71,7 +71,7 @@ export function createTools(ctx: ToolContext): ToolSet {
       inputSchema: z.object({}),
       execute: async () => {
         try {
-          const rates = plain(await readRates(leash, ctx.venues));
+          const rates = plain(await readRates(tsuna, ctx.venues));
           journal.add({ kind: "tool", tool: "read_rates", output: summary(rates) });
           return rates;
         } catch (error) {
@@ -117,10 +117,10 @@ export function createTools(ctx: ToolContext): ToolSet {
       },
     }),
     read_prices: tool({
-      description: "Oracle prices of USDC and XLM in USDC, from the Leash oracle router the vault itself uses.",
+      description: "Oracle prices of USDC and XLM in USDC, from the Tsuna oracle router the vault itself uses.",
       inputSchema: z.object({}),
       execute: async () => {
-        const prices = await readPrices(leash, ctx.venues.assets);
+        const prices = await readPrices(tsuna, ctx.venues.assets);
         journal.add({ kind: "tool", tool: "read_prices", output: summary(prices) });
         return prices;
       },

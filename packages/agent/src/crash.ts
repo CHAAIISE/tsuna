@@ -1,7 +1,7 @@
 import { Address, Contract, nativeToScVal, rpc, scValToNative, xdr, type Keypair } from "@stellar/stellar-sdk";
 import {
-  Leash, TESTNET, actions, type Call, type Deployments, type ExecuteOptions, type LeashError, type Position, type TxResult,
-} from "@leash/sdk";
+  Tsuna, TESTNET, actions, type Call, type Deployments, type ExecuteOptions, type TsunaError, type Position, type TxResult,
+} from "@tsuna/sdk";
 import type { JournalEntry } from "./runtime/journal.js";
 import { runAgent } from "./runtime/run.js";
 
@@ -44,7 +44,7 @@ export interface CrashKeys {
 
 export interface CrashOptions {
   /** Client of the deployments; built from `deployments` when omitted. */
-  leash?: Leash;
+  tsuna?: Tsuna;
   deployments?: Deployments;
   keys: CrashKeys;
   /** Vault id in the deployments file. */
@@ -62,7 +62,7 @@ export interface CrashTx {
   label: string;
   hash: string;
   status: TxResult["status"];
-  error?: LeashError;
+  error?: TsunaError;
 }
 
 export interface CrashStepResult {
@@ -130,21 +130,21 @@ export function budgetRepayAmount(debt: bigint, health: bigint, floor: bigint): 
 const sum = (positions: Position[], match: (p: Position) => boolean, field: "amount" | "value") =>
   positions.filter(match).reduce((total, p) => total + p[field], 0n);
 
-/** Vault and oracle router of the crash scenario in `leash`'s deployments. */
-function crashTarget(leash: Leash, vaultId: string): { vault: string; router: string } {
-  const record = leash.deployments.vaults.find(v => v.id === vaultId);
+/** Vault and oracle router of the crash scenario in `tsuna`'s deployments. */
+function crashTarget(tsuna: Tsuna, vaultId: string): { vault: string; router: string } {
+  const record = tsuna.deployments.vaults.find(v => v.id === vaultId);
   if (!record) throw new Error(`Vault ${vaultId} is not in the deployments file`);
-  const router = leash.deployments.oracleRouter;
+  const router = tsuna.deployments.oracleRouter;
   if (!router) throw new Error("No oracle router in the deployments file");
   return { vault: record.address, router };
 }
 
 /** Price of `asset` forced on the demo oracle `router`, read from its ledger entry; `null` when none. */
-async function demoPrice(leash: Leash, router: string, asset: string): Promise<bigint | null> {
+async function demoPrice(tsuna: Tsuna, router: string, asset: string): Promise<bigint | null> {
   const key = xdr.ScVal.scvVec([nativeToScVal("Price", { type: "symbol" }), address(asset)]);
   let entry: rpc.Api.LedgerEntryResult;
   try {
-    entry = await leash.server.getContractData(router, key, rpc.Durability.Persistent);
+    entry = await tsuna.server.getContractData(router, key, rpc.Durability.Persistent);
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === 404) return null;
     throw error;
@@ -155,14 +155,14 @@ async function demoPrice(leash: Leash, router: string, asset: string): Promise<b
 }
 
 /** Live readings of the crash vault and the demo oracle; unpriced values come back `null`. */
-export async function readCrashLive(leash: Leash, vaultId = CRASH_VAULT_ID): Promise<CrashLive> {
-  const { vault: address, router } = crashTarget(leash, vaultId);
-  const vault = leash.vault(address);
+export async function readCrashLive(tsuna: Tsuna, vaultId = CRASH_VAULT_ID): Promise<CrashLive> {
+  const { vault: address, router } = crashTarget(tsuna, vaultId);
+  const vault = tsuna.vault(address);
   const priced = <T>(read: Promise<T>) => read.catch(() => null);
   const [demo, forcedPrice, xlmPrice, health, nav, pps, paused, policy, positions] = await Promise.all([
-    leash.read<boolean>(router, "is_demo"),
-    demoPrice(leash, router, TESTNET.xlm),
-    priced(leash.price(TESTNET.xlm)),
+    tsuna.read<boolean>(router, "is_demo"),
+    demoPrice(tsuna, router, TESTNET.xlm),
+    priced(tsuna.price(TESTNET.xlm)),
     priced(vault.healthFactor()),
     priced(vault.nav()),
     priced(vault.pricePerShare()),
@@ -188,7 +188,7 @@ export async function readCrashLive(leash: Leash, vaultId = CRASH_VAULT_ID): Pro
  * read back with `getTransaction`. `restore` puts the price, the pause and the Blend book back.
  */
 export class CrashScenario {
-  readonly leash: Leash;
+  readonly tsuna: Tsuna;
   readonly vaultId: string;
   readonly vaultAddress: string;
   private readonly router: string;
@@ -212,9 +212,9 @@ export class CrashScenario {
   private restored = false;
 
   constructor(opts: CrashOptions) {
-    this.leash = opts.leash ?? new Leash(opts.deployments ? { deployments: opts.deployments } : {});
+    this.tsuna = opts.tsuna ?? new Tsuna(opts.deployments ? { deployments: opts.deployments } : {});
     this.vaultId = opts.vault ?? CRASH_VAULT_ID;
-    const { vault, router } = crashTarget(this.leash, this.vaultId);
+    const { vault, router } = crashTarget(this.tsuna, this.vaultId);
     this.vaultAddress = vault;
     this.router = router;
     this.keys = opts.keys;
@@ -223,7 +223,7 @@ export class CrashScenario {
   }
 
   private get vault() {
-    return this.leash.vault(this.vaultAddress);
+    return this.tsuna.vault(this.vaultAddress);
   }
 
   /** First step not run yet; `null` once every step ran or a restore ran. */
@@ -263,7 +263,7 @@ export class CrashScenario {
 
   /** Reads `tx` back from the RPC and fails unless it landed with `expected` (and `error`). */
   private async confirm(label: string, tx: TxResult, expected: TxResult["status"], error?: string): Promise<CrashTx> {
-    const onChain = await this.leash.server.getTransaction(tx.hash);
+    const onChain = await this.tsuna.server.getTransaction(tx.hash);
     const found = tx.error?.name;
     if (onChain.status !== expected || tx.status !== expected) {
       throw new CrashError(`${label}: expected ${expected}, the chain says ${onChain.status} (${tx.hash})`);
@@ -274,12 +274,12 @@ export class CrashScenario {
 
   private routerCall(fn: string, args: xdr.ScVal[] = []): Promise<TxResult> {
     const { admin, feePayer } = this.keys;
-    return this.leash.chain.invoke(feePayer ?? admin, new Contract(this.router).call(fn, ...args), [admin], "oracle");
+    return this.tsuna.chain.invoke(feePayer ?? admin, new Contract(this.router).call(fn, ...args), [admin], "oracle");
   }
 
   private setPaused(paused: boolean): Promise<TxResult> {
     const { admin, feePayer } = this.keys;
-    return this.leash.chain.invoke(feePayer ?? admin, new Contract(this.vaultAddress).call("set_paused", xdr.ScVal.scvBool(paused)), [admin], "vault");
+    return this.tsuna.chain.invoke(feePayer ?? admin, new Contract(this.vaultAddress).call("set_paused", xdr.ScVal.scvBool(paused)), [admin], "vault");
   }
 
   private execute(member: Keypair, call: Call, opts: ExecuteOptions = {}): Promise<TxResult> {
@@ -302,7 +302,7 @@ export class CrashScenario {
    * here are refused: those reads come from read-only calls instead.
    */
   private async blendOracleOps(): Promise<xdr.Operation[]> {
-    const { oracle } = await this.leash.read<{ oracle: string }>(TESTNET.blendPool, "get_config");
+    const { oracle } = await this.tsuna.read<{ oracle: string }>(TESTNET.blendPool, "get_config");
     const blendOracle = new Contract(oracle);
     const pool = new Contract(TESTNET.blendPool);
     return [
@@ -337,11 +337,11 @@ export class CrashScenario {
       throw new CrashError("The vault is already paused (drawdown or protocol watch): restore it before simulating a crash.");
     }
     const txs: CrashTx[] = [];
-    if (!await this.leash.read<boolean>(this.router, "is_demo")) {
+    if (!await this.tsuna.read<boolean>(this.router, "is_demo")) {
       txs.push(await this.confirm("Demo mode switched on", await this.routerCall("set_demo", [xdr.ScVal.scvBool(true)]), "SUCCESS"));
       this.demoEnabledHere = true;
     }
-    if (await demoPrice(this.leash, this.router, TESTNET.xlm) !== null) {
+    if (await demoPrice(this.tsuna, this.router, TESTNET.xlm) !== null) {
       txs.push(await this.confirm("Leftover demo price cleared", await this.routerCall("clear_demo_price", [address(TESTNET.xlm)]), "SUCCESS"));
     }
     if (await vault.sharesOf(depositor.publicKey()) === 0n) {
@@ -374,13 +374,13 @@ export class CrashScenario {
   }
 
   private async crash(): Promise<CrashStepResult> {
-    const before = this.xlmBefore ?? await this.leash.price(TESTNET.xlm);
+    const before = this.xlmBefore ?? await this.tsuna.price(TESTNET.xlm);
     this.xlmBefore = before;
     const crashPrice = before * (BPS - CRASH_BPS) / BPS;
     this.crashed = true;
     const tx = await this.confirm(`Demo oracle sets XLM to ${formatAmount(crashPrice)} USDC (−${CRASH_BPS / 100n} %)`,
       await this.routerCall("set_demo_price", [address(TESTNET.xlm), i128(crashPrice)]), "SUCCESS");
-    const [after, health, { limits }] = await Promise.all([this.leash.price(TESTNET.xlm), this.vault.healthFactor(), this.vault.policy()]);
+    const [after, health, { limits }] = await Promise.all([this.tsuna.price(TESTNET.xlm), this.vault.healthFactor(), this.vault.policy()]);
     if (after !== crashPrice) throw new CrashError(`price_strict reads ${after}, expected the forced ${crashPrice}.`);
     return this.result("crash", [tx], [
       `XLM ${formatAmount(before)} → ${formatAmount(after)} USDC on the vault's oracle.`,
@@ -439,8 +439,8 @@ export class CrashScenario {
       const run = await runAgent({
         vault: this.vaultId,
         role: RISKOFF,
-        deployments: this.leash.deployments,
-        leash: this.leash,
+        deployments: this.tsuna.deployments,
+        tsuna: this.tsuna,
         keys: { member: riskoff, ...(feePayer ? { feePayer } : {}) },
         prompt: `Situation: XLM fell ${CRASH_BPS / 100n} % on the vault's oracle and the keeper paused the vault on its drawdown breaker. Reduce the vault's risk now.`,
         onEntry: entry => {
@@ -494,9 +494,9 @@ export class CrashScenario {
       }
     };
 
-    if (await demoPrice(this.leash, this.router, TESTNET.xlm) !== null) {
+    if (await demoPrice(this.tsuna, this.router, TESTNET.xlm) !== null) {
       await step("Demo price cleared", () => this.routerCall("clear_demo_price", [address(TESTNET.xlm)]));
-      const price = await this.leash.price(TESTNET.xlm).catch(() => null);
+      const price = await this.tsuna.price(TESTNET.xlm).catch(() => null);
       if (price !== null) notes.push(`XLM back to ${formatAmount(price)} USDC from the oracle's sources.`);
     }
     if (this.demoEnabledHere && await step("Demo mode switched off", () => this.routerCall("set_demo", [xdr.ScVal.scvBool(false)]))) {

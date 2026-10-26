@@ -1,11 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Keypair, StrKey } from "@stellar/stellar-sdk";
-import type { Deployments } from "@leash/sdk";
+import type { Deployments } from "@tsuna/sdk";
 import { STRATEGY_IDS, type StrategyId } from "./strategies.js";
 import { z } from "zod";
 
-/** Blend testnet assets held by Leash vaults. */
+/** Blend testnet assets held by Tsuna vaults. */
 export const TESTNET_ASSETS = {
   USDC: "CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU",
   XLM: "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",

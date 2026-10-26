@@ -78,7 +78,7 @@ async function ensureDefindexVault(): Promise<string> {
     strategies: vec([struct({ address: address(DEFINDEX_BLEND_USDC_STRATEGY), name: str("Blend USDC"), paused: bool(false) })]),
   })]);
   const metadata = xdr.ScVal.scvMap([
-    new xdr.ScMapEntry({ key: str("name"), val: str("Leash Blend USDC") }),
+    new xdr.ScMapEntry({ key: str("name"), val: str("Tsuna Blend USDC") }),
     new xdr.ScMapEntry({ key: str("symbol"), val: str("lbUSDC") }),
   ]);
   const created = await send(admin, call(DEFINDEX_FACTORY, "create_defindex_vault", [

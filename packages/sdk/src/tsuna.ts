@@ -1,14 +1,14 @@
 import { Address, Contract, Keypair, nativeToScVal, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { encodeArgs } from "./contracts/index.js";
 import { loadDeployments, required, type AdapterKind, type Deployments } from "./deployments.js";
-import { LeashRefusal, describeError, isLeashError, parseHostError, type ErrorSource, type LeashError } from "./errors.js";
+import { TsunaRefusal, describeError, isTsunaError, parseHostError, type ErrorSource, type TsunaError } from "./errors.js";
 import { fetchSnapshots, rank, score, type LeaderboardRow, type Snapshot } from "./leaderboard.js";
 import { TESTNET } from "./network.js";
 import { encodePolicy, type Policy } from "./policy.js";
 import { Chain, type TxResult } from "./tx.js";
 import { VaultClient, type Adapter } from "./vault.js";
 
-export interface LeashOptions {
+export interface TsunaOptions {
   rpcUrl?: string;
   networkPassphrase?: string;
   /** Defaults to {@link loadDeployments}. */
@@ -28,7 +28,7 @@ export interface VaultSummary {
   /** `null` with `navError` when the oracle cannot vouch for a held asset right now. */
   nav: bigint | null;
   pps: bigint | null;
-  navError?: LeashError;
+  navError?: TsunaError;
   totalShares: bigint;
   paused: boolean;
   /** Role names, `default` included while the session key is live. */
@@ -57,7 +57,7 @@ export interface CreatedVault {
 
 const short = (id: string) => `${id.slice(0, 4)}…${id.slice(-4)}`;
 
-export class Leash {
+export class Tsuna {
   readonly deployments: Deployments;
   readonly server: rpc.Server;
   readonly chain: Chain;
@@ -66,7 +66,7 @@ export class Leash {
   /** Vault addresses seen through this client, for naming their errors. */
   private readonly knownVaults = new Set<string>();
 
-  constructor(opts: LeashOptions = {}) {
+  constructor(opts: TsunaOptions = {}) {
     this.deployments = opts.deployments ?? loadDeployments();
     this.networkPassphrase = opts.networkPassphrase ?? TESTNET.networkPassphrase;
     this.server = new rpc.Server(opts.rpcUrl ?? TESTNET.rpcUrl);
@@ -120,7 +120,7 @@ export class Leash {
     const record = this.deployments.vaults.find(v => v.address === address);
     const [nav, owner, session, totalShares, paused, policy, adapters] = await Promise.all([
       Promise.all([vault.nav(), vault.pricePerShare()]).catch((error: unknown) => {
-        if (error instanceof LeashRefusal) return error.error;
+        if (error instanceof TsunaRefusal) return error.error;
         throw error;
       }),
       vault.owner(),
@@ -163,11 +163,11 @@ export class Leash {
   }
 
   /** Contract error carried by `e`: a refusal, a transaction result or a host error text. */
-  decodeError(e: unknown): LeashError | null {
-    if (e instanceof LeashRefusal) return e.error;
+  decodeError(e: unknown): TsunaError | null {
+    if (e instanceof TsunaRefusal) return e.error;
     if (typeof e === "object" && e !== null && "error" in e) {
       const { error } = e;
-      if (isLeashError(error)) return error;
+      if (isTsunaError(error)) return error;
       if (typeof error === "string") return this.decodeError(error);
     }
     const text = e instanceof Error ? e.message : typeof e === "string" ? e : null;

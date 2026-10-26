@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { signer } from "./lib/stellar.js";
-import { Leash, explorerTx, loadDeployments } from "../packages/sdk/dist/index.js";
+import { Tsuna, explorerTx, loadDeployments } from "../packages/sdk/dist/index.js";
 import { fetchSnapshots } from "../packages/sdk/src/leaderboard.js";
 import { runAgent } from "../packages/agent/src/runtime/run.js";
 import { runKeeper } from "../packages/agent/src/keeper.js";
@@ -12,7 +12,7 @@ const VAULT_IDS = ["prudent", "leverage", "liquidity"] as const;
 async function main(): Promise<void> {
   const deployments = loadDeployments();
   if (deployments.network !== "testnet") throw new Error("Warmup only supports Stellar testnet");
-  const leash = new Leash({ deployments });
+  const tsuna = new Tsuna({ deployments });
   const keeper = signer("LEASH_KEEPER_SECRET");
   const vaults = VAULT_IDS.map(id => {
     const record = deployments.vaults.find(vault => vault.id === id);
@@ -25,15 +25,15 @@ async function main(): Promise<void> {
     console.log(`CYCLE ${cycle}/${CYCLES}`);
     // The demo vaults share signing accounts, so transactions must remain sequential.
     for (const record of vaults) {
-      if (await leash.vault(record.address).paused()) throw new Error(`${record.id} is paused; resolve the cause before warmup`);
+      if (await tsuna.vault(record.address).paused()) throw new Error(`${record.id} is paused; resolve the cause before warmup`);
       const result = await runAgent({
         vault: record.id,
         deployments,
-        leash,
+        tsuna,
         onEntry: entry => console.log(JSON.stringify({ cycle, vault: record.id, ...entry })),
       });
       for (const tx of result.transactions) {
-        const onChain = await leash.server.getTransaction(tx.hash);
+        const onChain = await tsuna.server.getTransaction(tx.hash);
         console.log(`EXECUTE ${record.id} ${onChain.status} ${tx.hash} ${explorerTx(tx.hash)}`);
         if (onChain.status !== "SUCCESS" || tx.status !== "SUCCESS") {
           throw new Error(`${record.id}: execute failed (${tx.error ?? onChain.status}), ${tx.hash}`);
@@ -43,7 +43,7 @@ async function main(): Promise<void> {
     }
 
     const report = await runKeeper({
-      leash,
+      tsuna,
       keeper,
       vaults: vaults.map(vault => vault.address),
       onEntry: entry => console.log(JSON.stringify({ cycle, ...entry })),
@@ -55,7 +55,7 @@ async function main(): Promise<void> {
         || !snapshot?.tx || snapshot.tx.status !== "SUCCESS") {
         throw new Error(`${record.id}: keeper did not complete healthy checks`);
       }
-      const onChain = await leash.server.getTransaction(snapshot.tx.hash);
+      const onChain = await tsuna.server.getTransaction(snapshot.tx.hash);
       if (onChain.status !== "SUCCESS") throw new Error(`${record.id}: snapshot transaction ${snapshot.tx.hash} is ${onChain.status}`);
       snapshotTxs.get(record.address)!.add(snapshot.tx.hash);
       console.log(`SNAPSHOT ${record.id} ${snapshot.tx.hash} ${explorerTx(snapshot.tx.hash)}`);
@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   }
 
   // Count emitted events, not successful calls: the leaderboard consumes these same RPC events.
-  const { snapshots } = await fetchSnapshots(leash.server, vaults.map(vault => vault.address));
+  const { snapshots } = await fetchSnapshots(tsuna.server, vaults.map(vault => vault.address));
   for (const record of vaults) {
     const history = snapshots.filter(snapshot => snapshot.vault === record.address);
     const generated = history.filter(snapshot => snapshotTxs.get(record.address)!.has(snapshot.txHash));

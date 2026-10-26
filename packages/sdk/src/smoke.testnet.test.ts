@@ -2,14 +2,14 @@ import { env, stdout } from "node:process";
 import { describe, expect, test } from "vitest";
 import { actions } from "./actions.js";
 import { TESTNET } from "./network.js";
-import { fixtureKey, fixtureVault, testLeash } from "./testnet.fixture.js";
+import { fixtureKey, fixtureVault, testTsuna } from "./testnet.fixture.js";
 
 const UNIT = 10_000_000n;
 
 describe("testnet write smoke", () => {
-  const leash = testLeash();
+  const tsuna = testTsuna();
   const { address } = fixtureVault("sdk-smoke");
-  const vault = leash.vault(address);
+  const vault = tsuna.vault(address);
   const owner = fixtureKey("LEASH_SDKTEST_OWNER_SECRET");
   const agent = fixtureKey("LEASH_SDKTEST_AGENT_SECRET");
   const attacker = env.LEASH_ATTACKER_PUBLIC ?? owner.publicKey();
@@ -41,7 +41,7 @@ describe("testnet write smoke", () => {
     const refused = await vault.execute(agent, transfer, { submitEvenIfRefused: true, feePayer: owner });
     expect(refused.status).toBe("FAILED");
     expect(refused.error).toMatchObject({ contract: "vault", code: 1, name: "CallNotAllowed" });
-    const onChain = await leash.server.getTransaction(refused.hash);
+    const onChain = await tsuna.server.getTransaction(refused.hash);
     expect(onChain.status).toBe("FAILED");
 
     // Withdraw everything the owner holds now, performance-fee shares included.

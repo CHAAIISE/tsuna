@@ -1,5 +1,5 @@
 import { Address } from "@stellar/stellar-sdk";
-import type { Leash } from "@leash/sdk";
+import type { Tsuna } from "@tsuna/sdk";
 import { fromUnits } from "./amounts.js";
 import type { AssetSymbol } from "./menu.js";
 
@@ -62,14 +62,14 @@ interface ManagedFunds {
  * yield comes from the Blend USDC strategy, scaled by the invested share) and
  * the Aquarius pool state. Every figure is read on-chain now.
  */
-export async function readRates(leash: Leash, venues: RateVenues) {
+export async function readRates(tsuna: Tsuna, venues: RateVenues) {
   const out: Record<string, unknown> = {};
   let usdcSupplyApr: number | undefined;
   if (venues.blendPool) {
     const pool = venues.blendPool;
-    const config = await leash.read<{ bstop_rate: number }>(pool, "get_config", []);
+    const config = await tsuna.read<{ bstop_rate: number }>(pool, "get_config", []);
     const reserves = await Promise.all((Object.entries(venues.assets) as [AssetSymbol, string][]).map(async ([symbol, asset]) => {
-      const reserve = await leash.read<BlendReserve>(pool, "get_reserve", [addr(asset)]);
+      const reserve = await tsuna.read<BlendReserve>(pool, "get_reserve", [addr(asset)]);
       const rates = reserveRates(reserve, config.bstop_rate);
       if (symbol === "USDC") usdcSupplyApr = rates.supplyApr;
       return {
@@ -86,9 +86,9 @@ export async function readRates(leash: Leash, venues: RateVenues) {
   if (venues.defindexVault) {
     const vault = venues.defindexVault;
     const [funds, totalShares, fees] = await Promise.all([
-      leash.read<ManagedFunds[]>(vault, "fetch_total_managed_funds", []),
-      leash.read<bigint>(vault, "total_supply", []),
-      leash.read<[number, number]>(vault, "get_fees", []),
+      tsuna.read<ManagedFunds[]>(vault, "fetch_total_managed_funds", []),
+      tsuna.read<bigint>(vault, "total_supply", []),
+      tsuna.read<[number, number]>(vault, "get_fees", []),
     ]);
     const usdc = funds.find(fund => fund.asset === venues.assets.USDC);
     const investedShare = usdc && usdc.total_amount > 0n ? Number(usdc.invested_amount * 1_000_000n / usdc.total_amount) / 1_000_000 : 0;
@@ -109,10 +109,10 @@ export async function readRates(leash: Leash, venues: RateVenues) {
   if (venues.aquariusPool) {
     const pool = venues.aquariusPool;
     const [tokens, reserves, fee, shares] = await Promise.all([
-      leash.read<string[]>(pool, "get_tokens", []),
-      leash.read<bigint[]>(pool, "get_reserves", []),
-      leash.read<number>(pool, "get_fee_fraction", []),
-      leash.read<bigint>(pool, "get_total_shares", []),
+      tsuna.read<string[]>(pool, "get_tokens", []),
+      tsuna.read<bigint[]>(pool, "get_reserves", []),
+      tsuna.read<number>(pool, "get_fee_fraction", []),
+      tsuna.read<bigint>(pool, "get_total_shares", []),
     ]);
     const symbolOf = (token: string) => (Object.entries(venues.assets).find(([, asset]) => asset === token)?.[0]) ?? token;
     out.aquarius = {
@@ -127,13 +127,13 @@ export async function readRates(leash: Leash, venues: RateVenues) {
 }
 
 /** Oracle router prices (`price_strict`) of the vault assets, in USDC with 7 decimals. */
-export async function readPrices(leash: Leash, assets: Record<AssetSymbol, string>) {
+export async function readPrices(tsuna: Tsuna, assets: Record<AssetSymbol, string>) {
   const entries = await Promise.all((Object.entries(assets) as [AssetSymbol, string][]).map(async ([symbol, asset]) => {
     try {
-      return { asset: symbol, priceInUsdc: fromUnits(await leash.price(asset)) };
+      return { asset: symbol, priceInUsdc: fromUnits(await tsuna.price(asset)) };
     } catch (error) {
       return { asset: symbol, error: error instanceof Error ? error.message : String(error) };
     }
   }));
-  return { source: "Leash oracle router price_strict (Reflector + Chainlink, freshness and deviation checked)", prices: entries };
+  return { source: "Tsuna oracle router price_strict (Reflector + Chainlink, freshness and deviation checked)", prices: entries };
 }

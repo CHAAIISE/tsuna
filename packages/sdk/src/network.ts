@@ -1,6 +1,6 @@
 import { Networks } from "@stellar/stellar-sdk";
 
-/** Stellar testnet endpoints and the third-party contracts Leash vaults use there. */
+/** Stellar testnet endpoints and the third-party contracts Tsuna vaults use there. */
 export const TESTNET = {
   rpcUrl: "https://soroban-testnet.stellar.org",
   networkPassphrase: Networks.TESTNET,

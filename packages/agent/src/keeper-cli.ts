@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Leash } from "@leash/sdk";
+import { Tsuna } from "@tsuna/sdk";
 import { runKeeper } from "./keeper.js";
 
 const envFile = fileURLToPath(new URL("../../../.env.local", import.meta.url));
@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   if (!secret) throw new Error("LEASH_KEEPER_SECRET is not set");
   const vaults = process.argv.slice(2);
   const report = await runKeeper({
-    leash: new Leash(),
+    tsuna: new Tsuna(),
     keeper: Keypair.fromSecret(secret),
     ...(vaults.length > 0 ? { vaults } : {}),
     onEntry: entry => console.log(JSON.stringify(entry)),

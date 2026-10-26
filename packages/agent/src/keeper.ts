@@ -1,5 +1,5 @@
 import type { Keypair } from "@stellar/stellar-sdk";
-import { LeashRefusal, type Leash, type TxResult } from "@leash/sdk";
+import { TsunaRefusal, type Tsuna, type TxResult } from "@tsuna/sdk";
 import { currentHashes, planProtocolChecks, type ProtocolUpgrade, type WatchedVault } from "./watch-protocols.js";
 
 export interface KeeperTx {
@@ -25,7 +25,7 @@ export interface KeeperEntry {
 }
 
 export interface KeeperOptions {
-  leash: Leash;
+  tsuna: Tsuna;
   /** Pays for and signs the permissionless `check_protocols` and `check_drawdown` calls. */
   keeper: Keypair;
   /** Defaults to every vault the factory deployed. */
@@ -39,7 +39,7 @@ export interface KeeperReport {
 }
 
 function describe(error: unknown): string {
-  if (error instanceof LeashRefusal) return error.error.name;
+  if (error instanceof TsunaRefusal) return error.error.name;
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -56,21 +56,21 @@ const txOf = (result: TxResult): KeeperTx => ({
  * Both calls are permissionless: the keeper only triggers checks the vault runs on-chain.
  */
 export async function runKeeper(opts: KeeperOptions): Promise<KeeperReport> {
-  const { leash, keeper } = opts;
+  const { tsuna, keeper } = opts;
   const entries: KeeperEntry[] = [];
   const nameOf = (vault: string) =>
-    leash.deployments.vaults.find(v => v.address === vault)?.name ?? `${vault.slice(0, 4)}…${vault.slice(-4)}`;
+    tsuna.deployments.vaults.find(v => v.address === vault)?.name ?? `${vault.slice(0, 4)}…${vault.slice(-4)}`;
   const log = (entry: Omit<KeeperEntry, "at" | "name">) => {
     const full: KeeperEntry = { at: new Date().toISOString(), name: nameOf(entry.vault), ...entry };
     entries.push(full);
     opts.onEntry?.(full);
   };
 
-  const addresses = opts.vaults ?? await leash.vaultAddresses();
+  const addresses = opts.vaults ?? await tsuna.vaultAddresses();
   const watched: WatchedVault[] = [];
   const live: string[] = [];
   for (const address of addresses) {
-    const vault = leash.vault(address);
+    const vault = tsuna.vault(address);
     try {
       const policy = await vault.findPolicy();
       if (!policy) {
@@ -88,10 +88,10 @@ export async function runKeeper(opts: KeeperOptions): Promise<KeeperReport> {
     }
   }
 
-  const plan = planProtocolChecks(watched, await currentHashes(leash.server, watched));
+  const plan = planProtocolChecks(watched, await currentHashes(tsuna.server, watched));
   for (const address of plan.check) {
     try {
-      const result = await leash.vault(address).checkProtocols(keeper);
+      const result = await tsuna.vault(address).checkProtocols(keeper);
       const upgrades = plan.upgrades.filter(u => u.vault === address);
       for (const upgrade of upgrades) {
         log({ vault: address, kind: "protocol upgraded", protocol: upgrade.protocol, pinned: upgrade.pinned, current: upgrade.current, paused: true, tx: txOf(result) });
@@ -103,7 +103,7 @@ export async function runKeeper(opts: KeeperOptions): Promise<KeeperReport> {
   }
 
   for (const address of live) {
-    const vault = leash.vault(address);
+    const vault = tsuna.vault(address);
     try {
       const result = await vault.checkDrawdown(keeper);
       const [nav, paused] = await Promise.all([vault.nav().catch(() => null), vault.paused()]);

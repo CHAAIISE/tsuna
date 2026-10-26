@@ -199,15 +199,15 @@ importers:
       '@ai-sdk/openai':
         specifier: ^4.0.102
         version: 4.0.102(zod@4.6.7)
-      '@leash/sdk':
-        specifier: workspace:*
-        version: link:../sdk
       '@stellar/mpp':
         specifier: 0.7.1
         version: 0.7.1(@stellar/stellar-sdk@17.4.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0))(mppx@0.6.31(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(supports-color@7.2.0)(zod@4.6.7))(express@5.3.0(supports-color@7.2.0))(hono@4.13.13)(typescript@5.9.3)(viem@2.57.11(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.7)))
       '@stellar/stellar-sdk':
         specifier: ^17.4.0
         version: 17.4.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+      '@tsuna/sdk':
+        specifier: workspace:*
+        version: link:../sdk
       '@x402/core':
         specifier: 2.28.0
         version: 2.28.0
@@ -255,12 +255,6 @@ importers:
       '@creit.tech/stellar-wallets-kit':
         specifier: ^2.7.1
         version: 2.7.1(@types/react@19.3.0)(@x402/core@2.28.0)(@x402/extensions@2.28.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(debug@4.4.3(supports-color@7.2.0))(near-api-js@5.1.1)(react@19.3.0)(supports-color@7.2.0)(tslib@2.8.1)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.7)
-      '@leash/agent':
-        specifier: workspace:*
-        version: link:../packages/agent
-      '@leash/sdk':
-        specifier: workspace:*
-        version: link:../packages/sdk
       '@stellar/mpp':
         specifier: 0.7.1
         version: 0.7.1(@stellar/stellar-sdk@17.4.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0))(mppx@0.6.31(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(supports-color@7.2.0)(zod@4.6.7))(express@5.3.0(supports-color@7.2.0))(hono@4.13.13)(typescript@5.9.3)(viem@2.57.11(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(zod@4.6.7)))
@@ -270,6 +264,12 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.104.5
         version: 5.104.5(@types/react@19.3.0)(react@19.3.0)
+      '@tsuna/agent':
+        specifier: workspace:*
+        version: link:../packages/agent
+      '@tsuna/sdk':
+        specifier: workspace:*
+        version: link:../packages/sdk
       '@x402/core':
         specifier: 2.28.0
         version: 2.28.0

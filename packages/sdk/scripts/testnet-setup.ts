@@ -8,7 +8,7 @@
  * - `deployments/sdk.testnet.json` recording them with the infrastructure they use.
  *
  * Infrastructure addresses come from the deployments file (`LEASH_DEPLOYMENTS` or
- * `deployments/testnet.json`). Run: `pnpm --filter @leash/sdk testnet:setup`.
+ * `deployments/testnet.json`). Run: `pnpm --filter @tsuna/sdk testnet:setup`.
  */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -17,7 +17,7 @@ import {
   Asset, Contract, Keypair, Operation, TransactionBuilder, nativeToScVal, rpc, scValToNative, xdr,
 } from "@stellar/stellar-sdk";
 import {
-  BlendRequest, Leash, TESTNET, blendRequestVal, composePolicy, loadDeployments,
+  BlendRequest, Tsuna, TESTNET, blendRequestVal, composePolicy, loadDeployments,
   type Deployments, type Venues, type VaultRecord,
 } from "../src/index.js";
 
@@ -33,8 +33,8 @@ const log = (line: string) => stdout.write(`${line}\n`);
 
 if (existsSync(envFile)) loadEnvFile(envFile);
 const infra = loadDeployments();
-const leash = new Leash({ deployments: infra });
-const { server, chain } = leash;
+const tsuna = new Tsuna({ deployments: infra });
+const { server, chain } = tsuna;
 
 async function funded(name: string): Promise<Keypair> {
   const existing = env[name];
@@ -49,7 +49,7 @@ async function funded(name: string): Promise<Keypair> {
 
 /** USDC balance of `owner`, `null` while the account has no USDC trustline (the SAC then fails). */
 async function usdcBalance(owner: string): Promise<bigint | null> {
-  return leash.read<bigint>(TESTNET.usdc, "balance", [nativeToScVal(owner, { type: "address" })]).catch(() => null);
+  return tsuna.read<bigint>(TESTNET.usdc, "balance", [nativeToScVal(owner, { type: "address" })]).catch(() => null);
 }
 
 async function ensureUsdc(owner: Keypair): Promise<void> {
@@ -109,7 +109,7 @@ async function main(): Promise<void> {
       ...(venues.defindexVault ? [{ kind: "DeFindex" as const, protocol: venues.defindexVault }] : []),
       { kind: "Soroswap" as const, protocol: venues.soroswapRouter as string },
     ];
-    const created = await leash.createVault(owner, { agent: agent.publicKey(), policy, adapters });
+    const created = await tsuna.createVault(owner, { agent: agent.publicKey(), policy, adapters });
     log(`VAULT sdk-smoke ${created.address} deploy=${created.deployTx} register=${created.registerTx} adapters=${created.adapterTxs.join(",")}`);
     smoke = {
       id: "sdk-smoke", name: "SDK smoke", address: created.address, owner: owner.publicKey(), agent: agent.publicKey(),
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
 
   let probe = previous?.vaults.find(v => v.id === "sdk-probe");
   if (!probe || !await exists(probe.address)) {
-    const deployed = await leash.deployVault(owner, { agent: agent.publicKey(), asset: TESTNET.usdc });
+    const deployed = await tsuna.deployVault(owner, { agent: agent.publicKey(), asset: TESTNET.usdc });
     log(`VAULT sdk-probe ${deployed.address} deploy=${deployed.hash} (no policy, used to simulate register)`);
     probe = { id: "sdk-probe", name: "SDK probe (no policy)", address: deployed.address, owner: owner.publicKey(), deployTx: deployed.hash };
   }

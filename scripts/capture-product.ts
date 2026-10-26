@@ -13,7 +13,7 @@ const require = createRequire(resolve(web, "package.json"));
 const args = process.argv.slice(2);
 const urlIndex = args.indexOf("--url");
 const suppliedUrl = urlIndex === -1 ? undefined : args[urlIndex + 1];
-if (urlIndex !== -1 && !suppliedUrl) throw new Error("--url requires the URL of a running Leash app");
+if (urlIndex !== -1 && !suppliedUrl) throw new Error("--url requires the URL of a running Tsuna app");
 
 type Preview = { server: ChildProcess; url: string };
 

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { spec, type ContractName } from "./contracts/index.js";
 import {
-  FACTORY_ERRORS, LeashRefusal, ORACLE_ERRORS, REGISTRY_ERRORS, SIGNAL_BUDGET_ERRORS, VAULT_ERRORS,
-  describeError, isLeashError, parseHostError, parseHostFailure,
+  FACTORY_ERRORS, TsunaRefusal, ORACLE_ERRORS, REGISTRY_ERRORS, SIGNAL_BUDGET_ERRORS, VAULT_ERRORS,
+  describeError, isTsunaError, parseHostError, parseHostFailure,
 } from "./errors.js";
 
 const tables: [ContractName, Record<number, [string, string]>][] = [
@@ -70,9 +70,9 @@ describe("host error parsing", () => {
   });
 
   test("refusals carry a typed error", () => {
-    const refusal = new LeashRefusal(describeError("vault", 1));
+    const refusal = new TsunaRefusal(describeError("vault", 1));
     expect(refusal.message).toBe("CallNotAllowed (vault #1): The vault policy does not allowlist this contract function.");
-    expect(isLeashError(refusal.error)).toBe(true);
-    expect(isLeashError({ code: 1 })).toBe(false);
+    expect(isTsunaError(refusal.error)).toBe(true);
+    expect(isTsunaError({ code: 1 })).toBe(false);
   });
 });

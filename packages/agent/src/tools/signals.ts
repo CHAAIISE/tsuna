@@ -17,7 +17,7 @@ const NETWORK = "stellar:testnet";
 const LEDGER_SECONDS = 5;
 
 export interface BuySignalOptions {
-  /** Origin of the Leash web app serving `/api/signals/*`. */
+  /** Origin of the Tsuna web app serving `/api/signals/*`. */
   baseUrl: string;
   budget: SignalBudget;
   /** SEP-41 contract the budget pays with (Blend testnet USDC). */
@@ -156,7 +156,7 @@ async function payWithMpp(url: string, context: Context) {
 }
 
 /**
- * Buys one Leash signal, paying from the signal budget with the agent session
+ * Buys one Tsuna signal, paying from the signal budget with the agent session
  * key: `rates` is sold over x402 and `risk` over an MPP charge, both settled in
  * USDC on Stellar testnet. When the budget's spending limit policy refuses the
  * payment, the result is a typed refusal instead of an exception.

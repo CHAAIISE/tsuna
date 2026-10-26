@@ -3,12 +3,12 @@
  * yield agent is refused `HealthFactorTooLow`, the keeper's `check_drawdown` pauses the vault,
  * the risk-off role is refused `RiskIncreased` when it tries to borrow, the risk-off agent repays
  * Blend debt while paused, and Alice withdraws. Every step is a real transaction read back with
- * `getTransaction` (see `CrashScenario` in `@leash/agent`). The price, the pause and the Blend
+ * `getTransaction` (see `CrashScenario` in `@tsuna/agent`). The price, the pause and the Blend
  * book are restored at the end so the scenario can run again.
  */
 import { LEVERAGE_MAX_DRAWDOWN_BPS, UNIT, fail, signer } from "./lib/stellar.js";
 import { ensureBlendUsdc } from "./lib/pay.js";
-import { Leash, explorerTx, loadDeployments } from "../packages/sdk/src/index.js";
+import { Tsuna, explorerTx, loadDeployments } from "../packages/sdk/src/index.js";
 import {
   CRASH_STEPS, CRASH_VAULT_ID, CrashScenario, type CrashStepResult,
 } from "../packages/agent/src/crash.js";
@@ -17,10 +17,10 @@ import type { JournalEntry } from "../packages/agent/src/runtime/journal.js";
 const ALICE_DEPOSIT = UNIT;
 
 const deployments = loadDeployments();
-const leash = new Leash({ deployments });
+const tsuna = new Tsuna({ deployments });
 const found = deployments.vaults.find(v => v.id === CRASH_VAULT_ID);
 if (!found) throw new Error(`Vault ${CRASH_VAULT_ID} is not in the deployments file`);
-const vault = leash.vault(found.address);
+const vault = tsuna.vault(found.address);
 
 const admin = signer("LEASH_ADMIN_SECRET");
 const alice = signer("E2E_USER_SECRET");
@@ -64,7 +64,7 @@ async function setUp(): Promise<void> {
   const policy = await vault.policy();
   const limit = policy.limits.max_drawdown_bps;
   if (limit > LEVERAGE_MAX_DRAWDOWN_BPS) {
-    const tightened = await leash.proposePolicy(admin, vault.address, {
+    const tightened = await tsuna.proposePolicy(admin, vault.address, {
       ...policy, limits: { ...policy.limits, max_drawdown_bps: LEVERAGE_MAX_DRAWDOWN_BPS },
     });
     console.log(`DRAWDOWN_LIMIT ${limit} -> ${LEVERAGE_MAX_DRAWDOWN_BPS} bps ${tightened.status} ${tightened.hash}`);

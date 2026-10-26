@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { openai } from "@ai-sdk/openai";
 import type { Keypair } from "@stellar/stellar-sdk";
-import { Leash, loadDeployments, type Deployments } from "@leash/sdk";
+import { Tsuna, loadDeployments, type Deployments } from "@tsuna/sdk";
 import { generateText, isStepCount, type LanguageModel } from "ai";
 import type { BuySignalOptions } from "../tools/signals.js";
 import { Journal, type JournalEntry, type JournalTx } from "./journal.js";
@@ -39,7 +39,7 @@ export interface RunAgentOptions {
   /** Paid signals; `buy_signal` is offered only when set. */
   signals?: BuySignalOptions;
   deployments?: Deployments;
-  leash?: Leash;
+  tsuna?: Tsuna;
   model?: LanguageModel;
   /** Extra instruction appended to the run prompt. */
   prompt?: string;
@@ -67,7 +67,7 @@ const modelName = () => process.env.OPENAI_MODEL || DEFAULT_MODEL;
  */
 export async function runAgent(options: RunAgentOptions): Promise<RunAgentResult> {
   const deployments = options.deployments ?? loadDeployments();
-  const leash = options.leash ?? new Leash({ deployments });
+  const tsuna = options.tsuna ?? new Tsuna({ deployments });
   const target = resolveVault(options.vault, knownVaults(deployments));
   const strategyId = options.strategy ?? (options.role === "riskoff" ? "riskoff" : target.strategyId);
   if (!strategyId) throw new Error(`No strategy for ${target.name}: pass one of ${Object.keys(STRATEGIES).join(", ")}`);
@@ -83,20 +83,20 @@ export async function runAgent(options: RunAgentOptions): Promise<RunAgentResult
     assets,
     ...(blendPool ? { blendPool } : {}),
     ...(defindexVault ? { defindexVault } : {}),
-    ...(aquariusPool ? { aquariusPool, aquariusTokens: await leash.read<string[]>(aquariusPool, "get_tokens", []) } : {}),
+    ...(aquariusPool ? { aquariusPool, aquariusTokens: await tsuna.read<string[]>(aquariusPool, "get_tokens", []) } : {}),
   };
 
   const journal = new Journal(options.onEntry);
   const { injection, news: newsSource } = options;
   const news = injection ? async () => injection : newsSource ? () => loadNewsPage(newsSource) : undefined;
   const tools = createTools({
-    leash, vault: leash.vault(target.address), venues, strategy, role, journal,
+    tsuna, vault: tsuna.vault(target.address), venues, strategy, role, journal,
     member: keys.member,
     ...(keys.feePayer ? { feePayer: keys.feePayer } : {}),
     ...(news ? { news } : {}),
     ...(options.signals ? { signals: options.signals } : {}),
     quote: async (sell, buy, amountIn) => {
-      const [sellPrice, buyPrice] = await Promise.all([leash.price(assets[sell]), leash.price(assets[buy])]);
+      const [sellPrice, buyPrice] = await Promise.all([tsuna.price(assets[sell]), tsuna.price(assets[buy])]);
       const scaled = amountIn * sellPrice * (10_000n - SWAP_MAX_LOSS_BPS);
       const divisor = buyPrice * 10_000n;
       return (scaled + divisor - 1n) / divisor;

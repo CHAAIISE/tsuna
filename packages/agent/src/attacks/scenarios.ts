@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Address, Asset, Keypair, Operation, nativeToScVal, xdr } from "@stellar/stellar-sdk";
 import {
-  BlendRequest, Leash, TESTNET, actions, blendRequestVal, explorerTx, loadDeployments,
+  BlendRequest, Tsuna, TESTNET, actions, blendRequestVal, explorerTx, loadDeployments,
   type Call, type Deployments, type ExecuteOptions, type TxResult, type VaultClient,
-} from "@leash/sdk";
+} from "@tsuna/sdk";
 import type { LanguageModel } from "ai";
 import type { JournalEntry } from "../runtime/journal.js";
 import type { NewsPage } from "../runtime/news.js";
@@ -86,7 +86,7 @@ export interface AttackResult {
 
 export interface AttackOptions {
   deployments?: Deployments;
-  leash?: Leash;
+  tsuna?: Tsuna;
   /** Session key of the demo agents; `LEASH_AGENT_SECRET` when omitted. */
   sessionKey?: Keypair;
   /** Attacker account; `LEASH_ATTACKER_SECRET` when omitted. */
@@ -112,7 +112,7 @@ const keyFromEnv = (name: string) => {
 };
 
 interface Scene {
-  leash: Leash;
+  tsuna: Tsuna;
   vault: VaultClient;
   vaultName: string;
   sessionKey: Keypair;
@@ -140,7 +140,7 @@ async function submitRefusal(scene: Scene, member: Keypair, call: Call, opts: Ex
   return { hash: tx.hash, status: tx.status, ...(tx.error ? { error: tx.error.name } : {}) };
 }
 
-const tokenBalance = (leash: Leash, token: string, holder: string) => leash.read<bigint>(token, "balance", [address(holder)]);
+const tokenBalance = (tsuna: Tsuna, token: string, holder: string) => tsuna.read<bigint>(token, "balance", [address(holder)]);
 
 function defindexOf(deployments: Deployments, vaultId: string): string {
   const vault = deployments.vaults.find(v => v.id === vaultId);
@@ -154,7 +154,7 @@ async function injection(scene: Scene): Promise<Outcome> {
   const run = await runAgent({
     vault: ATTACKS.injection.vault,
     injection: page,
-    leash: scene.leash,
+    tsuna: scene.tsuna,
     keys: { member: scene.sessionKey },
     ...(scene.options.deployments ? { deployments: scene.options.deployments } : {}),
     ...(scene.options.model ? { model: scene.options.model } : {}),
@@ -173,7 +173,7 @@ async function injection(scene: Scene): Promise<Outcome> {
   }
   // The model did not send it: the attacker's instruction is submitted as written instead.
   const simulatedOnly = transfers.some(entry => entry.tool === "simulate");
-  const idle = await tokenBalance(scene.leash, TESTNET.usdc, scene.vault.address);
+  const idle = await tokenBalance(scene.tsuna, TESTNET.usdc, scene.vault.address);
   const amount = idle > 0n ? idle : 10_000_000n;
   const tx = await submitRefusal(scene, scene.sessionKey, actions.usdcTransfer(scene.vault.address, scene.attacker.publicKey(), amount)[0] as Call);
   return {
@@ -206,7 +206,7 @@ async function blendRedirect(scene: Scene): Promise<Outcome> {
 async function defindexShares(scene: Scene, deployments: Deployments): Promise<Outcome> {
   const vault = scene.vault.address;
   const defindex = defindexOf(deployments, ATTACKS["defindex-shares"].vault);
-  const shares = await tokenBalance(scene.leash, defindex, vault);
+  const shares = await tokenBalance(scene.tsuna, defindex, vault);
   if (shares <= 1n) throw new Error(`${scene.vaultName} holds no DeFindex shares to steal`);
   const transfer = (amount: bigint): Call => ({
     target: defindex, fn: "transfer", args: [address(vault), address(scene.attacker.publicKey()), i128(amount)],
@@ -222,18 +222,18 @@ async function defindexShares(scene: Scene, deployments: Deployments): Promise<O
 }
 
 /** Stellar Asset Contract of the attacker's own token, deployed on first use. */
-async function lureToken(leash: Leash, attacker: Keypair): Promise<string> {
+async function lureToken(tsuna: Tsuna, attacker: Keypair): Promise<string> {
   const asset = new Asset(LURE_CODE, attacker.publicKey());
-  const id = asset.contractId(leash.networkPassphrase);
-  const exists = await leash.read<number>(id, "decimals").then(() => true, () => false);
-  if (!exists) await leash.chain.invoke(attacker, Operation.createStellarAssetContract({ asset }), [attacker]);
+  const id = asset.contractId(tsuna.networkPassphrase);
+  const exists = await tsuna.read<number>(id, "decimals").then(() => true, () => false);
+  if (!exists) await tsuna.chain.invoke(attacker, Operation.createStellarAssetContract({ asset }), [attacker]);
   return id;
 }
 
 async function fakeTokenRoute(scene: Scene): Promise<Outcome> {
-  const lure = await lureToken(scene.leash, scene.attacker);
+  const lure = await lureToken(scene.tsuna, scene.attacker);
   const amountIn = 10_000_000n;
-  const [usdcPrice, xlmPrice] = await Promise.all([scene.leash.price(TESTNET.usdc), scene.leash.price(TESTNET.xlm)]);
+  const [usdcPrice, xlmPrice] = await Promise.all([scene.tsuna.price(TESTNET.usdc), scene.tsuna.price(TESTNET.xlm)]);
   // Same floor as an honest swap (oracle quote less the call's tolerance): only the path differs.
   const minOut = amountIn * usdcPrice * (10_000n - SWAP_LOSS_BPS) / (xlmPrice * 10_000n);
   const call = actions.soroswapSwap(scene.vault.address, [TESTNET.usdc, lure, TESTNET.xlm], amountIn, minOut)[0] as Call;
@@ -247,7 +247,7 @@ async function fakeTokenRoute(scene: Scene): Promise<Outcome> {
 async function stolenKey(scene: Scene, deployments: Deployments): Promise<Outcome> {
   const vault = scene.vault.address;
   const defindex = defindexOf(deployments, ATTACKS["stolen-key"].vault);
-  const shares = await tokenBalance(scene.leash, defindex, vault);
+  const shares = await tokenBalance(scene.tsuna, defindex, vault);
   const call: Call = {
     target: defindex, fn: "withdraw", args: [i128(shares > 0n ? shares : 1n), xdr.ScVal.scvVec([i128(0n)]), address(scene.attacker.publicKey())],
   };
@@ -266,12 +266,12 @@ async function stolenKey(scene: Scene, deployments: Deployments): Promise<Outcom
 export async function runAttack(id: AttackId, options: AttackOptions = {}): Promise<AttackResult> {
   const attack = ATTACKS[id];
   const deployments = options.deployments ?? loadDeployments();
-  const leash = options.leash ?? new Leash({ deployments });
+  const tsuna = options.tsuna ?? new Tsuna({ deployments });
   const record = deployments.vaults.find(vault => vault.id === attack.vault);
   if (!record) throw new Error(`Vault ${attack.vault} is not in the deployments file`);
   const scene: Scene = {
-    leash,
-    vault: leash.vault(record.address),
+    tsuna,
+    vault: tsuna.vault(record.address),
     vaultName: record.name,
     sessionKey: options.sessionKey ?? keyFromEnv("LEASH_AGENT_SECRET"),
     attacker: options.attacker ?? keyFromEnv("LEASH_ATTACKER_SECRET"),
@@ -286,7 +286,7 @@ export async function runAttack(id: AttackId, options: AttackOptions = {}): Prom
       case "stolen-key": return stolenKey(scene, deployments);
     }
   })();
-  const onChain = await leash.server.getTransaction(outcome.tx.hash);
+  const onChain = await tsuna.server.getTransaction(outcome.tx.hash);
   const { error } = outcome.tx;
   return {
     id,

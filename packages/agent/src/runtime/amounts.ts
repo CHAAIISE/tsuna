@@ -1,4 +1,4 @@
-/** Every vault asset, Blend reserve, DeFindex share and Aquarius share used by Leash has 7 decimals. */
+/** Every vault asset, Blend reserve, DeFindex share and Aquarius share used by Tsuna has 7 decimals. */
 export const DECIMALS = 7;
 const SCALE = 10n ** BigInt(DECIMALS);
 

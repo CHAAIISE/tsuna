@@ -2,7 +2,7 @@ import { Address, Contract, Keypair, nativeToScVal, scValToNative, xdr } from "@
 import type { Call } from "./actions.js";
 import { decodeResult } from "./contracts/index.js";
 import type { AdapterKind } from "./deployments.js";
-import { LeashRefusal, type LeashError } from "./errors.js";
+import { TsunaRefusal, type TsunaError } from "./errors.js";
 import { decodePending, decodePolicy, type PendingPolicy, type Policy, type Role } from "./policy.js";
 import type { Chain, TxResult } from "./tx.js";
 
@@ -31,7 +31,7 @@ export interface Adapter {
 
 export type SimResult =
   | { ok: true; navBefore?: bigint; returnValue?: xdr.ScVal }
-  | { ok: false; error: LeashError };
+  | { ok: false; error: TsunaError };
 
 export interface ExecuteOptions {
   /** Role to act as; `undefined` or `default` calls `execute`, any other `execute_as`. */
@@ -175,7 +175,7 @@ export class VaultClient {
             .then(value => scValToNative(value) as bigint)
             .catch((error: unknown) => {
               // Strict NAV counts an asset without a feed as worth 0.
-              if (error instanceof LeashRefusal && error.error.contract === "oracle" && error.error.name === "NoPriceFeed") return 0n;
+              if (error instanceof TsunaRefusal && error.error.contract === "oracle" && error.error.name === "NoPriceFeed") return 0n;
               throw error;
             }),
           this.raw<number>(token, "decimals"),
@@ -282,13 +282,13 @@ export class VaultClient {
       ]);
       return { ok: true, navBefore, ...(simulation.result ? { returnValue: simulation.result.retval } : {}) };
     } catch (error) {
-      if (error instanceof LeashRefusal) return { ok: false, error: error.error };
+      if (error instanceof TsunaRefusal) return { ok: false, error: error.error };
       throw error;
     }
   }
 
   /**
-   * Signs and submits `call`. A refusal at simulation throws {@link LeashRefusal}, unless
+   * Signs and submits `call`. A refusal at simulation throws {@link TsunaRefusal}, unless
    * `submitEvenIfRefused` is set: the transaction is then sent with a budget reconstructed from
    * valid simulations and returns `{ status: "FAILED", hash, error }`.
    */
@@ -299,7 +299,7 @@ export class VaultClient {
     try {
       return await this.chain.invoke(source, operation, [member], "vault");
     } catch (error) {
-      if (!(error instanceof LeashRefusal) || !opts.submitEvenIfRefused) throw error;
+      if (!(error instanceof TsunaRefusal) || !opts.submitEvenIfRefused) throw error;
     }
     const registry = await this.registry();
     const roleArgs = role === "default" ? [] : [symbol(role)];

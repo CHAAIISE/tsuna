@@ -1,6 +1,6 @@
 /**
  * Testnet fixtures shared by the `*.testnet.test.ts` suites: the burner keys and vaults created
- * by `pnpm --filter @leash/sdk testnet:setup`, recorded in `deployments/sdk.testnet.json`.
+ * by `pnpm --filter @tsuna/sdk testnet:setup`, recorded in `deployments/sdk.testnet.json`.
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -8,13 +8,13 @@ import { env, loadEnvFile } from "node:process";
 import { fileURLToPath } from "node:url";
 import { Keypair } from "@stellar/stellar-sdk";
 import { loadDeployments, type VaultRecord } from "./deployments.js";
-import { Leash } from "./leash.js";
+import { Tsuna } from "./tsuna.js";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const envFile = join(root, ".env.local");
 if (existsSync(envFile)) loadEnvFile(envFile);
 
-const SETUP = "run `pnpm --filter @leash/sdk testnet:setup` first";
+const SETUP = "run `pnpm --filter @tsuna/sdk testnet:setup` first";
 
 export const fixtures = loadDeployments(join(root, "deployments", "sdk.testnet.json"));
 
@@ -30,4 +30,4 @@ export function fixtureKey(name: "LEASH_SDKTEST_OWNER_SECRET" | "LEASH_SDKTEST_A
   return Keypair.fromSecret(secret);
 }
 
-export const testLeash = () => new Leash({ deployments: fixtures });
+export const testTsuna = () => new Tsuna({ deployments: fixtures });

@@ -1,14 +1,14 @@
 import { Address, xdr } from "@stellar/stellar-sdk";
 import { describe, expect, test } from "vitest";
 import { actions } from "./actions.js";
-import { LeashRefusal } from "./errors.js";
+import { TsunaRefusal } from "./errors.js";
 import { TESTNET } from "./network.js";
 import { DEFAULT_LIMITS, decodePolicy, encodePolicy, type Policy, type PolicyCall } from "./policy.js";
 import {
   MAX_LOSS_BPS, RISK_OFF_QUOTA, RISK_OFF_ROLE, composePolicy, presetOf, presets,
   type CallPreset, type CallPresetId, type Venues,
 } from "./presets.js";
-import { fixtureKey, fixtureVault, fixtures, testLeash } from "./testnet.fixture.js";
+import { fixtureKey, fixtureVault, fixtures, testTsuna } from "./testnet.fixture.js";
 
 const protocols = fixtures.protocols ?? {};
 const venues: Venues = {
@@ -93,11 +93,11 @@ describe("presets", () => {
 });
 
 describe("presets against the deployed registry", () => {
-  const leash = testLeash();
+  const tsuna = testTsuna();
   const registry = fixtures.policyRegistry as string;
   const probe = fixtureVault("sdk-probe").address;
   const register = (policy: Policy) =>
-    leash.read<null>(registry, "register", [new Address(probe).toScVal(), encodePolicy(policy)]);
+    tsuna.read<null>(registry, "register", [new Address(probe).toScVal(), encodePolicy(policy)]);
 
   test.each(callPresets)("%s alone is a policy the registry accepts", async id => {
     await expect(register(composePolicy({ assets: ASSETS, venues, actions: [id] }))).resolves.toBeNull();
@@ -113,13 +113,13 @@ describe("presets against the deployed registry", () => {
   test("the registry still refuses an invalid policy (base asset not first)", async () => {
     const refused = await register(composePolicy({ assets: [TESTNET.xlm, TESTNET.usdc], venues, actions: ["blend.supply"] }))
       .then(() => null, (error: unknown) => error);
-    expect(refused).toBeInstanceOf(LeashRefusal);
-    if (!(refused instanceof LeashRefusal)) throw new Error("Expected a registry refusal");
+    expect(refused).toBeInstanceOf(TsunaRefusal);
+    if (!(refused instanceof TsunaRefusal)) throw new Error("Expected a registry refusal");
     expect(refused.error).toMatchObject({ contract: "registry", name: "InvalidPolicy" });
   });
 
   test("the preset policy registered on the smoke vault reads back unchanged", async () => {
-    const vault = leash.vault(fixtureVault("sdk-smoke").address);
+    const vault = tsuna.vault(fixtureVault("sdk-smoke").address);
     const expected = composePolicy({
       assets: ASSETS, venues,
       actions: ["blend.supply", "blend.withdraw", "defindex.deposit", "defindex.withdraw", "soroswap.swap"],
@@ -130,7 +130,7 @@ describe("presets against the deployed registry", () => {
 
   test("the Soroswap preset refuses a route through an asset outside the vault's list", async () => {
     const { address } = fixtureVault("sdk-smoke");
-    const vault = leash.vault(address);
+    const vault = tsuna.vault(address);
     const agent = fixtureKey("LEASH_SDKTEST_AGENT_SECRET").publicKey();
     const [swap] = actions.soroswapSwap(address, [TESTNET.usdc, TESTNET.wbtc], 1_000n, 0n, venues.soroswapRouter);
     if (!swap) throw new Error("soroswapSwap built no call");

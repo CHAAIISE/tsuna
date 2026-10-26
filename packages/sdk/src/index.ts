@@ -5,11 +5,11 @@ export {
   type AdapterKind, type Deployments, type VaultRecord,
 } from "./deployments.js";
 export {
-  FACTORY_ERRORS, LeashRefusal, ORACLE_ERRORS, REGISTRY_ERRORS, SIGNAL_BUDGET_ERRORS, VAULT_ERRORS,
-  describeError, isLeashError, parseHostError, type ErrorSource, type LeashError,
+  FACTORY_ERRORS, TsunaRefusal, ORACLE_ERRORS, REGISTRY_ERRORS, SIGNAL_BUDGET_ERRORS, VAULT_ERRORS,
+  describeError, isTsunaError, parseHostError, type ErrorSource, type TsunaError,
 } from "./errors.js";
 export { rank, score, type LeaderboardRow, type Snapshot } from "./leaderboard.js";
-export { Leash, type CreateVaultOptions, type CreatedVault, type LeashOptions, type VaultSummary } from "./leash.js";
+export { Tsuna, type CreateVaultOptions, type CreatedVault, type TsunaOptions, type VaultSummary } from "./tsuna.js";
 export { TESTNET, explorerTx } from "./network.js";
 export {
   DEFAULT_LIMITS, decodePolicy, encodePolicy, encodeRole, ruleFor,

@@ -75,7 +75,7 @@ export const STRATEGIES: Record<StrategyId, Strategy> = {
  */
 export function systemPrompt(strategy: Strategy, vault: { name: string; address: string }): string {
   return [
-    `You manage the Leash vault "${vault.name}" (${vault.address}) on Stellar testnet with the ${strategy.label} strategy.`,
+    `You manage the Tsuna vault "${vault.name}" (${vault.address}) on Stellar testnet with the ${strategy.label} strategy.`,
     `Mandate: ${strategy.mandate}`,
     "Tools: read_rates, read_positions and read_prices return live on-chain data; buy_signal (when available) buys a paid data signal from the agent's capped budget; fetch_market_news (when available) returns third-party web content.",
     "Action menu (use exactly these names with decimal token amounts; you never write contract arguments):",

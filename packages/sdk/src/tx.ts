@@ -4,14 +4,14 @@ import {
 } from "@stellar/stellar-sdk";
 import type { Transaction } from "@stellar/stellar-sdk";
 import {
-  LeashRefusal, describeError, errorFromEvents, hostErrorFromEvents, parseHostError, parseHostFailure,
-  type ErrorSource, type LeashError, type RawContractError,
+  TsunaRefusal, describeError, errorFromEvents, hostErrorFromEvents, parseHostError, parseHostFailure,
+  type ErrorSource, type TsunaError, type RawContractError,
 } from "./errors.js";
 
 export interface TxResult {
   hash: string;
   status: "SUCCESS" | "FAILED";
-  error?: LeashError;
+  error?: TsunaError;
   returnValue?: xdr.ScVal;
   ledger?: number;
 }
@@ -54,7 +54,7 @@ export class Chain {
     readonly classify: (contractId: string) => ErrorSource,
   ) {}
 
-  toLeashError(raw: RawContractError, fallback: ErrorSource = "other"): LeashError {
+  toTsunaError(raw: RawContractError, fallback: ErrorSource = "other"): TsunaError {
     return describeError(raw.contractId ? this.classify(raw.contractId) : fallback, raw.code);
   }
 
@@ -64,14 +64,14 @@ export class Chain {
     }).addOperation(operation).setTimeout(TIMEOUT_SECS).build();
   }
 
-  /** Simulates `operation` from `source`; a contract refusal throws {@link LeashRefusal}. */
+  /** Simulates `operation` from `source`; a contract refusal throws {@link TsunaRefusal}. */
   async simulate(source: string, operation: xdr.Operation, fallback: ErrorSource = "other"): Promise<Simulated> {
     const tx = await this.build(source, operation);
     const simulation = await this.server.simulateTransaction(tx);
     if (rpc.Api.isSimulationError(simulation)) {
       const raw = parseHostError(simulation.error);
-      const error = raw ? this.toLeashError(raw, fallback) : parseHostFailure(simulation.error);
-      if (error) throw new LeashRefusal(error, simulation.error);
+      const error = raw ? this.toTsunaError(raw, fallback) : parseHostFailure(simulation.error);
+      if (error) throw new TsunaRefusal(error, simulation.error);
       throw new Error(`Simulation failed: ${simulation.error}`);
     }
     if (rpc.Api.isSimulationRestore(simulation)) throw new Error("Ledger entries of this call need restoration");
@@ -145,7 +145,7 @@ export class Chain {
     }
     if (sent.status !== "PENDING" && sent.status !== "DUPLICATE") {
       const raw = errorFromEvents(sent.diagnosticEvents ?? []);
-      if (raw) throw new LeashRefusal(this.toLeashError(raw, fallback), `Submission ${sent.status}`);
+      if (raw) throw new TsunaRefusal(this.toTsunaError(raw, fallback), `Submission ${sent.status}`);
       throw new Error(`Submission ${sent.status}: ${sent.errorResult?.toXDR("base64") ?? sent.hash}`);
     }
     const result = await this.server.pollTransaction(sent.hash, {
@@ -160,7 +160,7 @@ export class Chain {
     if (result.status === rpc.Api.GetTransactionStatus.FAILED) {
       const events = result.diagnosticEventsXdr ?? [];
       const raw = errorFromEvents(events);
-      const error = raw ? this.toLeashError(raw, fallback) : hostErrorFromEvents(events);
+      const error = raw ? this.toTsunaError(raw, fallback) : hostErrorFromEvents(events);
       return { hash: sent.hash, status: "FAILED", ledger: result.ledger, ...(error ? { error } : {}) };
     }
     throw new Error(`Transaction ${sent.hash} not found after submission`);

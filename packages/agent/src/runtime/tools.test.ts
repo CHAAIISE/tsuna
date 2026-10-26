@@ -1,5 +1,5 @@
 import { Keypair } from "@stellar/stellar-sdk";
-import type { Call, Leash, VaultClient } from "@leash/sdk";
+import type { Call, Tsuna, VaultClient } from "@tsuna/sdk";
 import type { Tool, ToolSet } from "ai";
 import { describe, expect, it } from "vitest";
 import { Journal } from "./journal.js";
@@ -40,7 +40,7 @@ function context(strategy: Strategy, extra: Partial<ToolContext> = {}) {
   const recording = recordingVault();
   const journal = new Journal();
   const ctx: ToolContext = {
-    leash: {} as Leash,
+    tsuna: {} as Tsuna,
     vault: recording.vault,
     venues: { vault: VAULT, assets: { ...TESTNET_ASSETS }, blendPool: POOL },
     strategy,

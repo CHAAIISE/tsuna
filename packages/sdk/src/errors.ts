@@ -3,7 +3,7 @@ import { Address, xdr } from "@stellar/stellar-sdk";
 export type ErrorSource = "vault" | "registry" | "oracle" | "factory" | "signal_budget" | "other";
 
 /** A contract error code, named and explained. */
-export interface LeashError {
+export interface TsunaError {
   contract: ErrorSource;
   code: number;
   name: string;
@@ -123,7 +123,7 @@ const TABLES: Record<Exclude<ErrorSource, "other">, Table> = {
 };
 
 /** Names and explains `code` raised by a contract of kind `contract`. */
-export function describeError(contract: ErrorSource, code: number): LeashError {
+export function describeError(contract: ErrorSource, code: number): TsunaError {
   // OZ spending-limit and smart-account codes are unique, whichever contract raised them.
   const source = contract === "other" && SIGNAL_BUDGET_ERRORS[code] ? "signal_budget" : contract;
   const entry = source === "other" ? undefined : TABLES[source][code];
@@ -135,7 +135,7 @@ export function describeError(contract: ErrorSource, code: number): LeashError {
 
 const SOURCES: readonly string[] = ["vault", "registry", "oracle", "factory", "signal_budget", "other"];
 
-export function isLeashError(value: unknown): value is LeashError {
+export function isTsunaError(value: unknown): value is TsunaError {
   return typeof value === "object" && value !== null
     && "contract" in value && typeof value.contract === "string" && SOURCES.includes(value.contract)
     && "code" in value && typeof value.code === "number"
@@ -144,10 +144,10 @@ export function isLeashError(value: unknown): value is LeashError {
 }
 
 /** Thrown when a contract refuses a call during simulation (no transaction was sent). */
-export class LeashRefusal extends Error {
-  constructor(readonly error: LeashError, readonly detail?: string) {
+export class TsunaRefusal extends Error {
+  constructor(readonly error: TsunaError, readonly detail?: string) {
     super(`${error.name} (${error.contract} #${error.code}): ${error.message}`);
-    this.name = "LeashRefusal";
+    this.name = "TsunaRefusal";
   }
 }
 
@@ -205,7 +205,7 @@ const HOST_MESSAGES: Record<string, string> = {
 };
 
 /** Host (non-contract) failure, e.g. `Error(Auth, InvalidAction)`, named `AuthFailed`-style. */
-export function hostError(kind: string, code: string): LeashError {
+export function hostError(kind: string, code: string): TsunaError {
   return {
     contract: "other",
     code: 0,
@@ -215,7 +215,7 @@ export function hostError(kind: string, code: string): LeashError {
 }
 
 /** First host failure in diagnostic events, when no contract error explains the failure. */
-export function hostErrorFromEvents(events: xdr.DiagnosticEvent[]): LeashError | null {
+export function hostErrorFromEvents(events: xdr.DiagnosticEvent[]): TsunaError | null {
   for (const { value } of errorEvents(events)) {
     if (value.type === "sceContract") continue;
     const kind = value.type.slice(3);
@@ -227,7 +227,7 @@ export function hostErrorFromEvents(events: xdr.DiagnosticEvent[]): LeashError |
 const HOST_TEXT = /Error\((\w+), (\w+)\)/;
 
 /** Host failure named in a simulation error text, e.g. `Error(Auth, InvalidAction)`. */
-export function parseHostFailure(text: string): LeashError | null {
+export function parseHostFailure(text: string): TsunaError | null {
   const match = HOST_TEXT.exec(text);
   return match && match[1] !== "Contract" ? hostError(match[1] as string, match[2] as string) : null;
 }

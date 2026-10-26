@@ -119,7 +119,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
     return (
       <Card data-testid="create-published" data-vault={published.vault}>
         <CardHeader>
-          <Badge variant="success" className="w-fit">Published on Stellar testnet</Badge>
+          <Badge variant="success" className="w-fit">Published on Stellar</Badge>
           <CardTitle>Your {strategy.label.toLowerCase()} agent has a vault</CardTitle>
           <CardDescription>
             Your vault runs the factory&apos;s shared code and its rules are in force.
@@ -255,7 +255,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
               {publishing ? "Waiting for Stellar…" : "Publish"}
             </Button>
             <Button variant="outline" disabled={publishing} onClick={() => setStep(1)}>Back</Button>
-            {creator && <span className="text-caption text-muted-foreground">Signed by the testnet demo creator; fees paid by Tsuna.</span>}
+            {creator && <span className="text-caption text-muted-foreground">Signed by the demo creator; fees paid by Tsuna.</span>}
           </CardFooter>
           {creator && (
             <CardContent>

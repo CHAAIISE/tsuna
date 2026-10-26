@@ -51,7 +51,7 @@ function SkeletonPage() {
       <div className="h-11 w-64 animate-pulse rounded bg-secondary" />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{[0, 1, 2, 3].map(i => <div key={i} className="h-28 animate-pulse rounded-xl bg-secondary" />)}</div>
       <div className="h-64 animate-pulse rounded-xl bg-secondary" />
-      <p className="text-caption text-muted-foreground">Reading the vault from Stellar testnet…</p>
+      <p className="text-caption text-muted-foreground">Reading the vault from Stellar…</p>
       <Button data-primary pending>Reading vault…</Button>
     </div>
   );
@@ -193,7 +193,7 @@ export function VaultView({ id }: { id: string }) {
 
         <aside className="order-first space-y-4 lg:sticky lg:top-6 lg:order-none">
           <DepositPanel vault={data} owner={account} holding={holding} balance={balance} />
-          <p className="px-1 text-caption text-muted-foreground">Testnet only. Performance fee: 10% of gains above the high-water mark, crystallized on deposits, withdrawals and agent calls.</p>
+          <p className="px-1 text-caption text-muted-foreground">Performance fee: 10% of gains above the high-water mark, crystallized on deposits, withdrawals and agent calls.</p>
         </aside>
       </div>
     </div>

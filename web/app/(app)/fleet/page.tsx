@@ -28,14 +28,14 @@ async function FleetLoader({ id }: { id: FleetId }) {
     return (
       <Card>
         <CardContent className="space-y-2 pt-6">
-          <p className="font-medium">Stellar testnet did not answer.</p>
+          <p className="font-medium">Stellar did not answer.</p>
           <p className="text-sm text-muted-foreground">The fleet is read live from the ledger. Reload the page in a moment.</p>
         </CardContent>
       </Card>
     );
   }
   if (!state) {
-    return <Card><CardContent className="pt-6 text-sm text-muted-foreground">This fleet is not deployed on testnet.</CardContent></Card>;
+    return <Card><CardContent className="pt-6 text-sm text-muted-foreground">This fleet is not deployed yet.</CardContent></Card>;
   }
   return <FleetConsole key={id} initial={state} />;
 }

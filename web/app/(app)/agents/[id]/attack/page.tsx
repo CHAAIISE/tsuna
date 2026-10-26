@@ -4,7 +4,7 @@ import { PageLayout } from "@/components/ui/page-layout";
 
 export const metadata: Metadata = {
   title: "Try to break it — Tsuna",
-  description: "Five real attacks against testnet vaults. The chain decides, even with a stolen session key.",
+  description: "Five real attacks against Tsuna vaults. The chain decides, even with a stolen session key.",
 };
 
 export default async function AttackPage({ params }: PageProps<"/agents/[id]/attack">) {
@@ -12,7 +12,7 @@ export default async function AttackPage({ params }: PageProps<"/agents/[id]/att
   return (
     <PageLayout>
       <AttackLab id={id} />
-      <footer className="border-t py-6 text-caption text-muted-foreground">Tsuna · Stellar testnet · No real funds.</footer>
+      <footer className="border-t py-6 text-caption text-muted-foreground">Tsuna · Built on Stellar</footer>
     </PageLayout>
   );
 }

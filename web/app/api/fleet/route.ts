@@ -16,7 +16,7 @@ function failure(error: unknown): Response {
   if (error instanceof z.ZodError) return Response.json({ error: "Invalid request." }, { status: 400 });
   // SDK errors can embed signed envelopes: log the message only.
   console.error(error instanceof Error ? error.message : "Fleet request failed");
-  return Response.json({ error: "Stellar testnet did not respond. Try again in a moment." }, { status: 502 });
+  return Response.json({ error: "Stellar did not respond. Try again in a moment." }, { status: 502 });
 }
 
 export async function GET(request: NextRequest) {

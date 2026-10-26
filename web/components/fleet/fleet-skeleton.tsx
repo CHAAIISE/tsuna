@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 /** Placeholder rows while the fleet is read from the ledger. */
 export function FleetSkeleton() {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="Reading the fleet from Stellar testnet">
+    <div className="space-y-6" aria-busy="true" aria-label="Reading the fleet from Stellar">
       <Card className="grid gap-6 p-6 sm:grid-cols-3">
         {[0, 1, 2].map(cell => (
           <div key={cell} className="space-y-2">

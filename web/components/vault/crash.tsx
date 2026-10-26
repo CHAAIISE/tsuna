@@ -50,13 +50,13 @@ export function CrashPanel({ vault }: { vault: VaultDetail }) {
       <CardHeader className="space-y-4 px-4 sm:px-6">
         <div className="space-y-2">
           <p className="font-overline text-caption tracking-overline text-muted-foreground">Stress test</p>
-          <CardTitle id="crash-title">Market crash (testnet demo oracle)</CardTitle>
-          <CardDescription>Walk the vault through a 30 % XLM crash. Every step is a real testnet transaction; the chain decides what passes.</CardDescription>
+          <CardTitle id="crash-title">Market crash (demo oracle)</CardTitle>
+          <CardDescription>Walk the vault through a 30 % XLM crash. Every step is a real Stellar transaction; the chain decides what passes.</CardDescription>
         </div>
         <div data-testid="demo-oracle-banner" className="flex gap-3 rounded-lg border border-dashed border-input bg-muted px-4 py-3">
           <FlaskConical aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-foreground" />
           <div className="space-y-1 text-sm">
-            <p className="font-medium">Demo oracle — testnet only</p>
+            <p className="font-medium">Demo oracle</p>
             <p className="text-muted-foreground">
               The demo fleet&apos;s oracle router is a testnet build with a demo switch: its admin can force a price. A mainnet build has no such function.
               {data.live ? (data.live.demo ? " Demo mode is on." : " Demo mode is off: the first step switches it on.") : ""}
@@ -64,7 +64,7 @@ export function CrashPanel({ vault }: { vault: VaultDetail }) {
           </div>
         </div>
         {data.live ? <CrashLive live={data.live} /> : (
-          <p role="status" className="text-sm text-muted-foreground">{data.liveError ?? "Reading the vault from Stellar testnet…"}</p>
+          <p role="status" className="text-sm text-muted-foreground">{data.liveError ?? "Reading the vault from Stellar…"}</p>
         )}
       </CardHeader>
 

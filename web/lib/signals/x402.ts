@@ -93,7 +93,7 @@ export function ratesRoute(): RouteConfig {
       price: { amount: toStroops(signalPrice()).toString(), asset: USDC },
       maxTimeoutSeconds: MAX_TIMEOUT_SECONDS,
     },
-    description: "Blend testnet pool rates for USDC and XLM",
+    description: "Blend pool rates for USDC and XLM",
     mimeType: "application/json",
   };
 }

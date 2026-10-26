@@ -34,7 +34,7 @@ const KEY_NAMES = {
 
 function crashKeys(): CrashKeys | string {
   const missing = Object.values(KEY_NAMES).filter(name => !process.env[name]);
-  if (missing.length > 0) return `This server does not hold the testnet keys of the crash demo (${missing.join(", ")}).`;
+  if (missing.length > 0) return `This server does not hold the keys of the crash demo (${missing.join(", ")}).`;
   if (!process.env.OPENAI_API_KEY) return "The risk-off agent's model is not configured on this server.";
   const key = (name: string) => Keypair.fromSecret(process.env[name] as string);
   const feePayer = key(KEY_NAMES.feePayer);
@@ -123,7 +123,7 @@ function message(error: unknown): string {
   const typed = decodeError(error);
   if (typed) return `The chain refused: ${typed.name} — ${typed.message}`;
   console.error("crash demo:", error instanceof Error ? error.message : error);
-  return "Stellar testnet did not respond. Try the step again in a moment.";
+  return "Stellar did not respond. Try the step again in a moment.";
 }
 
 /** Records activity on `run` and re-arms its idle restore while it holds the demo price or the pause. */

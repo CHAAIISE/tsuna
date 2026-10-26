@@ -110,7 +110,7 @@ export function DepositPanel({ vault, owner, holding, balance }: {
 
       <dl className="mt-4 space-y-2 text-sm">
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Your position</dt><dd className="tabular-nums" data-testid="your-position">{owner ? `${formatUsdc(position)} USDC` : "—"}</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Network fee</dt><dd>Paid by Tsuna (testnet)</dd></div>
+        <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Network fee</dt><dd>Paid by Tsuna</dd></div>
         {mode === "withdraw" && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Withdrawals</dt><dd>Always open, even when paused</dd></div>}
       </dl>
 

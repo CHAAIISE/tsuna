@@ -39,7 +39,7 @@ export function PortfolioView() {
     return (
       <Card className="flex flex-col items-start gap-4 p-4 sm:p-6">
         <p className="text-subheading font-medium">Sign in to see your deposits</p>
-        <p className="max-w-xl text-sm text-muted-foreground">Your passkey account lives on this device. Tsuna reads its vault shares and USDC balance straight from Stellar testnet.</p>
+        <p className="max-w-xl text-sm text-muted-foreground">Your passkey account lives on this device. Tsuna reads its vault shares and USDC balance straight from Stellar.</p>
         <Button asChild data-primary><Link href="/onboarding"><Fingerprint aria-hidden="true" />Sign in with passkey</Link></Button>
       </Card>
     );
@@ -72,7 +72,7 @@ export function PortfolioView() {
         {holdings.isPending && <div role="status" className="px-6 py-8 text-sm text-muted-foreground">Reading your vault shares on Stellar…</div>}
         {holdings.error && !data && (
           <div role="alert" className="flex flex-col items-start gap-3 px-6 py-8">
-            <p className="flex items-center gap-2 font-medium"><CircleAlert aria-hidden="true" className="size-4 text-muted-foreground" />Stellar testnet did not answer</p>
+            <p className="flex items-center gap-2 font-medium"><CircleAlert aria-hidden="true" className="size-4 text-muted-foreground" />Stellar did not answer</p>
             <Button variant="outline" onClick={() => void holdings.refetch()}>Try again</Button>
           </div>
         )}

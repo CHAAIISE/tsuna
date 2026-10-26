@@ -2,7 +2,7 @@ import { bricks, type Brick } from "./data";
 import { SectionIntro } from "./section";
 
 const statusLabel: Record<Brick["status"], string> = {
-  testnet: "On testnet",
+  testnet: "Integrated",
   tested: "Contract tests",
   "in progress": "In progress",
 };
@@ -14,7 +14,7 @@ function BuiltOn() {
         id="built-on-title"
         overline="Built on"
         title={<>Composed from Stellar&apos;s live protocols, <span className="text-muted-foreground">checked by one contract.</span></>}
-        lead="The status on each line says where it stands today: every brick below runs on Stellar testnet."
+        lead="The status on each line says where it stands today."
       />
       <dl className="mt-14 border-b">
         {bricks.map(brick => (

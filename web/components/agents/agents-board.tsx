@@ -131,7 +131,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
                   </span>
                 </td>
                 <td className="px-3 py-3"><YourDeposit holding={holdings.get(row.address)} signedIn={signedIn} /></td>
-                <td className="px-3 py-3 text-muted-foreground tabular-nums" title="Since the first NAV snapshot the RPC still retains (about 7 days on testnet)">{row.since ? formatAge(row.since) : "—"}</td>
+                <td className="px-3 py-3 text-muted-foreground tabular-nums" title="Since the first NAV snapshot the RPC still retains (about 7 days)">{row.since ? formatAge(row.since) : "—"}</td>
                 <td className="px-3 py-3"><Sparkline points={row.snapshots} label={`${row.name} share price`} /></td>
                 <td className="py-3 pr-6 pl-3">
                   <span className="flex items-center justify-between gap-3">
@@ -177,7 +177,7 @@ function SkeletonRows() {
           <div className="ml-auto h-6 w-24 animate-pulse rounded bg-secondary" />
         </div>
       ))}
-      <p className="pt-3 text-caption text-muted-foreground">Reading vaults from Stellar testnet…</p>
+      <p className="pt-3 text-caption text-muted-foreground">Reading vaults from Stellar…</p>
     </div>
   );
 }
@@ -270,7 +270,7 @@ export function AgentsBoard() {
         {isPending && <SkeletonRows />}
         {error && !data && (
           <div role="alert" className="flex flex-col items-start gap-3 px-6 py-10">
-            <p className="flex items-center gap-2 font-medium"><CircleAlert aria-hidden="true" className="size-4 text-muted-foreground" />Stellar testnet did not answer</p>
+            <p className="flex items-center gap-2 font-medium"><CircleAlert aria-hidden="true" className="size-4 text-muted-foreground" />Stellar did not answer</p>
             <p className="text-sm text-muted-foreground">{error.message}</p>
             <Button variant="outline" onClick={() => void refetch()} pending={isFetching}>Try again</Button>
           </div>

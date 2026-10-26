@@ -150,7 +150,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <p className="flex gap-3"><Fingerprint aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No seed phrase. Only your passkey can approve deposits and withdrawals.</p>
-                <p className="flex gap-3"><ArrowRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No gas. Tsuna pays the testnet network fees.</p>
+                <p className="flex gap-3"><ArrowRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />No gas. Tsuna pays the network fees.</p>
                 {!supported && <p className="text-muted-foreground">This browser cannot create passkeys. Use a wallet extension instead.</p>}
               </CardContent>
               <CardFooter className="flex-col items-stretch sm:flex-row sm:items-center">
@@ -170,7 +170,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
                 <CardDescription>
                   {wallet
                     ? "Classic Stellar accounts need a trustline before they can hold USDC. Tsuna opens it with the token contract's trust() call; you sign, the relayer pays the fee."
-                    : "Use Freighter, xBull, Albedo or another Stellar wallet on testnet. The account must already exist on testnet."}
+                    : "Use Freighter, xBull, Albedo or another Stellar wallet, switched to Testnet. The account must already exist there."}
                 </CardDescription>
               </CardHeader>
               {wallet && <CardContent className="text-sm">Connected as <span className="font-medium">{shortAddress(wallet)}</span></CardContent>}
@@ -198,7 +198,7 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
                   <span className="text-caption text-muted-foreground">{shortAddress(holder)}</span>
                 </div>
                 <CardTitle>{funded ? "You're funded" : "Get test USDC"}</CardTitle>
-                <CardDescription>{funded ? "Next, pick an agent and deposit. Its rules are enforced by the vault contract." : `Testnet only: ${amountLabel} USDC to try Tsuna.`}</CardDescription>
+                <CardDescription>{funded ? "Next, pick an agent and deposit. Its rules are enforced by the vault contract." : `${amountLabel} test USDC to try Tsuna.`}</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-caption text-muted-foreground">Balance, read on Stellar</p>
@@ -235,8 +235,8 @@ export function OnboardingFlow({ faucetAmount }: { faucetAmount: number }) {
           )}
           <Card className="bg-muted shadow-none">
             <CardHeader className="space-y-3">
-              <div className="flex items-center justify-between gap-2"><CardTitle className="text-base">How it works</CardTitle><Badge variant="secondary">Testnet only</Badge></div>
-              <CardDescription>Test tokens have no value. Blend testnet USDC is borrowed against faucet XLM and sent from a Tsuna faucet account.</CardDescription>
+              <div className="flex items-center justify-between gap-2"><CardTitle className="text-base">How it works</CardTitle></div>
+              <CardDescription>Test tokens have no value. Blend USDC is borrowed against faucet XLM and sent from a Tsuna faucet account.</CardDescription>
             </CardHeader>
             <CardContent><TransactionDetails rows={details} /></CardContent>
           </Card>

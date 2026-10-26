@@ -39,7 +39,7 @@ function Proof() {
         id="proof-title"
         overline="Proof"
         title={<>Don&apos;t take our word for it. <span className="text-muted-foreground">Open the transactions.</span></>}
-        lead="Every row is a real transaction on Stellar testnet. Refused calls were still submitted, so the failure and its error code live in the ledger."
+        lead="Every row is a real transaction on Stellar. Refused calls were still submitted, so the failure and its error code live in the ledger."
       />
       <h3 className="mt-14 text-subheading font-medium text-heading">Refused</h3>
       <ul className="mt-4 space-y-2">

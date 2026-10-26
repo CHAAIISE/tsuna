@@ -9,7 +9,7 @@ export function errorResponse(error: unknown): Response {
   const message = error instanceof Error ? error.message
     : typeof error === "object" && error !== null && "message" in error ? String(error.message) : "Unknown sponsor failure";
   console.error(message);
-  return Response.json({ error: "Stellar testnet did not respond. Try again in a moment." }, { status: 502 });
+  return Response.json({ error: "Stellar did not respond. Try again in a moment." }, { status: 502 });
 }
 
 export function tooManyRequests(retryAfter: number): Response {

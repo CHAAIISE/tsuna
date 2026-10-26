@@ -29,7 +29,7 @@ export const RISK_THRESHOLDS = {
 } as const;
 
 export const RISK_METHOD = [
-  "Prices come from the Reflector testnet oracle (lastprice, prices, price at past timestamps), quoted in USD.",
+  "Prices come from the Reflector oracle (lastprice, prices, price at past timestamps), quoted in USD.",
   "change1h and changeWindow compare the latest XLM price with the price one hour ago and with the oldest hourly point still retained (up to 24 h).",
   "Volatility is the sample standard deviation of log returns, annualized with sqrt(periods per year): 5-minute returns over the last hour and hourly returns over the window.",
   `level is "high" when |changeWindow| >= ${RISK_THRESHOLDS.high.absChange24h * 100}% or either volatility >= ${RISK_THRESHOLDS.high.annualizedVolatility * 100}%, "elevated" at ${RISK_THRESHOLDS.elevated.absChange24h * 100}% / ${RISK_THRESHOLDS.elevated.annualizedVolatility * 100}%, otherwise "low".`,

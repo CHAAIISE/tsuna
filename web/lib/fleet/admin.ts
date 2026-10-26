@@ -63,7 +63,7 @@ const TAG = nativeToScVal(fleetRecord.tag, { type: "string" });
 /** Starts the factory timelock for moving every vault of `fleet` to the uploaded build `wasmHash`. */
 export async function proposePatch(fleet: FleetId, wasmHash: string): Promise<TxResult> {
   const wasm = await uploadedWasm(wasmHash);
-  if (!wasm) throw new FleetError("No Wasm with this hash is uploaded on testnet.", 422);
+  if (!wasm) throw new FleetError("No Wasm with this hash is uploaded on Stellar.", 422);
   if (!isVaultBuild(wasm)) throw new FleetError("This Wasm does not export the vault interface.", 422);
   return invoke(fleet, "propose_ref", [TAG, xdr.ScVal.scvBytes(Buffer.from(wasmHash, "hex"))]);
 }

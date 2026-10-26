@@ -22,7 +22,7 @@ export class SponsorError extends Error {
 
 export function serverKey(name: "LEASH_RELAYER_SECRET" | "LEASH_FAUCET_SECRET"): Keypair {
   const secret = process.env[name];
-  if (!secret) throw new SponsorError("The testnet relayer is not configured on this server.", 503);
+  if (!secret) throw new SponsorError("The relayer is not configured on this server.", 503);
   return Keypair.fromSecret(secret);
 }
 

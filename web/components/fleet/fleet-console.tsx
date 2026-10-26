@@ -85,7 +85,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
         setSelected(body.state.candidates[0]?.hash ?? "");
       }
     } catch {
-      setRefusal({ message: "Stellar testnet did not respond. Try again in a moment." });
+      setRefusal({ message: "Stellar did not respond. Try again in a moment." });
     } finally {
       setBusy(null);
     }
@@ -152,7 +152,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
           <p id="fleet-next-action" className="text-sm text-muted-foreground">
             {pending
               ? ready ? "The timelock has ended. Apply this patch to update every vault." : "Apply becomes available when the timelock ends. No action is needed while you wait."
-              : selected ? "This is a real testnet upgrade proposal, signed by the demo admins. Review your selected build before proposing."
+              : selected ? "This is a real upgrade proposal, signed by the demo admins. Review your selected build before proposing."
                 : "Propose patch is unavailable until another vault build is uploaded."}
           </p>
           {result && !refusal && <ResultLine result={result} />}
@@ -167,7 +167,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
               {busy === "propose" ? "Waiting for Stellar…" : "Propose patch"}
             </Button>
           )}
-          <span className="text-caption text-muted-foreground">Signed server-side by the factory&apos;s two testnet admins.</span>
+          <span className="text-caption text-muted-foreground">Signed server-side by the factory&apos;s two admins.</span>
         </CardFooter>
       </Card>
 

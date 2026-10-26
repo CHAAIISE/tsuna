@@ -99,7 +99,7 @@ test("a 30 % XLM crash: both risky calls hit the wall, the vault pauses, a depos
   await page.goto("/agents/leverage");
   const panel = page.getByTestId("crash-panel");
   await expect(panel).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByTestId("demo-oracle-banner")).toContainText("Demo oracle — testnet only");
+  await expect(page.getByTestId("demo-oracle-banner")).toContainText("Demo oracle");
   await expect(page.getByTestId("crash-health")).toBeVisible();
 
   // A run left crashed by someone else is restored first; a finished one is started again.

@@ -6,7 +6,7 @@ import { publisherAccount, presetCatalog } from "@/lib/fleet/create";
 
 export const metadata: Metadata = {
   title: "Publish an agent — Tsuna",
-  description: "Choose a strategy, then the rules its agent can never break. The vault is deployed by the Tsuna factory on Stellar testnet.",
+  description: "Choose a strategy, then the rules its agent can never break. The vault is deployed by the Tsuna factory on Stellar.",
 };
 
 export default function CreatePage() {

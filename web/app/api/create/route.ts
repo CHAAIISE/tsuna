@@ -14,6 +14,6 @@ export async function POST(request: Request) {
     if (error instanceof z.ZodError) return Response.json({ error: "Invalid request." }, { status: 400 });
     // SDK errors can embed signed envelopes: log the message only.
     console.error(error instanceof Error ? error.message : "Publishing failed");
-    return Response.json({ error: "Stellar testnet did not respond. Try again in a moment." }, { status: 502 });
+    return Response.json({ error: "Stellar did not respond. Try again in a moment." }, { status: 502 });
   }
 }

@@ -55,7 +55,7 @@ function LandingFooter() {
   return (
     <footer className="flex flex-col gap-4 border-t px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-12">
       <Logo className="h-4" />
-      <p>Stellar testnet only. Every balance here is test USDC with no real value.</p>
+      <p>Built on Stellar.</p>
     </footer>
   );
 }

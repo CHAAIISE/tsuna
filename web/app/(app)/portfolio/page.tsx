@@ -4,7 +4,7 @@ import { PageHeader, PageLayout } from "@/components/ui/page-layout";
 
 export const metadata: Metadata = {
   title: "Portfolio — Tsuna",
-  description: "Your deposits in Tsuna vaults, their value and gains, read on Stellar testnet.",
+  description: "Your deposits in Tsuna vaults, their value and gains, read on Stellar.",
 };
 
 export default function PortfolioPage() {
@@ -13,7 +13,7 @@ export default function PortfolioPage() {
       <PageLayout>
         <PageHeader title="Portfolio" description="Your deposits, read from the vaults. Withdrawals are always open." />
         <PortfolioView />
-        <footer className="border-t py-6 text-caption text-muted-foreground">Tsuna · Stellar testnet · No real funds.</footer>
+        <footer className="border-t py-6 text-caption text-muted-foreground">Tsuna · Built on Stellar</footer>
       </PageLayout>
     </>
   );

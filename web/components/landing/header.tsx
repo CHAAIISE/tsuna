@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
 
 const links = [
   { href: "#how-it-works", label: "How it works" },
@@ -10,7 +9,7 @@ const links = [
 
 function LandingHeader() {
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between gap-6 border-b bg-background/90 px-6 py-5 backdrop-blur sm:px-12">
+    <header className="sticky top-0 z-20 flex items-center justify-between gap-6 border-b bg-background/90 h-[5.5rem] px-6 backdrop-blur sm:h-[6.25rem] sm:px-12">
       <Link href="/" aria-label="Tsuna home" className="rounded-sm">
         <Logo className="h-5" />
       </Link>
@@ -25,9 +24,7 @@ function LandingHeader() {
           ))}
         </ul>
       </nav>
-      <Button asChild variant="outline" className="border-input">
-        <Link href="/onboarding">Launch app</Link>
-      </Button>
+      <span aria-hidden="true" className="w-36 sm:w-44" />
     </header>
   );
 }

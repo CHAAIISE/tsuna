@@ -1,7 +1,7 @@
 import { BuiltOn } from "@/components/landing/built-on";
 import { Emblem } from "@/components/landing/emblem";
 import { LandingHeader } from "@/components/landing/header";
-import { Hero } from "@/components/landing/hero";
+import { Hero, LaunchApp } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Closing, LandingFooter, Limits } from "@/components/landing/limits";
 import { Problem } from "@/components/landing/problem";
@@ -20,6 +20,7 @@ export default function Home() {
   return (
     <>
       <Hero />
+      <LaunchApp />
       <div className="relative z-10 bg-background">
         <RisingEdge />
         <div className="mx-auto min-h-screen max-w-site border-x">

@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { Taut } from "./taut";
 
 export function Emblem() {
   return (
@@ -8,7 +7,7 @@ export function Emblem() {
         <div className="max-w-lg">
           <p className="font-display text-sm tracking-[0.2em] text-primary uppercase">Power on a rope</p>
           <h2 id="emblem-title" className="mt-5 font-editorial text-5xl leading-[1.05] font-medium text-heading sm:text-6xl">
-            Let the agent fly. <Taut>Keep the rope.</Taut>
+            Let the agent fly. Keep the rope.
           </h2>
           <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
             An AI agent is fast, tireless and easy to fool. Tsuna gives it the whole of DeFi to work with, and

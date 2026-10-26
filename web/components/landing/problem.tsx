@@ -1,6 +1,5 @@
 import { incidents } from "./data";
 import { Overline, SectionIntro } from "./section";
-import { Taut } from "./taut";
 
 function Problem() {
   return (
@@ -8,7 +7,7 @@ function Problem() {
       <SectionIntro
         id="problem-title"
         overline="The problem"
-        title={<>The prompt is not a <Taut className="text-muted-foreground">security boundary.</Taut></>}
+        title={<>The prompt is not a <span className="text-muted-foreground">security boundary.</span></>}
         lead="Agents that hold money are already being robbed. In each case the safety rules lived in a prompt or on a server, and someone got a sentence in front of the model."
       />
       <ol className="mt-14 border-b">

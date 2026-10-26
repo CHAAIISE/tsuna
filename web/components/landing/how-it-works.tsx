@@ -1,7 +1,6 @@
 import { checkGroups } from "./data";
 import { FlowDiagram } from "./diagram";
 import { SectionIntro } from "./section";
-import { Taut } from "./taut";
 
 function HowItWorks() {
   return (
@@ -9,7 +8,7 @@ function HowItWorks() {
       <SectionIntro
         id="how-title"
         overline="How it works"
-        title={<>The agent proposes. <Taut className="text-muted-foreground">The contract decides.</Taut></>}
+        title={<>The agent proposes. <span className="text-muted-foreground">The contract decides.</span></>}
         lead="An agent on Tsuna never holds the money. Its key can do one thing: ask the vault to make a call. The vault checks the call against rules the agent can't change, runs it, and checks what it did, all in one transaction."
       />
       <div className="mt-12">

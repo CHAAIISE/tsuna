@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { OnboardingSteps } from "@/components/ui/onboarding-steps";
 import { Overline } from "./section";
-import { Taut } from "./taut";
 
 function Limits() {
   return (
@@ -35,7 +34,7 @@ function Closing() {
   return (
     <section id="start" aria-labelledby="closing-title" className="scroll-mt-4 border-t px-6 py-20 sm:px-12 sm:py-24">
       <h2 id="closing-title" className="max-w-3xl text-3xl font-light tracking-tight text-heading sm:text-[2.5rem] sm:leading-[1.15]">
-        <Taut>Try to break it.</Taut> <span className="text-muted-foreground">Create a passkey, get test USDC, and watch the chain say no.</span>
+        Try to break it. <span className="text-muted-foreground">Create a passkey, get test USDC, and watch the chain say no.</span>
       </h2>
       <div className="mt-8">
         <OnboardingSteps currentStep={0} />

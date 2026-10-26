@@ -1,8 +1,8 @@
 import "server-only";
-import { describeError } from "@leash/sdk";
+import { describeError } from "@tsuna/sdk";
 import { rpc } from "@stellar/stellar-sdk";
 import { decodeVaultCall, failureFromDiagnostics, type VaultCall } from "./chain-events";
-import { HORIZON_URL, cached, leash, rpcServer, typedError } from "./client";
+import { HORIZON_URL, cached, tsuna, rpcServer, typedError } from "./client";
 import { contractName, deployments, extraSources } from "./deployments";
 import { readJournal } from "./journal-store";
 import { mergeTimeline, type FailedAttempt } from "./timeline";
@@ -51,7 +51,7 @@ async function failureOf(hash: string): Promise<TypedError | null> {
   const raw = failureFromDiagnostics(result.diagnosticEventsXdr ?? []);
   const error: TypedError | null = !raw ? null
     : raw.kind === "contract"
-      ? typedError(describeError(raw.contractId ? leash().classify(raw.contractId) : "vault", raw.code))
+      ? typedError(describeError(raw.contractId ? tsuna().classify(raw.contractId) : "vault", raw.code))
       : {
         contract: "other", code: 0, name: raw.type === "Auth" ? "AuthFailed" : `Host${raw.type}Error`,
         message: HOST_MESSAGES[raw.type] ?? `The Soroban host failed with a ${raw.type} error.`,
@@ -74,7 +74,7 @@ async function failedAttempts(vault: string, members: string[]): Promise<FailedA
   for (const tx of lists.flat()) {
     if (tx.successful || seen.has(tx.hash)) continue;
     seen.add(tx.hash);
-    const call = decodeVaultCall(tx.envelope_xdr, leash().networkPassphrase);
+    const call = decodeVaultCall(tx.envelope_xdr, tsuna().networkPassphrase);
     if (call?.vault === vault) candidates.push({ ...tx, call });
   }
   candidates.sort((a, b) => b.created_at.localeCompare(a.created_at));

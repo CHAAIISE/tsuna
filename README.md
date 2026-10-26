@@ -1,4 +1,4 @@
-# Leash
+# Tsuna
 
 DeFi vaults on Stellar with on-chain limits for AI agents.
 
@@ -35,7 +35,7 @@ pnpm contracts:test
 
 ```sh
 pnpm --dir web exec playwright test
-BASE_URL=https://leash-one.vercel.app pnpm --dir web exec playwright test --grep @smoke
+BASE_URL=https://tsuna-fi.vercel.app pnpm --dir web exec playwright test --grep @smoke
 ```
 
 The local suite covers the eleven demo stages with numbered `test.step` entries, including real deposits, model-driven execution, five failed attack receipts, session revocation, the crash and risk-off repayment, a timed fleet upgrade, CCTP and publication. It runs serially against Stellar testnet, not a local chain. Chromium's virtual authenticator signs real passkey account authorizations; no production test-signing endpoint is required.
@@ -132,13 +132,13 @@ When a rule has `approve`, the vault itself grants the target an allowance for t
 
 Other refusals: `CallNotAllowed` (1), `DestinationNotVault` (2), `SpenderNotProtocol` (3), `ArgCountMismatch` (4), `Paused` (6), `SessionRevoked` (18). Successful calls emit `Executed(target, fn, nav_before, nav_after)`.
 
-The leash stops the agent from moving value out of the vault; it does not make an allowlisted protocol safe. A compromised protocol can still lose what it holds, which is why exposure per protocol is capped and drawdowns pause the vault.
+Tsuna stops the agent from moving value out of the vault; it does not make an allowlisted protocol safe. A compromised protocol can still lose what it holds, which is why exposure per protocol is capped and drawdowns pause the vault.
 
 The owner can pause the vault (`set_paused`), `revoke_session`, or `rotate_session` to a new key. `check_drawdown()` is permissionless: anyone can pause a vault whose price per share has fallen below its 24-hour peak by more than the configured drawdown. Peaks are kept in a segment tree indexed by observation, so a check touches a logarithmic number of storage entries and skips expired history. None of these switches blocks withdrawals.
 
 ## Agent roles
 
-A vault can give several session keys their own leash, as Zodiac's Roles Modifier does on EVM, except that Leash also checks what each call did. The policy's `roles` map names each role to a `Role { member, mode, calls, quota }`: the member's key, `Normal` or `RiskOff`, an allowlist with the same `CallRule`s as `calls`, and a `Quota { tx_cap_bps, daily_cap_bps, calls_per_hour, daily_loss_bps }` counted apart from every other role (`role_usage(role)`, `role_daily_loss(role)`). Protocols, guards, assets, exposure caps and the health-factor floor stay vault-wide. Role `default` is `execute` itself: the session key with the policy's own `calls` and `limits`.
+A vault can give several session keys their own rules, as Zodiac's Roles Modifier does on EVM, except that Tsuna also checks what each call did. The policy's `roles` map names each role to a `Role { member, mode, calls, quota }`: the member's key, `Normal` or `RiskOff`, an allowlist with the same `CallRule`s as `calls`, and a `Quota { tx_cap_bps, daily_cap_bps, calls_per_hour, daily_loss_bps }` counted apart from every other role (`role_usage(role)`, `role_daily_loss(role)`). Protocols, guards, assets, exposure caps and the health-factor floor stay vault-wide. Role `default` is `execute` itself: the session key with the policy's own `calls` and `limits`.
 
 `execute_as(member, role, target, fn, args)` requires `member`'s signature, then fails with `RoleNotFound` (34) for a role the policy in force does not define and `NotRoleMember` (35) when `member` does not hold it (for `default`, the current session key). The call then runs under the role's rules with the pre- and post-conditions above, and emits `RoleExecuted(role, target, fn, nav_before, nav_after)` (`default` emits `Executed`).
 
@@ -244,17 +244,17 @@ Each payload states its method. Both protocols use a signed Soroban authorizatio
 
 The x402 facilitator runs in-process. The public testnet facilitator named in the Stellar docs (x402.org) refuses these payments: its verifier caps settlement fees at 50,000 stroops (a smart-account transfer simulates at about 465,000) and expects SAC transfer events only, while the policy emits its own. The stock `@stellar/mpp` server only accepts `G…` payers, so the MPP charge keeps its method schema with a verifier that accepts contract accounts.
 
-`buySignal(kind, options)` in `@leash/agent` runs the 402 flow, signs with the session key, and returns `{ data, paymentTxHash }` or a typed refusal such as `SpendingLimitExceeded` (3221). With a `refusalSubmitter`, the refused payment is submitted anyway so the refusal is a `FAILED` transaction on-chain; its resources come from the same transfer reduced to one stroop. `pay-signal.ts` starts the web app on port 3217, buys one x402 and one MPP signal, verifies both hashes are `SUCCESS`, confirms that a third payment fails on-chain with the policy error, and stops the server. A budget that already spent in the current window is replaced by a fresh one.
+`buySignal(kind, options)` in `@tsuna/agent` runs the 402 flow, signs with the session key, and returns `{ data, paymentTxHash }` or a typed refusal such as `SpendingLimitExceeded` (3221). With a `refusalSubmitter`, the refused payment is submitted anyway so the refusal is a `FAILED` transaction on-chain; its resources come from the same transfer reduced to one stroop. `pay-signal.ts` starts the web app on port 3217, buys one x402 and one MPP signal, verifies both hashes are `SUCCESS`, confirms that a third payment fails on-chain with the policy error, and stops the server. A budget that already spent in the current window is replaced by a fresh one.
 
 ## Agent runtime
 
-`@leash/agent` runs one bounded management cycle of a vault with the Vercel AI SDK and OpenAI (`OPENAI_MODEL`, default `gpt-4.1-mini`), at most 6 model steps:
+`@tsuna/agent` runs one bounded management cycle of a vault with the Vercel AI SDK and OpenAI (`OPENAI_MODEL`, default `gpt-4.1-mini`), at most 6 model steps:
 
 ```sh
-pnpm --filter @leash/agent agent run <vault|prudent|leverage|liquidity> [--role riskoff] [--inject <file|url>] [--news <file|url>]
+pnpm --filter @tsuna/agent agent run <vault|prudent|leverage|liquidity> [--role riskoff] [--inject <file|url>] [--news <file|url>]
 ```
 
-The model gets Zod-typed tools: `read_rates` (Blend reserve APRs from the v2 rate model, the DeFindex vault's allocation, the Aquarius pool state), `read_positions` (NAV, positions per protocol, health factor, the role's usage), `read_prices` (the vault's oracle router), `simulate` and `propose_execute`, plus `buy_signal` when `LEASH_SIGNALS_URL` points at the web app and `fetch_market_news` when a page is given. Strategies (Prudent, Leverage, Liquidity, Risk-off) are a mandate and a menu of action names; the model picks an action and decimal amounts, and the runtime builds the vault calls with `actions.*` from `@leash/sdk`. Risk-off acts through `execute_as` under the vault's `riskoff` role.
+The model gets Zod-typed tools: `read_rates` (Blend reserve APRs from the v2 rate model, the DeFindex vault's allocation, the Aquarius pool state), `read_positions` (NAV, positions per protocol, health factor, the role's usage), `read_prices` (the vault's oracle router), `simulate` and `propose_execute`, plus `buy_signal` when `LEASH_SIGNALS_URL` points at the web app and `fetch_market_news` when a page is given. Strategies (Prudent, Leverage, Liquidity, Risk-off) are a mandate and a menu of action names; the model picks an action and decimal amounts, and the runtime builds the vault calls with `actions.*` from `@tsuna/sdk`. Risk-off acts through `execute_as` under the vault's `riskoff` role.
 
 The runtime is not a safety control. The model can be fooled, so every menu also offers a USDC transfer to any address, and `fetch_market_news` passes third-party pages unfiltered, only wrapped as `<untrusted_content>`. Whatever the model decides is submitted, and the vault contract accepts or refuses it on-chain (a refused call is still submitted so its `FAILED` hash and typed error exist). Each run prints a JSON-lines journal: step, tool, input, simulation result, transaction hash, status and error name, and the model's text. `runAgent({ vault, strategy, role, injection })` returns the same journal.
 
@@ -264,21 +264,21 @@ The web app keeps “Run agent” pending until `POST /api/agent` returns the co
 
 ## TypeScript SDK
 
-`@leash/sdk` (`packages/sdk`) is what the agent runtime and the web app use to talk to the contracts:
+`@tsuna/sdk` (`packages/sdk`) is what the agent runtime and the web app use to talk to the contracts:
 
-- `new Leash({ deployments })` reads `deployments/testnet.json` (or `LEASH_DEPLOYMENTS`); `vaults()` lists every factory vault with NAV, price per share, roles and adapters; `vault(address)` returns a client for reads (`nav`, `positions`, `policy`, `roles`, `usage`, `dailyLoss`, `protocolHash`, `haltedProtocols`), `deposit`/`withdraw`, `simulateExecute`/`execute`, `checkDrawdown`, `checkProtocols` and `acknowledgeProtocol`; `createVault` deploys through the factory and registers the initial policy.
+- `new Tsuna({ deployments })` reads `deployments/testnet.json` (or `LEASH_DEPLOYMENTS`); `vaults()` lists every factory vault with NAV, price per share, roles and adapters; `vault(address)` returns a client for reads (`nav`, `positions`, `policy`, `roles`, `usage`, `dailyLoss`, `protocolHash`, `haltedProtocols`), `deposit`/`withdraw`, `simulateExecute`/`execute`, `checkDrawdown`, `checkProtocols` and `acknowledgeProtocol`; `createVault` deploys through the factory and registers the initial policy.
 - `actions.*` build the exact calls the vault makes (Blend `submit_with_allowance` requests, DeFindex, Soroswap, Aquarius); `presets` hold one rule per protocol action (loss tolerance 10 bps between stablecoins, 50 bps with a volatile asset, custody contracts as guards) plus a `riskOff` role, and `composePolicy` turns them into a `PolicyV2`.
 - `execute(member, call, { submitEvenIfRefused: true })` submits a call the vault refuses so the refusal is recorded on-chain: a failed preflight has no budget, so the footprint is the union of valid simulations of the same vault (NAV, counters, registry policy, optionally a valid sibling call for refusals after the protocol call), with the vault's entries read-write and the member's authorization nonce added. `decodeError` names every vault, registry, oracle, factory and signal-budget code.
 - `leaderboard()` pages `NavSnapshot` events with `getEvents`; history is bounded by the RPC's retention (about 7 days on testnet), so each row reports the first snapshot it still sees.
 
-The contract specs are vendored from the release WASM (`pnpm --filter @leash/sdk specs` after `stellar contract build`) and interpreted by the Stellar SDK's `contract.Spec`; generated binding packages pin their own SDK version and browser polyfills, which do not fit this workspace. Maps are sorted in host order before submission.
+The contract specs are vendored from the release WASM (`pnpm --filter @tsuna/sdk specs` after `stellar contract build`) and interpreted by the Stellar SDK's `contract.Spec`; generated binding packages pin their own SDK version and browser polyfills, which do not fit this workspace. Maps are sorted in host order before submission.
 
-The test suite includes testnet reads and one write smoke. Its fixtures come from `pnpm --filter @leash/sdk testnet:setup`, which creates the `LEASH_SDKTEST_*` burner keys, borrows test USDC on Blend, deploys a vault with a preset policy and a vault without policy (to simulate `register`), and records them in `deployments/sdk.testnet.json`.
+The test suite includes testnet reads and one write smoke. Its fixtures come from `pnpm --filter @tsuna/sdk testnet:setup`, which creates the `LEASH_SDKTEST_*` burner keys, borrows test USDC on Blend, deploys a vault with a preset policy and a vault without policy (to simulate `register`), and records them in `deployments/sdk.testnet.json`.
 
 ## Attack scenarios
 
 ```sh
-pnpm --filter @leash/agent attacks [injection | blend-redirect | defindex-shares | fake-token-route | stolen-key ...]
+pnpm --filter @tsuna/agent attacks [injection | blend-redirect | defindex-shares | fake-token-route | stolen-key ...]
 ```
 
 Each scenario sends a real transaction to a demo vault on testnet and prints `BLOCKED <error> <hash>` once `getTransaction` reports it `FAILED` with the expected error:
@@ -291,13 +291,13 @@ Each scenario sends a real transaction to a demo vault on testnet and prints `BL
 | `fake-token-route` | Leverage | Soroswap swap routed USDC → `LURE` (a token the attacker issues) → XLM | `AssetNotAllowed` |
 | `stolen-key` | Prudent | The attacker's account submits a DeFindex withdrawal to itself, authorized with the agent's session key | `DestinationNotVault` |
 
-Only `injection` goes through the model, and the output says whether the model obeyed: if it does not submit the transfer, the injected call is submitted as written and labelled as sent by the attacker. The other four are calls a compromised runtime or a key thief would build, which the agent's action menu cannot express. Crafted calls are simulated first and never sent if the vault would accept them. `runAttack(id)` in `@leash/agent` returns the same result (hash, error, who chose the call, and the agent journal for `injection`).
+Only `injection` goes through the model, and the output says whether the model obeyed: if it does not submit the transfer, the injected call is submitted as written and labelled as sent by the attacker. The other four are calls a compromised runtime or a key thief would build, which the agent's action menu cannot express. Crafted calls are simulated first and never sent if the vault would accept them. `runAttack(id)` in `@tsuna/agent` returns the same result (hash, error, who chose the call, and the agent journal for `injection`).
 
 The Prudent policy allowlists DeFindex `transfer` with an open recipient on purpose, for the `defindex-shares` scenario: the rule passes, and the NAV check after the call refuses any transfer worth more than the call's 10 bps loss tolerance.
 
 The web lab is at `/agents/prudent/attack`, also linked from each vault. Launch one scenario at a time: the first unplayed attack is highlighted, pending transactions disable the other launches, and each result shows the decoded refusal, an explorer receipt and whether the model or attacker chose the call. Four scenarios target Prudent; the fake-token route targets Leverage, regardless of the vault page used to enter the lab. Results are the latest run per scenario on the serving instance, not a permanent history.
 
-The **Leash rules** tab shows the selected vault's exposure caps, rolling loss budget and protocol upgrade watch (pinned versus current executable hashes). **Revoke session key** prepares an unsigned `revoke_session` transaction for the vault's creator wallet; Stellar Wallets Kit signs locally and the relayer sponsors its fee. Depositors cannot revoke the session. Revocation leaves withdrawals and independent risk-off roles available, but stops subsequent default-agent attacks until the creator calls `rotate_session`. No server admin signature is used for this control.
+The **Tsuna rules** tab shows the selected vault's exposure caps, rolling loss budget and protocol upgrade watch (pinned versus current executable hashes). **Revoke session key** prepares an unsigned `revoke_session` transaction for the vault's creator wallet; Stellar Wallets Kit signs locally and the relayer sponsors its fee. Depositors cannot revoke the session. Revocation leaves withdrawals and independent risk-off roles available, but stops subsequent default-agent attacks until the creator calls `rotate_session`. No server admin signature is used for this control.
 
 ```sh
 pnpm --dir web exec playwright test attack.spec.ts
@@ -306,11 +306,11 @@ pnpm --dir web exec playwright test attack.spec.ts
 ## Keeper and protocol upgrades
 
 ```sh
-pnpm --filter @leash/agent keeper [vault ...]
+pnpm --filter @tsuna/agent keeper [vault ...]
 curl -X POST -H "Authorization: Bearer $KEEPER_TOKEN" https://<app>/api/keeper
 ```
 
-One pass over every factory vault (both entry points run `runKeeper` from `@leash/agent`, signed by `LEASH_KEEPER_SECRET`):
+One pass over every factory vault (both entry points run `runKeeper` from `@tsuna/agent`, signed by `LEASH_KEEPER_SECRET`):
 
 1. **Protocol upgrades.** Soroban contracts can replace their own code, so an allowlisted protocol could become something else after the creator approved it. Each vault pins the Wasm hash of every protocol it calls: `execute` pins it on first use (`Address::executable()`) and refuses a target whose hash changed with `ProtocolChanged` (37). The keeper reads each protocol's instance entry with `getLedgerEntries` (resolving CAP-85 executable refs) and compares it with `protocol_hash` on the vault; on a mismatch it calls the permissionless `check_protocols`, which re-reads the hash on-chain, pauses the vault and emits `ProtocolUpgraded`. The keeper logs a `protocol upgraded` entry. Withdrawals stay open. The owner resumes with `acknowledge_protocol(protocol, hash)` at the current hash; that lifts the pause only if the watch caused it, never a drawdown pause.
 2. **Drawdown.** `check_drawdown` pauses a vault whose price per share fell more than `max_drawdown_bps` below its rolling 24 h peak, and records a `NavSnapshot`.
@@ -333,7 +333,7 @@ The model can choose not to trade, including when simulations are refused. Those
 
 ```sh
 pnpm tsx scripts/align-liquidity.ts
-pnpm --filter @leash/agent agent run liquidity
+pnpm --filter @tsuna/agent agent run liquidity
 ```
 
 Testnet pools have no external arbitrage keeping them at the oracle price. The maintenance command adds liquidity to the existing Soroswap XLM/USDC-Blend pair up to a 15,000 USDC reserve, then swaps the admin's funds to align that pair and the Aquarius pool with the current strict oracle price. It uses `LEASH_ADMIN_SECRET`, borrows test USDC from Blend when needed, and funds XLM through Friendbot. Successful pool-maintenance hashes are recorded in `deployments/testnet.json`; no vault policy, price override or pause state is changed.
@@ -359,4 +359,4 @@ Runs on the Leverage vault, whose router is the demo-mode build (`is_demo()` is 
 
 Each step is checked with `getTransaction`. Afterwards the script clears the price override, unpauses the vault and puts the Leverage position back, so it can run again. The Leverage vault keeps `max_drawdown_bps` at 25: its XLM position is small next to its idle USDC, so a 30 % XLM drop moves the share price by about 44 bps, which never reaches a 20 % limit. The script prints the expected move and stops if it would not breach the limit.
 
-The same steps run from the app: the Leverage vault page has a "Market crash (testnet demo oracle)" panel that sends one step per click through `/api/crash` (`CrashScenario` in `@leash/agent`, shared with the script), shows each refusal as a wall with its failed transaction, and reads the health factor, NAV and pause live. The server runs one crash at a time, rate-limits new runs, and restores the price and the pause on its own after 10 minutes without a step. Transactions are paid by `LEASH_CRASH_FEE_SECRET` (the admin, agent and risk-off keys only sign their authorization entries; the fee payer calls the permissionless `check_drawdown`), and `LEASH_CRASH_DEPOSITOR_SECRET` is the demo depositor, which borrows its test USDC on Blend against Friendbot XLM the first time.
+The same steps run from the app: the Leverage vault page has a "Market crash (testnet demo oracle)" panel that sends one step per click through `/api/crash` (`CrashScenario` in `@tsuna/agent`, shared with the script), shows each refusal as a wall with its failed transaction, and reads the health factor, NAV and pause live. The server runs one crash at a time, rate-limits new runs, and restores the price and the pause on its own after 10 minutes without a step. Transactions are paid by `LEASH_CRASH_FEE_SECRET` (the admin, agent and risk-off keys only sign their authorization entries; the fee payer calls the permissionless `check_drawdown`), and `LEASH_CRASH_DEPOSITOR_SECRET` is the demo depositor, which borrows its test USDC on Blend against Friendbot XLM the first time.

@@ -4,7 +4,7 @@ import deployment from "../../../deployments/pay.testnet.json";
 export const NETWORK = "stellar:testnet" as const;
 export const NETWORK_PASSPHRASE = Networks.TESTNET;
 export const USDC = deployment.usdc;
-/** Signal revenue goes to the Leash operations account, which holds a USDC trustline. */
+/** Signal revenue goes to the Tsuna operations account, which holds a USDC trustline. */
 export const PAY_TO = deployment.payTo;
 export const USDC_DECIMALS = 7;
 

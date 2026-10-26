@@ -18,12 +18,12 @@ import { CrashPanel } from "./crash";
 import { DepositPanel } from "./deposit-panel";
 import { VaultKpis } from "./kpis";
 import { Positions } from "./positions";
-import { LeashRules } from "./rules";
+import { TsunaRules } from "./rules";
 import { Timeline } from "./timeline";
 
 type Tab = "overview" | "activity" | "rules";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" }, { id: "activity", label: "Activity" }, { id: "rules", label: "Leash rules" },
+  { id: "overview", label: "Overview" }, { id: "activity", label: "Activity" }, { id: "rules", label: "Tsuna rules" },
 ];
 /** Journal items shown on the overview; the Activity tab has them all. */
 const OVERVIEW_ITEMS = 12;
@@ -57,7 +57,7 @@ function SkeletonPage() {
   );
 }
 
-/** Vault page: KPIs, positions, the agent's journal, the leash, and the deposit panel. */
+/** Vault page: KPIs, positions, the agent's journal, its rules, and the deposit panel. */
 export function VaultView({ id }: { id: string }) {
   const vault = useVault(id);
   const run = useAgentRun(id);
@@ -187,7 +187,7 @@ export function VaultView({ id }: { id: string }) {
           )}
 
           {tab === "rules" && (
-            <div id="panel-rules" role="tabpanel" aria-labelledby="tab-rules"><LeashRules vault={data} /></div>
+            <div id="panel-rules" role="tabpanel" aria-labelledby="tab-rules"><TsunaRules vault={data} /></div>
           )}
         </div>
 

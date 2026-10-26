@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { Address, Contract, Keypair, Transaction, TransactionBuilder, nativeToScVal } from "@stellar/stellar-sdk";
-import { Leash, actions } from "@leash/sdk";
+import { Tsuna, actions } from "@tsuna/sdk";
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
 
@@ -21,7 +21,7 @@ test("the creator revokes a stolen session without closing withdrawals", async (
   test.setTimeout(360_000);
   const asset = target?.assets[0];
   if (!target || !asset) throw new Error("No runtime test vault or base asset");
-  const client = new Leash();
+  const client = new Tsuna();
   const vault = client.vault(target.address);
   const owner = key("LEASH_AGENTRUN_OWNER_SECRET");
   const member = key("LEASH_AGENTRUN_AGENT_SECRET");

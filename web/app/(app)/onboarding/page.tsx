@@ -3,7 +3,7 @@ import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { PageHeader, PageLayout } from "@/components/ui/page-layout";
 
 export const metadata: Metadata = {
-  title: "Create your account — Leash",
+  title: "Create your account — Tsuna",
   description: "A passkey on this device. No seed phrase, no gas.",
 };
 
@@ -14,7 +14,7 @@ export default function OnboardingPage() {
       <PageLayout>
         <PageHeader title="Create your account" description="A passkey on this device. No seed phrase, no gas." />
         <OnboardingFlow faucetAmount={faucetAmount} />
-        <footer className="border-t py-6 text-caption text-muted-foreground">Leash · Stellar testnet · No real funds.</footer>
+        <footer className="border-t py-6 text-caption text-muted-foreground">Tsuna · Stellar testnet · No real funds.</footer>
       </PageLayout>
     </>
   );

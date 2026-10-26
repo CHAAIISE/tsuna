@@ -75,12 +75,12 @@ export async function deployAccount(publicKey: Uint8Array, credentialId: Uint8Ar
 async function assertPasskeyAccount(account: string): Promise<void> {
   if (!StrKey.isValidContract(account)) throw new SponsorError("Expected a passkey account address (C…).");
   if (await contractWasmHash(account) !== passkeyDeployment.accountWasmHash) {
-    throw new SponsorError("Only Leash passkey accounts can use the relayer.", 403);
+    throw new SponsorError("Only Tsuna passkey accounts can use the relayer.", 403);
   }
 }
 
 function invocationOperation({ contract, method, args }: Invocation, auth: xdr.SorobanAuthorizationEntry[] = []): xdr.Operation {
-  if (!sponsoredContracts().has(contract)) throw new SponsorError("The relayer only pays for calls to Leash and USDC contracts.", 403);
+  if (!sponsoredContracts().has(contract)) throw new SponsorError("The relayer only pays for calls to Tsuna and USDC contracts.", 403);
   if (!/^[a-z_][a-z0-9_]{0,31}$/.test(method)) throw new SponsorError("Invalid method name.");
   return Operation.invokeContractFunction({
     contract,
@@ -165,7 +165,7 @@ export async function feeBump(signedXdr: string): Promise<{ hash: string }> {
     throw new SponsorError("The relayer only sponsors contract calls.", 403);
   }
   const target = Address.fromScAddress(func.invokeContract.contractAddress).toString();
-  if (!sponsoredContracts().has(target)) throw new SponsorError("The relayer only pays for calls to Leash and USDC contracts.", 403);
+  if (!sponsoredContracts().has(target)) throw new SponsorError("The relayer only pays for calls to Tsuna and USDC contracts.", 403);
   const envelope = inner.toEnvelope();
   const ext = envelope.type === "envelopeTypeTx" ? envelope.v1.tx.ext : undefined;
   if (!ext || ext.type !== "sorobanData" || ext.sorobanData.resourceFee > MAX_RESOURCE_FEE) {

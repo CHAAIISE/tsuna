@@ -1,6 +1,6 @@
 import "server-only";
 import { Address, nativeToScVal } from "@stellar/stellar-sdk";
-import { fleetConfig, fleetRecord, leash, type FleetConfig, type FleetId } from "./config";
+import { fleetConfig, fleetRecord, tsuna, type FleetConfig, type FleetId } from "./config";
 import { contractMeta, exportedFunctions } from "./wasm";
 
 /** Functions every `agent_vault` build exports; a fleet may only move to a build that has them. */
@@ -48,7 +48,7 @@ const wasmCache = new Map<string, Promise<Uint8Array | null>>();
 export function uploadedWasm(hash: string): Promise<Uint8Array | null> {
   let cached = wasmCache.get(hash);
   if (!cached) {
-    cached = leash().server.getContractWasmByHash(Buffer.from(hash, "hex"))
+    cached = tsuna().server.getContractWasmByHash(Buffer.from(hash, "hex"))
       .then(wasm => new Uint8Array(wasm))
       .catch(() => null);
     // A missing build may be uploaded later: only cache hits.
@@ -78,7 +78,7 @@ export async function buildInfo(hash: string): Promise<BuildInfo> {
 const hex = (bytes: Uint8Array | Buffer) => Buffer.from(bytes).toString("hex");
 
 async function readVault(address: string, config: FleetConfig): Promise<FleetVault> {
-  const client = leash();
+  const client = tsuna();
   const instance = await client.server.getContractInstance(address);
   const { executable } = instance;
   let executableRef: FleetVault["executableRef"] = null;
@@ -112,7 +112,7 @@ async function readVault(address: string, config: FleetConfig): Promise<FleetVau
 export async function readFleet(id: FleetId): Promise<FleetState | null> {
   const config = fleetConfig(id);
   if (!config) return null;
-  const client = leash();
+  const client = tsuna();
   const tag = nativeToScVal(fleetRecord.tag, { type: "string" });
   const [addresses, current, pending, timelock, admins] = await Promise.all([
     client.read<string[]>(config.factory, "vaults"),

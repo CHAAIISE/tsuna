@@ -13,7 +13,7 @@ import {
 } from "@/lib/fleet/strategies";
 
 const EXPLORER = "https://stellar.expert/explorer/testnet";
-const STEPS = ["Strategy", "Leash rules", "Review"] as const;
+const STEPS = ["Strategy", "Tsuna rules", "Review"] as const;
 
 interface Published {
   vault: string;
@@ -113,7 +113,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
   if (published) {
     const txs = [
       { label: "Vault deployed by the factory", hash: published.deployTx },
-      { label: "Leash rules registered", hash: published.registerTx },
+      { label: "Tsuna rules registered", hash: published.registerTx },
       ...published.adapterTxs.map((hash, index) => ({ label: `${venues[index]?.label ?? "Protocol"} position tracking`, hash })),
     ];
     return (
@@ -176,7 +176,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
             </fieldset>
           </CardContent>
           <CardFooter>
-            <Button data-primary onClick={() => setStep(1)}>Next: Leash rules</Button>
+            <Button data-primary onClick={() => setStep(1)}>Next: Tsuna rules</Button>
           </CardFooter>
         </Card>
       )}
@@ -184,7 +184,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
       {step === 1 && (
         <Card>
           <CardHeader>
-            <CardTitle>Leash rules</CardTitle>
+            <CardTitle>Tsuna rules</CardTitle>
             <CardDescription>Composed from the SDK&apos;s protocol presets. The chain refuses any call outside them, whatever the agent is told.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 sm:space-y-8">
@@ -232,7 +232,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
         <Card>
           <CardHeader>
             <CardTitle>Review</CardTitle>
-            <CardDescription>Publishing deploys the vault through the Leash factory and registers these rules before any deposit.</CardDescription>
+            <CardDescription>Publishing deploys the vault through the Tsuna factory and registers these rules before any deposit.</CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="divide-y rounded-lg border text-sm">
@@ -255,7 +255,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
               {publishing ? "Waiting for Stellar…" : "Publish"}
             </Button>
             <Button variant="outline" disabled={publishing} onClick={() => setStep(1)}>Back</Button>
-            {creator && <span className="text-caption text-muted-foreground">Signed by the testnet demo creator; fees paid by Leash.</span>}
+            {creator && <span className="text-caption text-muted-foreground">Signed by the testnet demo creator; fees paid by Tsuna.</span>}
           </CardFooter>
           {creator && (
             <CardContent>

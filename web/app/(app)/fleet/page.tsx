@@ -10,8 +10,8 @@ import { isFleetId, type FleetId } from "@/lib/fleet/config";
 import { readFleet } from "@/lib/fleet/read";
 
 export const metadata: Metadata = {
-  title: "Fleet — Leash",
-  description: "Every Leash vault runs one factory-held executable: one timelocked patch upgrades them all.",
+  title: "Fleet — Tsuna",
+  description: "Every Tsuna vault runs one factory-held executable: one timelocked patch upgrades them all.",
 };
 
 const fleets: { id: FleetId; label: string }[] = [

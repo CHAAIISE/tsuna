@@ -4,7 +4,7 @@
  * otherwise.
  */
 
-/** A contract error, named and explained by `@leash/sdk`. */
+/** A contract error, named and explained by `@tsuna/sdk`. */
 export interface TypedError {
   contract: string;
   code: number;
@@ -32,7 +32,7 @@ export interface AgentRow {
   /** Route segment: the deployment slug when the vault has one, else its address. */
   id: string;
   name: string;
-  /** Vaults of the Leash demo fleet (`deployments/testnet.json`). */
+  /** Vaults of the Tsuna demo fleet (`deployments/testnet.json`). */
   featured: boolean;
   strategyId: string | null;
   strategy: string | null;
@@ -133,7 +133,7 @@ export interface VaultDetail extends AgentRow {
   exposure: ExposureView[];
   policy: PolicyView | null;
   roleViews: RoleView[];
-  /** Deposits and withdrawals can go through the Leash relayer for this vault. */
+  /** Deposits and withdrawals can go through the Tsuna relayer for this vault. */
   sponsored: boolean;
   /** The server holds the member keys to run this vault's agent. */
   runnable: boolean;

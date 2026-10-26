@@ -10,7 +10,7 @@ test("publishing an agent deploys a factory vault with its rules", async ({ page
     await page.getByTestId("strategy-yield").click();
     await page.locator("[data-primary]:visible").click();
 
-    await expect(page.getByRole("heading", { name: "Leash rules" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tsuna rules" })).toBeVisible();
     await page.getByText("0.25 %").click();
     await page.getByText("60 % per position protocol").click();
     await page.getByTestId("risk-off-option").click();

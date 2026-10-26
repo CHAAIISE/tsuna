@@ -2,7 +2,7 @@ import { LockKeyhole } from "lucide-react";
 import type { RuleCount } from "@/lib/stellar/types";
 
 /** Number of on-chain rules the vault enforces (allowlisted calls plus limits). */
-export function LeashBadge({ rules }: { rules: RuleCount | null }) {
+export function RulesBadge({ rules }: { rules: RuleCount | null }) {
   if (!rules) return <span className="text-caption text-muted-foreground">No policy</span>;
   return (
     <span

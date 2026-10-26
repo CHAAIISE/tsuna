@@ -43,7 +43,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await test.step("creator reviews rules without losing its next action", async () => {
       await page.goto("/create");
       await page.locator("[data-primary]:visible").click();
-      await expect(page.getByRole("heading", { name: "Leash rules", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Tsuna rules", exact: true })).toBeVisible();
       await guidedScreen(page);
       await page.locator("[data-primary]:visible").click();
       await expect(page.getByRole("heading", { name: "Review", exact: true })).toBeVisible();
@@ -54,7 +54,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
 
     await test.step("attack rules retain a single recovery action", async () => {
       await page.goto("/agents/prudent/attack");
-      await page.getByRole("tab", { name: "Leash rules", exact: true }).click();
+      await page.getByRole("tab", { name: "Tsuna rules", exact: true }).click();
       await guidedScreen(page);
     });
   });

@@ -15,7 +15,7 @@ export interface PasskeyAccount {
 }
 
 const STORAGE_KEY = "leash.passkey-account";
-const CHANGE_EVENT = "leash:passkey-account";
+const CHANGE_EVENT = "tsuna:passkey-account";
 
 /** Subscribes to changes of the remembered account, in this tab and others. */
 export function subscribePasskeyAccount(onChange: () => void): () => void {

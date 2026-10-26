@@ -23,7 +23,7 @@ export interface VaultActionInput {
 /**
  * Deposits into or withdraws from a vault with the passkey account: the vault
  * call is simulated first (a refusal shows its typed error), then the passkey
- * signs and the Leash relayer submits and pays the fee. Afterwards the user's
+ * signs and the Tsuna relayer submits and pays the fee. Afterwards the user's
  * holdings, the vault and its activity are read again, bypassing server caches.
  */
 export function useVaultAction(vault: { id: string; address: string }, owner: PasskeyAccount | null) {

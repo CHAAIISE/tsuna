@@ -24,7 +24,7 @@ export default function DesignPage() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-card focus:p-4">Skip to content</a>
       <AppNavigation />
       <PageLayout>
-        <PageHeader title="A measured kind of control." description="Leash design system. Clear actions, quiet surfaces, unmistakable boundaries." aside={<Badge variant="secondary">Component library · development only</Badge>} />
+        <PageHeader title="A measured kind of control." description="Tsuna design system. Clear actions, quiet surfaces, unmistakable boundaries." aside={<Badge variant="secondary">Component library · development only</Badge>} />
         <OnboardingSteps currentStep={1} />
         <div className="grid items-start gap-8 lg:grid-cols-3">
           <section className="space-y-8 lg:col-span-2" aria-label="Design foundations">
@@ -33,13 +33,13 @@ export default function DesignPage() {
               <CardContent className="space-y-6">
                 <p className="text-page font-normal tracking-tight">Rules, not reassurance.</p>
                 <p className="max-w-lg text-base text-muted-foreground">Every action should explain what happens next. Every refusal should explain what the chain protected.</p>
-                <p className="font-editorial text-4xl font-medium text-heading">The chain holds the leash.</p>
+                <p className="font-editorial text-4xl font-medium text-heading">The chain holds the rope.</p>
                 <div className="flex flex-wrap gap-2"><Badge>On-chain rules</Badge><Badge variant="success">Authorized</Badge><Badge variant="destructive">Blocked</Badge><Badge variant="secondary">Testnet only</Badge></div>
               </CardContent>
               <CardFooter><Button asChild data-primary><a href="#components">Explore components <ArrowRight aria-hidden="true" /></a></Button><Button asChild variant="outline"><a href="#states">View feedback states</a></Button></CardFooter>
             </Card>
             <Card>
-              <CardHeader><CardTitle>A name with a boundary</CardTitle><CardDescription>The serif L extends into a leash. Its ring is the only blue accent.</CardDescription></CardHeader>
+              <CardHeader><CardTitle>A name with a boundary</CardTitle><CardDescription>The serif T&apos;s crossbar runs into a mooring loop. The loop is the only blue accent.</CardDescription></CardHeader>
               <CardContent className="flex flex-wrap items-end gap-8">
                 <Logo className="h-12" />
                 <div className="flex items-end gap-6">
@@ -77,7 +77,7 @@ export default function DesignPage() {
             </Card>
           </aside>
         </div>
-        <footer className="border-t py-6 text-caption text-muted-foreground">Leash · Stellar testnet · No real funds.</footer>
+        <footer className="border-t py-6 text-caption text-muted-foreground">Tsuna · Stellar testnet · No real funds.</footer>
       </PageLayout>
     </>
   );

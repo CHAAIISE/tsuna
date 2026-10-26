@@ -11,7 +11,7 @@ const links = [
 function LandingHeader() {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-6 border-b bg-background/90 px-6 py-5 backdrop-blur sm:px-12">
-      <Link href="/" aria-label="Leash home" className="rounded-sm">
+      <Link href="/" aria-label="Tsuna home" className="rounded-sm">
         <Logo className="h-9" />
       </Link>
       <nav aria-label="Page sections" className="hidden md:block">

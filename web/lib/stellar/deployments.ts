@@ -1,5 +1,5 @@
 import "server-only";
-import { TESTNET, parseDeployments, type Deployments } from "@leash/sdk";
+import { TESTNET, parseDeployments, type Deployments } from "@tsuna/sdk";
 import agentFile from "../../../deployments/agent.testnet.json";
 import passkeyFile from "../../../deployments/passkey.testnet.json";
 import fleetFile from "../../../deployments/testnet.json";
@@ -51,9 +51,9 @@ const protocolNames: [string | undefined, string][] = [
   [TESTNET.soroswapRouter, "Soroswap"],
   [TESTNET.aquariusRouter, "Aquarius router"],
   [TESTNET.defindexBlendUsdcStrategy, "DeFindex strategy"],
-  [fleet.oracleRouter, "Leash oracle"],
-  [fleet.policyRegistry, "Leash registry"],
-  [fleet.factory, "Leash factory"],
+  [fleet.oracleRouter, "Tsuna oracle"],
+  [fleet.policyRegistry, "Tsuna registry"],
+  [fleet.factory, "Tsuna factory"],
   [passkeyFile.usdc, "USDC"],
   [TESTNET.xlm, "XLM"],
 ];

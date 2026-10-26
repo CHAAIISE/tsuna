@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { Account, Contract, Keypair, Networks, TransactionBuilder, rpc, scValToNative } from "@stellar/stellar-sdk";
-import { Leash, parseDeployments } from "@leash/sdk";
+import { Tsuna, parseDeployments } from "@tsuna/sdk";
 import { expect, test } from "@playwright/test";
 
 const deployment = <T>(file: string) => JSON.parse(readFileSync(new URL(`../../deployments/${file}`, import.meta.url), "utf8")) as T;
@@ -60,7 +60,7 @@ test("the leaderboard lists the three demo agents with values read on-chain", as
 
 test("only the demo agents and agents published with Create are listed and counted", async ({ page }) => {
   // Every vault on the demo factory, with the creator its registry records.
-  const onFactory = await new Leash({ deployments: parseDeployments(deployment("testnet.json")) }).vaults();
+  const onFactory = await new Tsuna({ deployments: parseDeployments(deployment("testnet.json")) }).vaults();
   const secret = process.env.LEASH_CREATOR_SECRET;
   const publisher = secret ? Keypair.fromSecret(secret).publicKey() : null;
   const demo = new Set(fleet.vaults.map(vault => vault.address));

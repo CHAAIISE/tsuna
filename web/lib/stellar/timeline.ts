@@ -1,5 +1,5 @@
-import { describeError, type ErrorSource } from "@leash/sdk";
-import type { JournalEntry } from "@leash/agent";
+import { describeError, type ErrorSource } from "@tsuna/sdk";
+import type { JournalEntry } from "@tsuna/agent";
 import type { VaultEvent } from "./chain-events";
 import type { JournalRecord } from "./journal-store";
 import type { TimelineAction, TimelineItem, TimelineNote, TypedError } from "./types";

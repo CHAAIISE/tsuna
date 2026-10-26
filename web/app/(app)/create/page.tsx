@@ -5,8 +5,8 @@ import { serverKey } from "@/lib/fleet/config";
 import { publisherAccount, presetCatalog } from "@/lib/fleet/create";
 
 export const metadata: Metadata = {
-  title: "Publish an agent — Leash",
-  description: "Choose a strategy, then the rules its agent can never break. The vault is deployed by the Leash factory on Stellar testnet.",
+  title: "Publish an agent — Tsuna",
+  description: "Choose a strategy, then the rules its agent can never break. The vault is deployed by the Tsuna factory on Stellar testnet.",
 };
 
 export default function CreatePage() {

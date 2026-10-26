@@ -1,12 +1,12 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { Address, Contract, Keypair, xdr } from "@stellar/stellar-sdk";
-import { BlendRequest, TESTNET, blendRequestVal } from "@leash/sdk";
+import { BlendRequest, TESTNET, blendRequestVal } from "@tsuna/sdk";
 import {
   CRASH_VAULT_ID, CrashError, CrashScenario, readCrashLive, type CrashKeys, type CrashLive, type CrashTx, type JournalEntry,
-} from "@leash/agent";
+} from "@tsuna/agent";
 import { ensureTrustline } from "#cctp/stellar";
-import { cached, decodeError, invalidate, leash } from "@/lib/stellar/client";
+import { cached, decodeError, invalidate, tsuna } from "@/lib/stellar/client";
 import { fleet } from "@/lib/stellar/deployments";
 import { ApiError } from "@/lib/stellar/http";
 import { appendJournal } from "@/lib/stellar/journal-store";
@@ -95,7 +95,7 @@ function liveView(live: CrashLive): CrashLiveView {
  * transaction appended to `txs` as it lands. The USDC is borrowed on Blend against Friendbot XLM.
  */
 async function fundDepositor(keys: CrashKeys, vault: string, txs: CrashTxView[]): Promise<void> {
-  const client = leash();
+  const client = tsuna();
   for (const [key, who] of [[keys.feePayer, "the fee payer"], [keys.depositor, "the demo depositor"]] as const) {
     if (!key) continue;
     try {
@@ -185,7 +185,7 @@ function newRun(keys: CrashKeys): Run {
     id: randomUUID(), startedAt: new Date().toISOString(), updatedAt: Date.now(), keys, busy: null, steps: new Map(),
     agentRunId: null, entries: [], autoRestored: false,
     scenario: new CrashScenario({
-      leash: leash(), keys, depositAmount: DEPOSIT,
+      tsuna: tsuna(), keys, depositAmount: DEPOSIT,
       onEntry: entry => {
         run.entries.push(entry);
         if (!run.agentRunId) return;
@@ -215,7 +215,7 @@ export async function startStep(step: CrashStepId): Promise<{ run: CrashRunView;
   } else if (step === "restore") {
     if (!current?.scenario.needsRestore) {
       // Only a demo price left by a run this server lost (a restart) is restored from scratch.
-      if (await readCrashLive(leash()).then(live => live.forcedPrice === null)) {
+      if (await readCrashLive(tsuna()).then(live => live.forcedPrice === null)) {
         throw new ApiError("Nothing to restore: the demo oracle forces no price.", 409);
       }
       clearTimeout(current?.idle);
@@ -240,7 +240,7 @@ export async function crashState(vaultId: string | null): Promise<{ body: CrashR
   let live: CrashLiveView | null = null;
   let liveError: string | null = null;
   try {
-    live = liveView(await cached("crash:live", LIVE_TTL, () => readCrashLive(leash())));
+    live = liveView(await cached("crash:live", LIVE_TTL, () => readCrashLive(tsuna())));
   } catch (error) {
     liveError = message(error);
   }

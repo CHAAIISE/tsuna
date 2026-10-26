@@ -48,7 +48,7 @@ test("the relayer submits a passkey-signed transfer and refuses a forged one", a
   const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
   const jwk = publicKey.export({ format: "jwk" });
   const point = new Uint8Array(Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x ?? "", "base64url"), Buffer.from(jwk.y ?? "", "base64url")]));
-  const credentialId = new Uint8Array(Buffer.from(`leash-e2e-${Date.now()}`));
+  const credentialId = new Uint8Array(Buffer.from(`tsuna-e2e-${Date.now()}`));
 
   const deployed = await post<{ account: string; hash: string }>(request, "/api/sponsor", {
     action: "deploy", publicKey: toBase64Url(point), credentialId: toBase64Url(credentialId),

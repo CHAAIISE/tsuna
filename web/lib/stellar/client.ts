@@ -1,5 +1,5 @@
 import "server-only";
-import { Leash, TESTNET, type LeashError } from "@leash/sdk";
+import { Tsuna, TESTNET, type TsunaError } from "@tsuna/sdk";
 import { rpc } from "@stellar/stellar-sdk";
 import { after } from "next/server";
 import { deployments } from "./deployments";
@@ -8,23 +8,23 @@ import type { TypedError } from "./types";
 export const RPC_URL = process.env.STELLAR_RPC_URL || TESTNET.rpcUrl;
 export const HORIZON_URL = process.env.STELLAR_HORIZON_URL || "https://horizon-testnet.stellar.org";
 
-let client: Leash | undefined;
+let client: Tsuna | undefined;
 
-/** Read client of the Leash contracts on testnet (simulations only, nothing is signed). */
-export function leash(): Leash {
-  client ??= new Leash({ deployments, rpcUrl: RPC_URL, networkPassphrase: TESTNET.networkPassphrase });
+/** Read client of the Tsuna contracts on testnet (simulations only, nothing is signed). */
+export function tsuna(): Tsuna {
+  client ??= new Tsuna({ deployments, rpcUrl: RPC_URL, networkPassphrase: TESTNET.networkPassphrase });
   return client;
 }
 
-export const rpcServer = (): rpc.Server => leash().server;
+export const rpcServer = (): rpc.Server => tsuna().server;
 
-export const typedError = (error: LeashError): TypedError => ({
+export const typedError = (error: TsunaError): TypedError => ({
   contract: error.contract, code: error.code, name: error.name, message: error.message,
 });
 
 /** Typed contract error carried by `error`, decoded by the SDK; null for other failures. */
 export function decodeError(error: unknown): TypedError | null {
-  const decoded = leash().decodeError(error);
+  const decoded = tsuna().decodeError(error);
   return decoded ? typedError(decoded) : null;
 }
 

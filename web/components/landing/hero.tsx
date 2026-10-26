@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowDown } from "lucide-react";
 
-const docsUrl = "https://github.com/CHAAIISE/leash#readme";
+const docsUrl = "https://github.com/CHAAIISE/tsuna#readme";
 
 function Hero() {
   return (
@@ -30,7 +30,7 @@ function Hero() {
           id="hero-title"
           className="font-display text-[clamp(4rem,15vw,14rem)] leading-none font-medium tracking-[0.16em] text-foreground uppercase [padding-left:0.16em]"
         >
-          Leash
+          Tsuna
         </h1>
         <p className="mt-10 font-editorial text-xl text-muted-foreground italic sm:text-2xl">
           Your agents. The chain&apos;s rules.

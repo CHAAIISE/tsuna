@@ -21,7 +21,7 @@ const errorText = (error: unknown) => {
 
 /**
  * Deposit/Withdraw panel (Morpho layout): the passkey signs the vault call,
- * the Leash relayer submits it and pays the fee. Withdrawals stay open while
+ * the Tsuna relayer submits it and pays the fee. Withdrawals stay open while
  * the vault is paused.
  */
 export function DepositPanel({ vault, owner, holding, balance }: {
@@ -110,7 +110,7 @@ export function DepositPanel({ vault, owner, holding, balance }: {
 
       <dl className="mt-4 space-y-2 text-sm">
         <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Your position</dt><dd className="tabular-nums" data-testid="your-position">{owner ? `${formatUsdc(position)} USDC` : "—"}</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Network fee</dt><dd>Paid by Leash (testnet)</dd></div>
+        <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Network fee</dt><dd>Paid by Tsuna (testnet)</dd></div>
         {mode === "withdraw" && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Withdrawals</dt><dd>Always open, even when paused</dd></div>}
       </dl>
 
@@ -137,7 +137,7 @@ export function DepositPanel({ vault, owner, holding, balance }: {
         {blockedByPause && (
           <p className="rounded-lg border-l-[3px] border-destructive bg-destructive-soft px-3 py-2">The vault is paused: deposits are closed. Withdrawals stay open.</p>
         )}
-        {!vault.sponsored && <p className="text-muted-foreground">The Leash relayer only sponsors calls to listed vaults; this one is not listed.</p>}
+        {!vault.sponsored && <p className="text-muted-foreground">The Tsuna relayer only sponsors calls to listed vaults; this one is not listed.</p>}
         {owner && mode === "deposit" && (balance === null || balance === "0") && <p className="text-muted-foreground">This account has no USDC yet. <Link href="/onboarding" className="text-primary hover:underline">Get test USDC</Link></p>}
         {owner && mode === "withdraw" && shares === 0n && <p className="text-muted-foreground">You have no shares in this vault yet. Make a deposit first, then you can withdraw here.</p>}
         {refusal && (

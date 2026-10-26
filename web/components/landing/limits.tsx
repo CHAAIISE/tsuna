@@ -16,13 +16,13 @@ function Limits() {
         </div>
         <div className="space-y-4 text-lg leading-relaxed text-muted-foreground">
           <p>
-            The leash stops the agent from moving value out of the vault. It can&apos;t make Blend, Soroswap or any
+            Tsuna stops the agent from moving value out of the vault. It can&apos;t make Blend, Soroswap or any
             other protocol unhackable: once funds sit in a protocol, they share its risk.
           </p>
           <p>
             What bounds that loss is the exposure cap on each protocol and the pause when a drawdown passes the limit.
             The agent can also lose money inside its rules, within the per-call tolerance and the daily loss budget.
-            Leash bounds the worst case; it doesn&apos;t promise returns.
+            Tsuna bounds the worst case; it doesn&apos;t promise returns.
           </p>
         </div>
       </div>

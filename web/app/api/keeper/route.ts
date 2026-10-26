@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Leash, parseDeployments } from "@leash/sdk";
-import { runKeeper } from "@leash/agent/keeper";
+import { Tsuna, parseDeployments } from "@tsuna/sdk";
+import { runKeeper } from "@tsuna/agent/keeper";
 import deployments from "../../../../deployments/testnet.json";
 
 // One pass sends up to two transactions per vault and waits for each.
@@ -26,7 +26,7 @@ async function keep(request: Request): Promise<Response> {
   if (!secret) return Response.json({ error: "The keeper key is not configured." }, { status: 503 });
   try {
     const report = await runKeeper({
-      leash: new Leash({ deployments: parseDeployments(deployments) }),
+      tsuna: new Tsuna({ deployments: parseDeployments(deployments) }),
       keeper: Keypair.fromSecret(secret),
     });
     return Response.json(report);

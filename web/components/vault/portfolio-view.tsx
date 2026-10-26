@@ -39,7 +39,7 @@ export function PortfolioView() {
     return (
       <Card className="flex flex-col items-start gap-4 p-4 sm:p-6">
         <p className="text-subheading font-medium">Sign in to see your deposits</p>
-        <p className="max-w-xl text-sm text-muted-foreground">Your passkey account lives on this device. Leash reads its vault shares and USDC balance straight from Stellar testnet.</p>
+        <p className="max-w-xl text-sm text-muted-foreground">Your passkey account lives on this device. Tsuna reads its vault shares and USDC balance straight from Stellar testnet.</p>
         <Button asChild data-primary><Link href="/onboarding"><Fingerprint aria-hidden="true" />Sign in with passkey</Link></Button>
       </Card>
     );
@@ -78,7 +78,7 @@ export function PortfolioView() {
         )}
         {data && list.length === 0 && (
           <div className="space-y-2 px-6 pt-2 pb-8">
-            <p className="text-sm text-muted-foreground">No deposit yet. Pick an agent, read its leash, then deposit.</p>
+            <p className="text-sm text-muted-foreground">No deposit yet. Pick an agent, read its rules, then deposit.</p>
           </div>
         )}
         {list.length > 0 && (

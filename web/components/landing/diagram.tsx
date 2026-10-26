@@ -1,6 +1,6 @@
-const title = "Agent proposes, Leash checks, protocols execute";
+const title = "Agent proposes, Tsuna checks, protocols execute";
 const desc =
-  "The agent holds a session key and proposes a call. The Leash vault checks the call, runs it, then checks the result in the same transaction. Allowed calls reach Blend, DeFindex, Soroswap and Aquarius. Anything off reverts the whole transaction.";
+  "The agent holds a session key and proposes a call. The Tsuna vault checks the call, runs it, then checks the result in the same transaction. Allowed calls reach Blend, DeFindex, Soroswap and Aquarius. Anything off reverts the whole transaction.";
 
 function Wide() {
   return (
@@ -28,7 +28,7 @@ function Wide() {
 
       <rect x="378" y="40" width="270" height="200" rx="20" className="fill-card stroke-primary" strokeWidth="1.5" />
       <text x="404" y="82" className="fill-muted-foreground text-[13px] tracking-[0.12em]">02</text>
-      <text x="404" y="120" className="fill-heading font-editorial text-[34px] font-semibold">Leash</text>
+      <text x="404" y="120" className="fill-heading font-editorial text-[34px] font-semibold">Tsuna</text>
       <text x="404" y="152" className="fill-muted-foreground text-[14px]">1. Checks the call</text>
       <text x="404" y="176" className="fill-muted-foreground text-[14px]">2. Runs it</text>
       <text x="404" y="200" className="fill-muted-foreground text-[14px]">3. Checks the result</text>
@@ -69,7 +69,7 @@ function Tall() {
       <text x="184" y="128" className="fill-muted-foreground text-[13px]">proposes</text>
 
       <rect x="1" y="160" width="338" height="200" rx="20" className="fill-card stroke-primary" strokeWidth="1.5" />
-      <text x="22" y="204" className="fill-heading font-editorial text-[32px] font-semibold">Leash</text>
+      <text x="22" y="204" className="fill-heading font-editorial text-[32px] font-semibold">Tsuna</text>
       <text x="22" y="236" className="fill-muted-foreground text-[14px]">1. Checks the call</text>
       <text x="22" y="260" className="fill-muted-foreground text-[14px]">2. Runs it</text>
       <text x="22" y="284" className="fill-muted-foreground text-[14px]">3. Checks the result, same transaction</text>

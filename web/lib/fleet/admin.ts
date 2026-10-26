@@ -1,7 +1,7 @@
 import "server-only";
 import { Contract, nativeToScVal, xdr, type Keypair } from "@stellar/stellar-sdk";
-import type { TxResult } from "@leash/sdk";
-import { fleetConfig, fleetRecord, leash, serverKey, type FleetId } from "./config";
+import type { TxResult } from "@tsuna/sdk";
+import { fleetConfig, fleetRecord, tsuna, serverKey, type FleetId } from "./config";
 import { isVaultBuild, uploadedWasm } from "./read";
 
 /** An error whose message is safe to show, with the HTTP status to answer. */
@@ -32,7 +32,7 @@ async function signers(fleet: FleetId): Promise<{ factory: string; fee: Keypair;
   const fee = serverKey(FEE_SECRET);
   const [a, b] = config.adminSecrets.map(serverKey);
   if (!fee || !a || !b) throw new FleetError("Fleet administration is not configured on this server.", 503);
-  const onChain = await leash().read<[string, string]>(config.factory, "admins");
+  const onChain = await tsuna().read<[string, string]>(config.factory, "admins");
   if (onChain[0] !== a.publicKey() || onChain[1] !== b.publicKey()) {
     throw new FleetError("The configured keys are not this factory's admins.", 503);
   }
@@ -41,7 +41,7 @@ async function signers(fleet: FleetId): Promise<{ factory: string; fee: Keypair;
 
 async function invoke(fleet: FleetId, fn: string, args: xdr.ScVal[]): Promise<TxResult> {
   const { factory, fee, admins } = await signers(fleet);
-  const client = leash();
+  const client = tsuna();
   return serialized(async () => {
     try {
       const result = await client.chain.invoke(fee, new Contract(factory).call(fn, ...args), admins, "factory");

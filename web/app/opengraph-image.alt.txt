@@ -1,1 +1,1 @@
-Leash — AI agents on a leash the chain holds. DeFi vaults on Stellar with on-chain limits. Testnet only.
+Tsuna — Your agents. The chain's rules. DeFi vaults on Stellar run by AI agents, with limits enforced on-chain. Testnet only.

@@ -25,9 +25,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000",
   ),
-  title: "Leash — AI agents on a leash the chain holds",
+  title: "Tsuna — Your agents. The chain's rules.",
   description:
-    "DeFi vaults on Stellar with on-chain limits. Agents propose trades; the vault checks every call and its effect on your funds.",
+    "Tsuna: DeFi vaults on Stellar run by AI agents, with limits enforced on-chain. Agents propose trades; the vault checks every call and its effect on your funds.",
 };
 
 export const viewport: Viewport = {

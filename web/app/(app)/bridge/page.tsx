@@ -3,8 +3,8 @@ import { PageHeader, PageLayout } from "@/components/ui/page-layout";
 import { BridgeTracker } from "./bridge-tracker";
 
 export const metadata: Metadata = {
-  title: "Deposit from Ethereum — Leash",
-  description: "Bring USDC from Ethereum Sepolia to a Leash vault on Stellar with CCTP.",
+  title: "Deposit from Ethereum — Tsuna",
+  description: "Bring USDC from Ethereum Sepolia to a Tsuna vault on Stellar with CCTP.",
 };
 
 export default function BridgePage() {

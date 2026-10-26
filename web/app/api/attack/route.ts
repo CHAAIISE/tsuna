@@ -1,9 +1,9 @@
 import { after } from "next/server";
-import { ATTACKS, ATTACK_IDS, executableHash } from "@leash/agent";
+import { ATTACKS, ATTACK_IDS, executableHash } from "@tsuna/agent";
 import { Contract, StrKey, rpc } from "@stellar/stellar-sdk";
 import { z } from "zod";
 import { attackRuns, prepareAttack } from "@/lib/stellar/attack-runs";
-import { leash } from "@/lib/stellar/client";
+import { tsuna } from "@/lib/stellar/client";
 import { contractName } from "@/lib/stellar/deployments";
 import { ApiError, failure, notFound } from "@/lib/stellar/http";
 import { resolveVaultId } from "@/lib/stellar/vaults";
@@ -23,7 +23,7 @@ export async function GET(request: Request): Promise<Response> {
     if (watch) {
       const address = await resolveVaultId(watch);
       if (!address) return notFound();
-      const client = leash();
+      const client = tsuna();
       const vault = client.vault(address);
       const [policy, halted] = await Promise.all([vault.policy(), vault.haltedProtocols()]);
       const protocols = await Promise.all(policy.protocols.map(async protocol => {
@@ -44,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
     if (input.action === "prepare-revoke") {
       const address = await resolveVaultId(input.vault);
       if (!address) return notFound();
-      const client = leash();
+      const client = tsuna();
       if (await client.vault(address).owner() !== input.account) throw new ApiError("Connect the wallet that created this vault.", 403);
       const { tx, simulation } = await client.chain.simulate(input.account, new Contract(address).call("revoke_session"), "vault");
       return Response.json({ xdr: rpc.assembleTransaction(tx, simulation).build().toXDR() });

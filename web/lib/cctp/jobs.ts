@@ -19,7 +19,7 @@ export interface BridgeJob {
 }
 
 /** Jobs live in one JSON file per server instance; only the most recent ones are kept. */
-const STORE = join(tmpdir(), "leash-bridge-jobs.json");
+const STORE = join(tmpdir(), "tsuna-bridge-jobs.json");
 const MAX_JOBS = 20;
 /** A run that has not reported for this long died with its process. */
 const STALE_MS = 35 * 60_000;

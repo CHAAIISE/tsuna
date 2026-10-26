@@ -1,4 +1,4 @@
-import type { JournalEntry } from "@leash/agent";
+import type { JournalEntry } from "@tsuna/agent";
 import { describe, expect, it } from "vitest";
 import { mergeTimeline, parseRuntimeError, runTimeline } from "./timeline";
 import type { TimelineAction } from "./types";

@@ -30,7 +30,7 @@ async function visit(page: Page, path: string, ready: string) {
   const response = await page.goto(path);
   expect(response?.status(), path).toBe(200);
   await expect(page.locator(ready).first()).toBeVisible();
-  await expect(page).toHaveTitle(/Leash/);
+  await expect(page).toHaveTitle(/Tsuna/);
 }
 
 async function explorerLinks(page: Page) {

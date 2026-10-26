@@ -32,7 +32,7 @@ describe("encoding", () => {
 
   it("converts DER signatures to valid low-S raw signatures", () => {
     const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
-    const message = Buffer.from("leash");
+    const message = Buffer.from("tsuna");
     for (let i = 0; i < 32; i += 1) {
       const raw = derToLowSRawSignature(new Uint8Array(sign("sha256", message, { key: privateKey, dsaEncoding: "der" })));
       expect(raw).toHaveLength(64);

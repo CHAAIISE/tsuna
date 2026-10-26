@@ -2,7 +2,7 @@ import "server-only";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { JournalEntry } from "@leash/agent";
+import type { JournalEntry } from "@tsuna/agent";
 
 /**
  * Append-only journal of the agent runs started from the app. A refused vault
@@ -14,7 +14,7 @@ export type JournalRecord =
   | { type: "entry"; runId: string; vault: string; entry: JournalEntry };
 
 const configured = process.env.LEASH_JOURNAL_FILE;
-let file = configured || path.join(/*turbopackIgnore: true*/ process.cwd(), ".leash", "agent-journal.jsonl");
+let file = configured || path.join(/*turbopackIgnore: true*/ process.cwd(), ".tsuna", "agent-journal.jsonl");
 let queue: Promise<unknown> = Promise.resolve();
 
 async function write(line: string): Promise<void> {
@@ -24,7 +24,7 @@ async function write(line: string): Promise<void> {
   } catch (error) {
     // Read-only deployments (serverless) still have a writable temp directory.
     if (configured || file.startsWith(tmpdir())) throw error;
-    file = path.join(tmpdir(), "leash-agent-journal.jsonl");
+    file = path.join(tmpdir(), "tsuna-agent-journal.jsonl");
     await appendFile(/*turbopackIgnore: true*/ file, line);
   }
 }

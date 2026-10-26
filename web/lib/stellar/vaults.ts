@@ -1,11 +1,11 @@
 import "server-only";
-import { LeashRefusal, presets, type CallPreset, type LeaderboardRow, type Policy, type PolicyCall, type VaultSummary } from "@leash/sdk";
+import { TsunaRefusal, presets, type CallPreset, type LeaderboardRow, type Policy, type PolicyCall, type VaultSummary } from "@tsuna/sdk";
 import { Address, nativeToScVal, rpc } from "@stellar/stellar-sdk";
 import { publisherAccount } from "@/lib/fleet/create";
 import { passkeyDeployment } from "@/lib/passkey/deployment";
 import { sponsoredContracts } from "@/lib/sponsor/stellar";
 import { decodeVaultEvent, type VaultEvent } from "./chain-events";
-import { cached, leash, rpcServer, typedError } from "./client";
+import { cached, tsuna, rpcServer, typedError } from "./client";
 import { assetSymbol, contractName, deployments, isFeatured } from "./deployments";
 import { sharesValue } from "./format";
 import type {
@@ -71,7 +71,7 @@ function row(summary: VaultSummary, policy: Policy | null, board: LeaderboardRow
  */
 export function listAgents(): Promise<AgentsResponse> {
   return cached("agents", LIST_TTL, async () => {
-    const client = leash();
+    const client = tsuna();
     const publisher = publisherAccount();
     const [all, board] = await Promise.all([client.vaults(), client.leaderboard()]);
     const summaries = all.filter(summary => isFeatured(summary.address) || (publisher !== null && summary.creator === publisher));
@@ -120,7 +120,7 @@ function callView(call: PolicyCall, adapters: { kind: string; protocol: string }
 /** Full state of one vault: positions, exposure, policy, roles and their live budgets. */
 export function getVault(address: string): Promise<VaultDetail> {
   return cached(`vault:${address}`, DETAIL_TTL, async () => {
-    const client = leash();
+    const client = tsuna();
     const vault = client.vault(address);
     const [{ rows }, summary, policy, health, pending] = await Promise.all([
       listAgents(), client.summary(address), vault.findPolicy(), vault.healthFactor(),
@@ -128,7 +128,7 @@ export function getVault(address: string): Promise<VaultDetail> {
     ]);
     const base = rows.find(entry => entry.address === address) ?? row(summary, policy, undefined);
     const positions = policy ? await vault.positions().catch((error: unknown) => {
-      if (error instanceof LeashRefusal) return [];
+      if (error instanceof TsunaRefusal) return [];
       throw error;
     }) : [];
     const roles = policy ? await vault.roles() : {};
@@ -241,7 +241,7 @@ async function scan(server: rpc.Server, filters: rpc.Api.EventFilter[], cursor: 
 export function vaultEvents(): Promise<VaultEvent[]> {
   return cached("events", EVENTS_TTL, async () => {
     const server = rpcServer();
-    const vaults = [...new Set([...await leash().vaultAddresses(), ...deployments.vaults.map(vault => vault.address)])].sort();
+    const vaults = [...new Set([...await tsuna().vaultAddresses(), ...deployments.vaults.map(vault => vault.address)])].sort();
     const key = vaults.join();
     if (log?.key !== key) log = { key, events: [], cursors: [] };
     const current = log;
@@ -270,10 +270,10 @@ export function vaultEvents(): Promise<VaultEvent[]> {
 
 async function usdcBalance(user: string): Promise<bigint | null> {
   try {
-    return await leash().read<bigint>(passkeyDeployment.usdc, "balance", [new Address(user).toScVal()]);
+    return await tsuna().read<bigint>(passkeyDeployment.usdc, "balance", [new Address(user).toScVal()]);
   } catch (error) {
     // A classic account without a USDC trustline cannot hold a balance.
-    if (error instanceof LeashRefusal) return null;
+    if (error instanceof TsunaRefusal) return null;
     throw error;
   }
 }
@@ -281,7 +281,7 @@ async function usdcBalance(user: string): Promise<bigint | null> {
 /** Shares, value and net deposits of `user` in every vault, plus their USDC balance. */
 export function getHoldings(user: string): Promise<HoldingsResponse> {
   return cached(`holdings:${user}`, DETAIL_TTL, async () => {
-    const client = leash();
+    const client = tsuna();
     const [{ rows }, events, balance, addresses] = await Promise.all([listAgents(), vaultEvents(), usdcBalance(user), client.vaultAddresses()]);
     const holdings = await Promise.all(addresses.map(async address => {
       const owned = await client.vault(address).sharesOf(user);
@@ -312,7 +312,7 @@ export function getHoldings(user: string): Promise<HoldingsResponse> {
 
 /** Simulates `deposit`/`withdraw` for `user`: the typed refusal, or null when the vault accepts it. */
 export async function preflight(address: string, action: "deposit" | "withdraw", user: string, amount: bigint) {
-  const client = leash();
+  const client = tsuna();
   try {
     await client.read(address, action, [new Address(user).toScVal(), nativeToScVal(amount, { type: "i128" })]);
     return null;

@@ -1,4 +1,4 @@
-import type { Attack, AttackResult } from "@leash/agent";
+import type { Attack, AttackResult } from "@tsuna/agent";
 
 export interface AttackRun {
   id: string;

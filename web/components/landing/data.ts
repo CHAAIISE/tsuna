@@ -122,7 +122,7 @@ export const proofs: ProofItem[] = [
   {
     outcome: "allowed",
     name: "Blend supply",
-    meaning: "40 USDC supplied to Blend through the leash. Approval back to zero afterwards.",
+    meaning: "40 USDC supplied to Blend through the vault. Approval back to zero afterwards.",
     txs: [{ hash: "1c6df3673431c154948c09b000f7161836433ea1692f25194ae60385db7331ca" }],
   },
   {
@@ -159,7 +159,7 @@ export const proofs: ProofItem[] = [
 export type Brick = { name: string; role: string; status: "testnet" | "tested" | "in progress" };
 
 export const bricks: Brick[] = [
-  { name: "Blend", role: "Lending pool the vault supplies to. The leash reads positions and the health factor straight from it.", status: "testnet" },
+  { name: "Blend", role: "Lending pool the vault supplies to. The vault reads positions and the health factor straight from it.", status: "testnet" },
   { name: "DeFindex", role: "Second USDC venue for the Prudent strategy. Only deposit and withdraw are allowlisted, never share transfers.", status: "testnet" },
   { name: "Soroswap", role: "Swaps for the Leverage strategy and for USDC arriving over CCTP. Every hop must be an allowed asset.", status: "testnet" },
   { name: "Aquarius", role: "XLM/USDC liquidity for the Liquidity strategy, with LP shares valued back to their underlying tokens.", status: "testnet" },

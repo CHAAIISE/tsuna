@@ -1,7 +1,7 @@
 import "server-only";
-import { knownVaults, resolveKeys, resolveVault, runAgent, signalOptions, STRATEGIES, type JournalEntry } from "@leash/agent";
+import { knownVaults, resolveKeys, resolveVault, runAgent, signalOptions, STRATEGIES, type JournalEntry } from "@tsuna/agent";
 import { randomUUID } from "node:crypto";
-import { invalidate, leash } from "./client";
+import { invalidate, tsuna } from "./client";
 import { fleet } from "./deployments";
 import { ApiError } from "./http";
 import { appendJournal } from "./journal-store";
@@ -80,7 +80,7 @@ export function prepareRun(vault: string, signalsBaseUrl: string): { task: () =>
   const task = async () => {
     try {
       const result = await runAgent({
-        vault, deployments: fleet, leash: leash(), keys, ...(signals ? { signals } : {}),
+        vault, deployments: fleet, tsuna: tsuna(), keys, ...(signals ? { signals } : {}),
         onEntry: entry => {
           run.entries.push(entry);
           appendJournal({ type: "entry", runId: run.id, vault, entry })

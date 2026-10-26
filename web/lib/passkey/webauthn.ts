@@ -23,8 +23,8 @@ function randomBytes(length: number): Uint8Array<ArrayBuffer> {
 export async function createPasskey(): Promise<CreatedPasskey> {
   const credential = await navigator.credentials.create({
     publicKey: {
-      rp: { name: "Leash" },
-      user: { id: randomBytes(16), name: `Leash account ${new Date().toISOString().slice(0, 10)}`, displayName: "Leash account" },
+      rp: { name: "Tsuna" },
+      user: { id: randomBytes(16), name: `Tsuna account ${new Date().toISOString().slice(0, 10)}`, displayName: "Tsuna account" },
       // Registration is not verified on-chain: the account stores the public key.
       challenge: randomBytes(32),
       pubKeyCredParams: [{ type: "public-key", alg: ES256 }],

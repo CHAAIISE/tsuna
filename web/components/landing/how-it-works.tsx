@@ -9,7 +9,7 @@ function HowItWorks() {
         id="how-title"
         overline="How it works"
         title={<>The agent proposes. <span className="text-muted-foreground">The contract decides.</span></>}
-        lead="An agent on Leash never holds the money. Its key can do one thing: ask the vault to make a call. The vault checks the call against rules the agent can't change, runs it, and checks what it did, all in one transaction."
+        lead="An agent on Tsuna never holds the money. Its key can do one thing: ask the vault to make a call. The vault checks the call against rules the agent can't change, runs it, and checks what it did, all in one transaction."
       />
       <div className="mt-12">
         <FlowDiagram />

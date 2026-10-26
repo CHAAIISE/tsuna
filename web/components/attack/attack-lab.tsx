@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { fetchJson } from "@/lib/hooks/fetch-json";
 import { useVault } from "@/lib/hooks/use-vault";
 import type { AttackCatalog, AttackRun } from "@/lib/stellar/attack-types";
-import { LeashRules } from "@/components/vault/rules";
+import { TsunaRules } from "@/components/vault/rules";
 import wall from "@/components/vault/wall.module.css";
 import { RevokeSession } from "./revoke-session";
 
@@ -43,7 +43,7 @@ export function AttackLab({ id }: { id: string }) {
       <p className="text-base text-muted-foreground">Each attack is a real transaction. The chain decides.</p>
     </header>
     <div role="tablist" aria-label="Attack lab sections" className="flex w-fit gap-1 rounded-full bg-secondary p-1 text-sm">
-      {([['attacks', 'Attack lab'], ['rules', 'Leash rules']] as const).map(([key, label]) => <button key={key} role="tab" id={`attack-tab-${key}`} aria-selected={tab === key} aria-controls={`attack-panel-${key}`} onClick={() => setTab(key)} className={`rounded-full border px-4 py-1.5 ${tab === key ? "border-input bg-card shadow-card" : "border-transparent text-muted-foreground"}`}>{label}</button>)}
+      {([['attacks', 'Attack lab'], ['rules', 'Tsuna rules']] as const).map(([key, label]) => <button key={key} role="tab" id={`attack-tab-${key}`} aria-selected={tab === key} aria-controls={`attack-panel-${key}`} onClick={() => setTab(key)} className={`rounded-full border px-4 py-1.5 ${tab === key ? "border-input bg-card shadow-card" : "border-transparent text-muted-foreground"}`}>{label}</button>)}
     </div>
     {tab === "attacks" ? <div id="attack-panel-attacks" role="tabpanel" aria-labelledby="attack-tab-attacks" className="space-y-6">
       <div className="rounded-xl border bg-muted px-6 py-4 text-sm text-muted-foreground">This lab uses the demo fleet: Prudent for four attacks, Leverage for the fake-token route. Results name the vault actually attacked. Only the prompt injection asks the model to choose a call; the other attacks are crafted transactions.</div>
@@ -82,7 +82,7 @@ export function AttackLab({ id }: { id: string }) {
     </div> : <div id="attack-panel-rules" role="tabpanel" aria-labelledby="attack-tab-rules" className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Rules and live budgets for {vault.data?.name ?? "the selected vault"}.</p><Button data-primary pending={vault.isFetching} onClick={() => void vault.refetch()}>{vault.error ? "Try reading rules again" : "Refresh rules"}</Button></div>
       {vault.error && <p role="alert" className="text-sm text-muted-foreground">{vault.data ? "The latest rules could not be read. The last available rules are shown below; refresh before relying on their budgets." : "The vault rules could not be read. Try reading them again."}</p>}
-      {vault.data ? <LeashRules vault={vault.data} /> : !vault.error && <p role="status" className="text-sm text-muted-foreground">Reading on-chain rules…</p>}
+      {vault.data ? <TsunaRules vault={vault.data} /> : !vault.error && <p role="status" className="text-sm text-muted-foreground">Reading on-chain rules…</p>}
     </div>}
   </div>;
 }

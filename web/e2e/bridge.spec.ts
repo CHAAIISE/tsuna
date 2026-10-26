@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { Leash } from "@leash/sdk";
+import { Tsuna } from "@tsuna/sdk";
 import { rpc } from "@stellar/stellar-sdk";
 import { createPublicClient, http } from "viem";
 import { sepolia } from "viem/chains";
@@ -59,7 +59,7 @@ test("CCTP burns Sepolia USDC and deposits the minted funds into a Stellar vault
     const initial = bridgeState.parse(await initialResponse.json());
     expect(initial.bridge.ready).toBe(true);
     expect(initial.job?.status, "Do not interfere with another bridge run").not.toBe("running");
-    const client = new Leash();
+    const client = new Tsuna();
     const vault = client.vault(initial.bridge.vault);
     const sharesBefore = await vault.sharesOf(initial.bridge.recipient);
     await page.goto("/bridge");

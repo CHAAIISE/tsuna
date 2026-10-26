@@ -104,13 +104,13 @@ function RoleCard({ role, nav }: { role: RoleView; nav: string | null }) {
   );
 }
 
-/** The leash: everything the vault checks on-chain, with live usage of each budget. */
-export function LeashRules({ vault }: { vault: VaultDetail }) {
+/** Tsuna rules: everything the vault checks on-chain, with live usage of each budget. */
+export function TsunaRules({ vault }: { vault: VaultDetail }) {
   const policy = vault.policy;
   if (!policy) return <p className="text-sm text-muted-foreground">The creator has not registered this vault&apos;s policy yet: the agent cannot act (PolicyMissing).</p>;
   const { limits } = policy;
   return (
-    <div className="space-y-6" data-testid="leash-rules">
+    <div className="space-y-6" data-testid="tsuna-rules">
       {policy.pendingEta && (
         <p className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm"><Clock aria-hidden="true" className="size-4 text-primary" />A loosening of these rules is waiting for its public timelock until {new Date(policy.pendingEta * 1000).toLocaleString("en-US")}. Tightening applies at once.</p>
       )}

@@ -44,7 +44,7 @@ test("five attacks produce five real on-chain refusals with receipts", async ({ 
     await page.screenshot({ path: `${output}attack-mobile.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
-    await page.getByRole("tab", { name: "Leash rules" }).click();
+    await page.getByRole("tab", { name: "Tsuna rules" }).click();
     await expect(page.getByRole("heading", { name: "Exposure caps", exact: true })).toBeVisible();
     await expect(page.getByText("Daily loss budget", { exact: true }).first()).toBeVisible();
     await expect(page.getByTestId("protocol-watch")).toContainText("Pinned code matches");

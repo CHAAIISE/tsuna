@@ -12,7 +12,7 @@ import { usePasskeyAccount } from "@/lib/hooks/use-passkey-account";
 import { useHoldings } from "@/lib/hooks/use-vault";
 import { formatAge, formatSharePrice, formatUsdc, shortAddress } from "@/lib/stellar/format";
 import type { AgentRow, HoldingView } from "@/lib/stellar/types";
-import { LeashBadge } from "./leash-badge";
+import { RulesBadge } from "./rules-badge";
 import { DrawdownValue, ReturnValue } from "./metric";
 import { Sparkline } from "./sparkline";
 
@@ -109,7 +109,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
               <th scope="col" className="px-3 py-3 font-normal">Your deposit</th>
               <SortHeader label="Age" sortKey="age" sort={sort} onSort={onSort} />
               <th scope="col" className="px-3 py-3 font-normal">Snapshot</th>
-              <th scope="col" className="py-3 pr-6 pl-3 font-normal">Leash</th>
+              <th scope="col" className="py-3 pr-6 pl-3 font-normal">Rules</th>
             </tr>
           </thead>
           <tbody>
@@ -135,7 +135,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
                 <td className="px-3 py-3"><Sparkline points={row.snapshots} label={`${row.name} share price`} /></td>
                 <td className="py-3 pr-6 pl-3">
                   <span className="flex items-center justify-between gap-3">
-                    <LeashBadge rules={row.rules} />
+                    <RulesBadge rules={row.rules} />
                     {signedIn && (
                       <Button asChild size="sm" variant="outline" className="relative z-10 hidden group-hover:inline-flex group-focus-within:inline-flex">
                         <Link href={`/agents/${row.id}#deposit`}>Deposit</Link>
@@ -157,7 +157,7 @@ function AgentTable({ title, rows, holdings, signedIn, sort, onSort, empty }: {
               <div><dt className="text-muted-foreground">Drawdown</dt><dd><DrawdownValue bps={row.worstDrawdownBps} /></dd></div>
               <div><dt className="text-muted-foreground">Age</dt><dd className="tabular-nums">{row.since ? formatAge(row.since) : "—"}</dd></div>
             </dl>
-            <div className="flex items-center justify-between gap-3"><Sparkline points={row.snapshots} label={`${row.name} share price`} /><LeashBadge rules={row.rules} /></div>
+            <div className="flex items-center justify-between gap-3"><Sparkline points={row.snapshots} label={`${row.name} share price`} /><RulesBadge rules={row.rules} /></div>
           </li>
         ))}
       </ul>

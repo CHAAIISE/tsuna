@@ -1,6 +1,6 @@
 import "server-only";
 import { Keypair } from "@stellar/stellar-sdk";
-import { Leash, parseDeployments } from "@leash/sdk";
+import { Tsuna, parseDeployments } from "@tsuna/sdk";
 import { z } from "zod";
 import testnet from "../../../deployments/testnet.json" with { type: "json" };
 import agentFile from "../../../deployments/agent.testnet.json" with { type: "json" };
@@ -36,11 +36,11 @@ const fleetSchema = z.object({
 export const deployments = parseDeployments(testnet);
 export const fleetRecord = fleetSchema.parse(fleetFile);
 
-let client: Leash | undefined;
+let client: Tsuna | undefined;
 
 /** Shared SDK client over the testnet deployments (reads are simulations, no key involved). */
-export function leash(): Leash {
-  client ??= new Leash({ deployments, ...(process.env.STELLAR_RPC_URL ? { rpcUrl: process.env.STELLAR_RPC_URL } : {}) });
+export function tsuna(): Tsuna {
+  client ??= new Tsuna({ deployments, ...(process.env.STELLAR_RPC_URL ? { rpcUrl: process.env.STELLAR_RPC_URL } : {}) });
   return client;
 }
 

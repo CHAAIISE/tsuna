@@ -1,8 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { ATTACKS, runAttack, type AttackId } from "@leash/agent";
+import { ATTACKS, runAttack, type AttackId } from "@tsuna/agent";
 import { Keypair } from "@stellar/stellar-sdk";
-import { invalidate, leash } from "./client";
+import { invalidate, tsuna } from "./client";
 import { fleet } from "./deployments";
 import { ApiError } from "./http";
 import { reserveSource } from "./source-lock";
@@ -22,7 +22,7 @@ export async function prepareAttack(id: AttackId): Promise<{ run: AttackRun; tas
   try {
     const record = fleet.vaults.find(vault => vault.id === ATTACKS[id].vault);
     if (!record) throw new ApiError("The attack's demo vault is not deployed.", 404);
-    const vault = leash().vault(record.address);
+    const vault = tsuna().vault(record.address);
     if (await vault.session() !== member.publicKey()) throw new ApiError("This session is revoked or rotated. The creator must restore it before replaying attacks.", 409);
     if (await vault.paused()) throw new ApiError("This demo vault is paused. Restore the crash scenario before launching attacks.", 409);
     const run: AttackRun = { id: randomUUID(), attack: id, status: "running", result: null, error: null };
@@ -31,7 +31,7 @@ export async function prepareAttack(id: AttackId): Promise<{ run: AttackRun; tas
       run,
       task: async () => {
         try {
-          run.result = await runAttack(id, { deployments: fleet, leash: leash(), sessionKey: member, attacker: Keypair.fromSecret(attacker) });
+          run.result = await runAttack(id, { deployments: fleet, tsuna: tsuna(), sessionKey: member, attacker: Keypair.fromSecret(attacker) });
           run.status = "finished";
         } catch (error) {
           console.error(error instanceof Error ? error.message : "Attack failed");

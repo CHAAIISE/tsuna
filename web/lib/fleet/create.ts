@@ -1,9 +1,9 @@
 import "server-only";
 import { Address, Contract, nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
-import { TESTNET, composePolicy, encodePolicy, presets, type CallPresetId, type Policy, type TxResult, type Venues } from "@leash/sdk";
+import { TESTNET, composePolicy, encodePolicy, presets, type CallPresetId, type Policy, type TxResult, type Venues } from "@tsuna/sdk";
 import { z } from "zod";
 import { FleetError } from "./admin";
-import { deployments, leash, serverKey } from "./config";
+import { deployments, tsuna, serverKey } from "./config";
 import {
   DAILY_LOSS_OPTIONS, DRAWDOWN_OPTIONS, EXPOSURE_OPTIONS, PROTOCOL_CAP_BPS, STRATEGIES,
   type AssetSymbol, type CreateChoice, type PresetInfo, type Strategy,
@@ -102,7 +102,7 @@ export function publishAgent(choice: CreateChoice): Promise<Published> {
     return Promise.reject(new FleetError("Publishing is not configured on this server.", 503));
   }
   const { policy, adapters } = composeChoice(choice);
-  const client = leash();
+  const client = tsuna();
   const run = async (operation: xdr.Operation, source: "factory" | "registry" | "vault"): Promise<TxResult> => {
     const result = await client.chain.invoke(fee, operation, [creator], source).catch((error: unknown) => {
       const refusal = client.decodeError(error);

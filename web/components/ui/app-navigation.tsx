@@ -29,7 +29,6 @@ function AppNavigation() {
         </Link>
         <div className="ml-auto flex items-center gap-3 lg:order-last">
           <Badge variant="secondary" title="Every balance here is test USDC with no real value" data-testid="network-badge">
-            <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
             <span className="sm:hidden">Testnet</span>
             <span className="hidden sm:inline">Stellar testnet</span>
           </Badge>

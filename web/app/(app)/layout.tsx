@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { AppNavigation } from "@/components/ui/app-navigation";
-import { OnboardingProgress } from "@/components/onboarding/onboarding-progress";
 import { QueryProvider } from "@/lib/hooks/query-provider";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -8,7 +7,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <QueryProvider>
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-card focus:p-4">Skip to content</a>
       <AppNavigation />
-      <OnboardingProgress />
       {children}
     </QueryProvider>
   );

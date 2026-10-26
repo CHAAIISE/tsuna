@@ -17,7 +17,6 @@ test("five attacks produce five real on-chain refusals with receipts", async ({ 
   await test.step("06 · submit five attacks and inspect each failed on-chain receipt", async () => {
     await page.goto("/agents/prudent/attack");
     await expect(page.getByRole("heading", { name: "Try to break it" })).toBeVisible();
-    await expect(page.getByTestId("onboarding-steps")).toBeVisible();
     for (const [id, error] of scenarios) {
       await test.step(id, async () => {
         const card = page.getByTestId(`attack-${id}`);

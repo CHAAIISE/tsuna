@@ -169,7 +169,7 @@ export function CreateFlow({ presets, creator }: { presets: Record<string, Prese
                   </span>
                   <span className="text-sm text-muted-foreground">{item.summary}</span>
                   <span className="mt-auto flex flex-wrap gap-1.5">
-                    {item.venues.map(venue => <Badge key={venue.id} variant="secondary" className="px-2 py-1 text-caption">{venue.adapter}</Badge>)}
+                    {item.venues.map(venue => <Badge key={venue.id} variant="secondary">{venue.adapter}</Badge>)}
                   </span>
                 </label>
               ))}

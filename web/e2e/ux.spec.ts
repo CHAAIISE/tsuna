@@ -18,13 +18,11 @@ const screens = [
 
 async function guidedScreen(page: Page) {
   await expect(page.locator("[data-primary]:visible")).toHaveCount(1);
-  await expect(page.getByTestId("onboarding-steps")).toHaveCount(1);
-  await expect(page.getByTestId("onboarding-steps")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-  test(`a new visitor has one next action and onboarding guidance at ${viewport.width}px`, async ({ page }) => {
+  test(`a new visitor has one next action at ${viewport.width}px`, async ({ page }) => {
     test.setTimeout(600_000);
     await page.setViewportSize(viewport);
     const screenshots = resolve(process.env.LEASH_SCREENSHOT_DIR ?? test.info().outputPath("screenshots"));
@@ -35,7 +33,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
         await expect(page.locator(screen.ready).first()).toBeVisible();
         if (screen.id === "agents") await expect(page.getByTestId("agents-count")).not.toHaveText("—");
         await guidedScreen(page);
-        await expect(page.getByTestId("onboarding-steps").locator('[aria-current="step"]')).toContainText("Create your passkey");
+        if (screen.id === "onboarding") await expect(page.getByTestId("onboarding-steps").locator('[aria-current="step"]')).toContainText("Create your passkey");
         await page.screenshot({ path: resolve(screenshots, `ux-${screen.id}-apres-${viewport.width === 1440 ? "desktop" : "mobile"}.png`), fullPage: true });
       });
     }
@@ -80,7 +78,6 @@ test("a newly created account is guided to funds instead of an unusable deposit"
 
   for (const path of ["/agents", "/agents/prudent", "/portfolio"]) {
     await page.goto(path);
-    await expect(page.getByTestId("onboarding-steps").locator('[aria-current="step"]')).toContainText("Get test USDC");
     await guidedScreen(page);
     if (path !== "/portfolio") await expect(page.locator("[data-primary]")).toHaveAttribute("href", "/onboarding");
   }

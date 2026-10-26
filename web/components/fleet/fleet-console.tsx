@@ -178,7 +178,7 @@ export function FleetConsole({ initial }: { initial: FleetState }) {
             <CardDescription>Code read from each vault&apos;s instance entry and resolved through the factory.</CardDescription>
           </div>
           {vaults.length > 0 && (uniform
-            ? <Badge variant="success" data-testid="fleet-proof">Same build on all {vaults.length} vaults</Badge>
+            ? <Badge variant="success" data-testid="fleet-proof">{vaults.length === 1 ? "On the current build" : vaults.length === 2 ? "Both vaults on the same build" : `All ${vaults.length} vaults on the same build`}</Badge>
             : <Badge variant="secondary">{onCurrent} of {vaults.length} on the current build</Badge>)}
         </CardHeader>
         {vaults.length === 0 ? (

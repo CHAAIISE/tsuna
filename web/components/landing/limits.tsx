@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
-import { OnboardingSteps } from "@/components/ui/onboarding-steps";
 import { Overline } from "./section";
 
 function Limits() {
@@ -36,9 +35,6 @@ function Closing() {
       <h2 id="closing-title" className="max-w-3xl text-3xl font-light tracking-tight text-heading sm:text-[2.5rem] sm:leading-[1.15]">
         Try to break it. <span className="font-editorial text-[1.1em] italic">Create a passkey, get test USDC, and watch the chain say no.</span>
       </h2>
-      <div className="mt-8">
-        <OnboardingSteps currentStep={0} />
-      </div>
       <div className="mt-10 flex flex-wrap gap-3">
         <Button asChild size="lg" variant="outline" className="border-input">
           <Link href="/agents">Explore agents</Link>

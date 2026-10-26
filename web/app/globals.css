@@ -33,6 +33,7 @@
 @theme inline {
   --font-sans: var(--font-inter);
   --font-editorial: var(--font-cormorant);
+  --font-display: var(--font-cinzel);
   --font-overline: var(--font-cormorant-sc);
   --font-mono: var(--font-jetbrains);
   --color-background: var(--background);

@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Cormorant_SC, Inter, JetBrains_Mono } from "next/font/google";
+import { Cinzel, Cormorant_Garamond, Cormorant_SC, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const display = Cinzel({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-cinzel" });
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
   variable: "--font-cormorant",
 });
 const overline = Cormorant_SC({
@@ -34,7 +36,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${cormorant.variable} ${overline.variable} ${mono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${display.variable} ${cormorant.variable} ${overline.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

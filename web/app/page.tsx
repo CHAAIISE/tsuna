@@ -9,19 +9,21 @@ import { ProductPreview } from "@/components/landing/product-preview";
 
 export default function Home() {
   return (
-    <div className="mx-auto min-h-screen max-w-site border-x">
-      <LandingHeader />
-      <main>
-        <Hero />
-        <ProductPreview />
-        <Problem />
-        <HowItWorks />
-        <Proof />
-        <BuiltOn />
-        <Limits />
-        <Closing />
-      </main>
-      <LandingFooter />
-    </div>
+    <>
+      <Hero />
+      <div className="mx-auto min-h-screen max-w-site border-x">
+        <LandingHeader />
+        <main>
+          <ProductPreview />
+          <Problem />
+          <HowItWorks />
+          <Proof />
+          <BuiltOn />
+          <Limits />
+          <Closing />
+        </main>
+        <LandingFooter />
+      </div>
+    </>
   );
 }

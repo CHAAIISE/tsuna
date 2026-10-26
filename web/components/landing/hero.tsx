@@ -1,97 +1,49 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { cn } from "cn";
-import { explorerTx, metamaskReport, proofs } from "./data";
-import { TxLink } from "./section";
+import { ArrowDown } from "lucide-react";
 
-const feed = ["Blend supply", "CallNotAllowed", "DestinationNotVault"].flatMap(name =>
-  proofs.filter(item => item.name === name),
-);
-
-function GridLines() {
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden lg:block">
-      <div className="absolute inset-y-0 left-1/3 border-l border-dashed" />
-      <div className="absolute inset-y-0 left-2/3 border-l border-dashed" />
-    </div>
-  );
-}
-
-function TestnetFeed() {
-  return (
-    <figure className="rounded-xl border bg-card p-2 shadow-editorial">
-      <figcaption className="flex items-center justify-between px-4 pt-3 pb-4 text-caption text-muted-foreground">
-        <span>Three calls to one vault</span>
-        <span>Stellar testnet</span>
-      </figcaption>
-      <ol className="space-y-2">
-        {feed.map(item => {
-          const refused = item.outcome === "refused";
-          return (
-            <li
-              key={item.name}
-              className={cn(
-                "rounded-lg px-4 py-3",
-                refused ? "border-l-[3px] border-destructive bg-destructive-soft" : "bg-muted",
-              )}
-            >
-              <p className="flex items-center justify-between gap-3 text-sm">
-                <span className={cn("font-medium", refused ? "text-destructive" : "text-heading")}>
-                  {refused ? `Refused · ${item.name}` : `Allowed · ${item.name}`}
-                </span>
-                {!refused && <span className="size-2 rounded-full bg-success" aria-hidden="true" />}
-              </p>
-              <p className="mt-1 text-caption leading-relaxed text-muted-foreground">{item.meaning}</p>
-              <div className="mt-2">
-                {item.txs.map(tx => <TxLink key={tx.hash} hash={tx.hash} href={explorerTx(tx.hash)} />)}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </figure>
-  );
-}
+const docsUrl = "https://github.com/CHAAIISE/leash#readme";
 
 function Hero() {
   return (
-    <section aria-labelledby="hero-title" className="relative overflow-hidden px-6 pt-16 pb-20 sm:px-12 sm:pt-24 lg:pt-32 lg:pb-28">
-      <GridLines />
-      <div className="relative grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_23rem] lg:gap-16">
-        <div>
-          <a
-            href={metamaskReport}
-            target="_blank"
-            rel="noreferrer"
-            className="group inline-flex flex-wrap items-baseline gap-x-2 text-sm"
-          >
-            <span className="font-medium text-heading">$204,000 drained from one AI wallet</span>
-            <span className="text-muted-foreground">in May 2026</span>
-            <span className="text-muted-foreground underline-offset-4 group-hover:text-primary group-hover:underline">
-              MetaMask report ↗
-            </span>
-          </a>
-          <h1
-            id="hero-title"
-            className="mt-8 text-page font-light tracking-tight text-heading sm:text-hero"
-          >
-            AI agents can be tricked.{" "}
-            <span className="text-muted-foreground">Your vault can&apos;t.</span>
-          </h1>
-          <p className="mt-7 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            Agents propose trades; the chain checks every one. A hijacked agent hits a wall, not your funds.
-          </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Button asChild size="lg" data-primary>
-              <Link href="/agents">Explore agents</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="border-input">
-              <a href="#how-it-works">How the leash works</a>
-            </Button>
-          </div>
-        </div>
-        <TestnetFeed />
+    <section
+      aria-labelledby="hero-title"
+      className="relative flex min-h-svh flex-col bg-card px-6 py-6 sm:px-10 sm:py-7"
+    >
+      <header className="flex items-center justify-between">
+        <a
+          href={docsUrl}
+          className="font-display text-sm tracking-[0.18em] text-muted-foreground uppercase transition-colors hover:text-heading"
+        >
+          Docs
+        </a>
+        <Link
+          href="/agents"
+          data-primary
+          className="rounded-sm border border-destructive/70 px-5 py-2.5 font-display text-sm tracking-[0.14em] text-destructive uppercase transition-colors hover:bg-destructive hover:text-white sm:px-8 sm:py-3"
+        >
+          Launch app
+        </Link>
+      </header>
+
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
+        <h1
+          id="hero-title"
+          className="font-display text-[clamp(4rem,15vw,14rem)] leading-none font-medium tracking-[0.16em] text-foreground uppercase [padding-left:0.16em]"
+        >
+          Leash
+        </h1>
+        <p className="mt-10 font-editorial text-xl text-muted-foreground italic sm:text-2xl">
+          Your agents. The chain&apos;s rules.
+        </p>
       </div>
+
+      <a
+        href="#product"
+        className="mx-auto flex flex-col items-center gap-2 font-display text-xs tracking-[0.3em] text-muted-foreground/70 uppercase transition-colors hover:text-heading"
+      >
+        Scroll
+        <ArrowDown className="size-4" aria-hidden="true" />
+      </a>
     </section>
   );
 }
